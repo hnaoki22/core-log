@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #5B4FD6;
+  --color-primary-light: #EDE9FF;
+  --color-accent: #FF8C42;
+  --color-success: #22C55E;
+  --color-text: #1E1B3A;
+  --color-text-sub: #8B85A8;
+  --color-background: #F8F7FF;
+  --color-card: #FFFFFF;
+  --color-border: #E8E5F0;
+}
+
+@layer base {
+  * {
+    font-family: 'Noto Sans JP', sans-serif;
+  }
+
+  body {
+    @apply bg-[#F8F7FF] text-[#1E1B3A];
+  }
+}
+
+@layer components {
+  .safe-area-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .gradient-purple {
+    background: linear-gradient(135deg, #5B4FD6 0%, #7C6FEA 100%);
+  }
+
+  .gradient-orange {
+    background: linear-gradient(135deg, #FF8C42 0%, #FFB380 100%);
+  }
+
+  .card {
+    @apply bg-white rounded-lg shadow-sm;
+  }
+
+  .pill {
+    @apply rounded-full px-3 py-1 text-sm font-medium;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

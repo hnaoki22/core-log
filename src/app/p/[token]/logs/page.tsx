@@ -1,0 +1,126 @@
+"use client";
+
+import { useParams } from "next/navigation";
+import { getParticipantByToken, energyEmoji } from "@/lib/mock-data";
+import { BottomNav } from "A/components/BottomNav";
+import { useState } from "react";
+
+export default function LogsPage() {
+  const params = useParams();
+  const token = params.token as string;
+  const participant = getParticipantByToken(token);
+
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  if (!participant) {
+    return (
+      <div className="min-h-screen bg-[#F8F7FF] flex items-center justify-center p-6">
+        <div className="text-center">
+          <p className="text-[#8B85A8]">参加者が見つかりません</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F8F7FF] pb-24">
+      {/* Header */}
+      <div className="gradient-purple text-white p-6 rounded-b-3xl">
+        <div className="max-w-md mx-auto">
+          <h1 className="text-2xl font-bold">📋 ログ一覧</h1>
+        </div>
+      </div>
+
+      <div className="max-w-md mx-auto px-6 pt-6">
+        <div className="space-y-2">
+          {participant.logs.map((log) => (
+            <div key={log.id} className="bg-white rounded-xl overflow-hidden shadow-sm">
+              <button
+                onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
+                className="w-full p-4 flex gap-3 hover:bg-[#F8F7FF] transition-colors text-left"
+              >
+                {/* Date Circle */}
+                <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-white text-sm font-bold ${
+                  log.hasFeedback ? "bg-[#FF8C42]" : "bg-[#5B4FD6]"
+                }`}>
+                  <div className="text-center">
+                    <div className="font-bold">{log.dayNum}</div>
+                    <div className="text-xs opacity-80">{log.dayOfWeek}</div>
+                  </div>
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-[#1E1B3A] font-medium truncate">
+                    {log.morningIntent || "(未記入)"}
+                  </p>
+                  <p className="text-xs text-[#8B85A8] mt-1">{log.date}</p>
+                  <div className="flex gap-2 mt-2">
+                    {log.energy && <span className="text-lg">{energyEmoji[log.energy]}</span>}
+                    {log.status === "morning_only" && (
+                      <span className="inline-block px-2 py-0.5 bg-[#EDE9FF] text-[#5B4FD6] text-xs rounded font-medium">
+                        朝のみ
+                      </span>
+                    )}
+                    {log.status === "complete" && (
+                      <span className="inline-block px-2 py-0.5 bg-[#E0F7E0] text-[#22C55E] text-xs rounded font-medium">
+                        完了
+                      </span>
+                    )}
+                    {log.hasFeedback && (
+                      <span className="inline-block px-2 py-0.5 bg-[#FFE8D0] text-[#FF8C42] text-xs rounded font-medium">
+                        FB済
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex-shrink-0 flex items-center justify-center w-6 h-6 text-[#8B85A8]">
+                  {expandedId === log.id ? "▼" : "▶"}
+                </div>
+              </button>
+
+              {/* Expanded View */}
+              {expandedId === log.id && (
+                <div className="border-t border-[#E8E5F0] p-4 bg-[#F8F7FF]/50 space-y-4">
+                  {/* Morning Intent */}
+                  <div>
+                    <p className="text-xs font-semibold text-[#8B85A8] mb-1">朝の意図</p>
+                    <p className="text-sm text-[#1E1B3A]">
+                      {log.morningIntent || "(未記入)"}
+                    </p>
+                  </div>
+
+                  {/* Evening Insight */}
+                  {log.eveningInsight && (
+                    <div>
+                      <p className="text-xs font-semibold text-[#8B85A8] mb-1">夜の振り返り</p>
+                      <p className="text-sm text-[#1E1B3A]">{log.eveningInsight}</p>
+                    </div>
+                  )}
+
+                  {/* Energy */}
+                  {log.energy && (
+                    <div>
+                      <p className="text-xs font-semibold text-[#8B85A8] mb-1">エネルギー</p>
+                      <p className="text-lg">{energyEmoji[log.energy]}</p>
+                    </div>
+                  )}
+
+                  {/* Feedback Indicator */}
+                  {log.hasFeedback && (
+                    <div className="bg-[#FFE8D0] border border-[#FF8C42] p-3 rounded-lg">
+                      <p className="text-xs font-semibold text-[#FF8C42] mb-1">フィードバック付き</p>
+                      <p className="text-sm text-[#8B85A8]">マネージャーからのフィードバックがあります</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <BottomNav active="logs" baseUrl={`/p/${token}`} />
+    </div>
+  );
+}
