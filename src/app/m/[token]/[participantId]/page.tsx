@@ -1,15 +1,20 @@
-// Participant Detail Page
-// Shows participant entries, energy chart, latest mission, and feedback
+// Participant Detail Page (Manager View)
+// Shows individual participant's log entries
 
-import { suspense } from "react";
-import AutorCreatedFields from "@/components/AutorCreatedFields";
-import Sidebar from "@/components/Sidebar";
-import { HeaderBack } from "@/components/Header";
-import { FeedbackCard } from "@/components/FeedbackCard";
-import { MissionCard } from "A/components/MissionCard";
-import { EntryCard } from "@/components/EntryCard";
-import { EnergyLineChart } from "@/components/EnergyLineChart";
-import { getLogsByToken, getFeedbacksByToken, getMissionsByToken } from "@/lib/notion";
+import Link from "next/link";
+import { getLogsByParticipant, getMissionsByParticipant, NotionLogEntry } from "@/lib/notion";
+
+type MissionEntry = {
+  id: string;
+  title: string;
+  participantName: string;
+  setDate: string;
+  deadline: string;
+  status: string;
+  purpose: string | null;
+  reviewMemo: string | null;
+  finalReview: string | null;
+};
 
 type Params = {
   params: {
@@ -18,52 +23,98 @@ type Params = {
   };
 };
 
-async function getData(token: string, participantId: string) {
-  const [logs, feedbacks, missions] = await Promise.all([
-    getLogsByToken(token),
-    getFeedbacksByToken(token),
-    getMissionsByToken(token),
-  ]);
-
-  return { logs, feedbacks, missions };
-}
-
-export default async function Page({ params }: Params) {
+export default async function ParticipantDetailPage({ params }: Params) {
   const { token, participantId } = params;
-  const { logs, feedbacks, missions } = await getData(token, participantId);
+  const participantName = decodeURIComponent(participantId);
 
-  const entriesPerRow = 3;
-  const feedbackDisplay = feedbacks[0];
-  const latestMission = missions.filter((m) => m.status === "in-progress").at(0);
+  let logs: NotionLogEntry[] = [];
+  let missions: MissionEntry[] = [];
+
+  try {
+    const [fetchedLogs, fetchedMissions] = await Promise.all([
+      getLogsByParticipant(participantName),
+      getMissionsByParticipant(participantName),
+    ]);
+    logs = fetchedLogs;
+    missions = fetchedMissions as MissionEntry[];
+  } catch (e) {
+    console.error("Failed to fetch data:", e);
+  }
+
+  const energyMap: Record<string, string> = {
+    excellent: "🔥", good: "😊", okay: "😐", low: "😟",
+  };
 
   return (
-    <div className="flex h-screen">
-      <Sidebar />
-      <div className="flex-1 overflow-y-auto">
-        <HeaderBack />
-        <div className="p-4 space-y-8">
-          <section className="space-y-4">
-            <h2 className="text-sm font-semibold text-gray-400">綄続码贵 </h2>
-            <EnergyLineChart data={logs} />
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b px-4 py-3 flex items-center gap-3">
+        <Link
+          href={`/m/${token}`}
+          className="text-blue-600 hover:text-blue-800 text-sm"
+        >
+          ← 一覧に戻る
+        </Link>
+        <h1 className="text-lg font-bold text-gray-800">{participantName}</h1>
+      </header>
+
+      <main className="p-4 space-y-6 max-w-2xl mx-auto">
+        {/* Active Mission */}
+        {missions.length > 0 && (
+          <section className="bg-white rounded-xl p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-gray-500 mb-3">現在のミッション</h2>
+            {missions.slice(0, 1).map((m: MissionEntry) => (
+              <div key={m.id} className="border-l-4 border-blue-500 pl-3">
+                <p className="font-medium text-gray-800">{m.title}</p>
+                <p className="text-xs text-gray-500 mt-1">{m.status}</p>
+              </div>
+            ))}
           </section>
-          <section className="space-y-4 pt-4 border-t ">
-            <h2 className="text-sm font-semibold text-gray-400">忥計畵ゟとく </h2>
-            { latestMission && <MissionCard data={latestMission} /> }
-          </section>
-          <section className="space-y-4 pt-4 border-t">
-            <h2 className="text-sm font-semibold text-gray-400">問拘 </h2>
-            { feedbackDisplay && <FeedbackCard data={feedbackDisplay} /> }
-          </section>
-          <section className="space-y-4 pt-4 border-t pb-8">
-            <h2 className="text-sm font-semibold text-gray-400">Logs </h2>
-            <div className="grid grid-cols-3 gap-4">
-              {logs.slice(0, entriesPerRow).map((entry) => (
-                <EntryCard key={entry.id} data={entry} />
+        )}
+
+        {/* Log Entries */}
+        <section className="bg-white rounded-xl p-4 shadow-sm">
+          <h2 className="text-sm font-semibold text-gray-500 mb-3">日報一覧</h2>
+          {logs.length === 0 ? (
+            <p className="text-gray-400 text-sm">まだ日報がありません</p>
+          ) : (
+            <div className="space-y-3">
+              {logs.map((entry: NotionLogEntry) => (
+                <div key={entry.id} className="border rounded-lg p-3">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-gray-700">
+                      {entry.date}
+                    </span>
+                    <span className="text-lg">
+                      {entry.energy ? energyMap[entry.energy] || "😐" : "😐"}
+                    </span>
+                  </div>
+                  {entry.morningIntent && (
+                    <p className="text-xs text-gray-600">
+                      <span className="font-semibold">朝の意図：</span>
+                      {entry.morningIntent}
+                    </p>
+                  )}
+                  {entry.eveningInsight && (
+                    <p className="text-xs text-gray-600 mt-1">
+                      <span className="font-semibold">気づき：</span>
+                      {entry.eveningInsight}
+                    </p>
+                  )}
+                  {entry.managerComment && (
+                    <div className="mt-2 bg-blue-50 rounded p-2">
+                      <p className="text-xs text-blue-700">
+                        <span className="font-semibold">上司コメント：</span>
+                        {entry.managerComment}
+                      </p>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
-          </section>
-        </div>
-      </div>
+          )}
+        </section>
+      </main>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 // Add manager comment to a participant's record
 
 import { NextRequest, NextResponse } from "next/server";
-import { addManagerComment } from "A/lib/notion";
+import { addManagerComment } from "@/lib/notion";
 
 export async function POST(request: NextRequest) {
   const useMock = !process.env.NOTION_API_TOKEN;

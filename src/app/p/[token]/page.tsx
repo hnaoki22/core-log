@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { getParticipantByToken, energyEmoji } from "@/lib/mock-data";
-import { BottomNav } from "A/components/BottomNav";
+import { BottomNav } from "@/components/BottomNav";
 import Link from "next/link";
 
 export default function ParticipantHome() {

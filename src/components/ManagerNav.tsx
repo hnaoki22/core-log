@@ -26,5 +26,5 @@ export function ManagerNav({ title, backHref }: ManagerNavProps) {
         </div>
       </div>
     </nav>
-  
- "Š
+  );
+}

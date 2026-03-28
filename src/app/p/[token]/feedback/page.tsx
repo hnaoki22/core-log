@@ -92,6 +92,5 @@ export default function FeedbackPage() {
 
       <BottomNav active="feedback" baseUrl={`/p/${token}`} />
     </div>
-  
-  
- "‘óÒ§Ð
+  );
+}
