@@ -299,10 +299,31 @@ export async function hasLoggedToday(participantName: string, todayStr: string):
   }
 }
 
+// ===== Mission Types =====
+export type MissionEntry = {
+  id: string;
+  title: string;
+  participantName: string;
+  setDate: string;
+  deadline: string;
+  status: string;
+  purpose: string | null;
+  reviewMemo: string | null;
+  finalReview: string | null;
+};
+
+export type MissionComment = {
+  id: string;
+  authorName: string;
+  authorRole: "manager" | "participant";
+  body: string;
+  createdAt: string;
+};
+
 /**
  * Get missions for a participant
  */
-export async function getMissionsByParticipant(participantName: string) {
+export async function getMissionsByParticipant(participantName: string): Promise<MissionEntry[]> {
   if (!MISSION_DB_ID) return [];
 
   try {
@@ -312,6 +333,7 @@ export async function getMissionsByParticipant(participantName: string) {
         property: "参加者名",
         select: { equals: participantName },
       },
+      sorts: [{ property: "設定日", direction: "descending" }],
     });
 
     return response.results.map((page) => {
@@ -331,6 +353,138 @@ export async function getMissionsByParticipant(participantName: string) {
     });
   } catch (error) {
     console.error("Error fetching missions:", error);
+    return [];
+  }
+}
+
+/**
+ * Create a new mission (manager action)
+ */
+export async function createMission(
+  participantName: string,
+  title: string,
+  purpose: string,
+  deadline: string,
+  setDate: string
+): Promise<string | null> {
+  if (!MISSION_DB_ID) return null;
+
+  try {
+    const properties: Record<string, unknown> = {
+      "ミッション名": { title: [{ text: { content: title } }] },
+      "参加者名": { select: { name: participantName } },
+      "設定日": { date: { start: setDate } },
+      "達成期限": { date: { start: deadline } },
+      "ステータス": { select: { name: "進行中" } },
+    };
+
+    if (purpose) {
+      properties["背景・目的"] = { rich_text: [{ text: { content: purpose } }] };
+    }
+
+    const response = await notion.pages.create({
+      parent: { database_id: MISSION_DB_ID },
+      properties: properties as Parameters<typeof notion.pages.create>[0]["properties"],
+    });
+
+    return response.id;
+  } catch (error) {
+    console.error("Error creating mission:", error);
+    return null;
+  }
+}
+
+/**
+ * Update mission status (manager action: close/reopen)
+ */
+export async function updateMissionStatus(
+  missionId: string,
+  status: string,
+  finalReview?: string
+): Promise<boolean> {
+  try {
+    const properties: Record<string, unknown> = {
+      "ステータス": { select: { name: status } },
+    };
+
+    if (finalReview) {
+      properties["最終振り返り"] = { rich_text: [{ text: { content: finalReview } }] };
+    }
+
+    await notion.pages.update({
+      page_id: missionId,
+      properties: properties as Parameters<typeof notion.pages.update>[0]["properties"],
+    });
+
+    return true;
+  } catch (error) {
+    console.error("Error updating mission status:", error);
+    return false;
+  }
+}
+
+/**
+ * Add a comment to a mission page using Notion Comments API
+ * Author info is embedded in the comment text since the API always uses the integration as author
+ */
+export async function addMissionComment(
+  missionId: string,
+  authorName: string,
+  authorRole: "manager" | "participant",
+  commentText: string
+): Promise<boolean> {
+  try {
+    const roleLabel = authorRole === "manager" ? "上司" : "部下";
+    const formattedText = `[${roleLabel}] ${authorName}: ${commentText}`;
+
+    await notion.comments.create({
+      parent: { page_id: missionId },
+      rich_text: [{ text: { content: formattedText } }],
+    });
+
+    return true;
+  } catch (error) {
+    console.error("Error adding mission comment:", error);
+    return false;
+  }
+}
+
+/**
+ * Get all comments for a mission page
+ */
+export async function getMissionComments(missionId: string): Promise<MissionComment[]> {
+  try {
+    const response = await notion.comments.list({
+      block_id: missionId,
+    });
+
+    return response.results.map((comment) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const richText = (comment as any).rich_text || [];
+      const fullText = richText.map((t: { plain_text: string }) => t.plain_text).join("");
+
+      // Parse embedded author info: "[上司] 本藤直樹: actual comment"
+      let authorName = "";
+      let authorRole: "manager" | "participant" = "participant";
+      let body = fullText;
+
+      const match = fullText.match(/^\[(上司|部下)\]\s*(.+?):\s*([\s\S]*)$/);
+      if (match) {
+        authorRole = match[1] === "上司" ? "manager" : "participant";
+        authorName = match[2];
+        body = match[3];
+      }
+
+      return {
+        id: comment.id,
+        authorName,
+        authorRole,
+        body,
+        createdAt: comment.created_time,
+      };
+    });
+  } catch (error) {
+    console.error("Error fetching mission comments:", error);
     return [];
   }
 }

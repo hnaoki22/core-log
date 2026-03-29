@@ -1,21 +1,10 @@
 // Participant Detail Page (Manager View)
-// Shows individual participant's log entries
+// Shows individual participant's log entries + full mission management
 
 import Link from "next/link";
 import { getLogsByParticipant, getMissionsByParticipant, NotionLogEntry } from "@/lib/notion";
 import CommentForm from "./CommentForm";
-
-type MissionEntry = {
-  id: string;
-  title: string;
-  participantName: string;
-  setDate: string;
-  deadline: string;
-  status: string;
-  purpose: string | null;
-  reviewMemo: string | null;
-  finalReview: string | null;
-};
+import MissionManager from "./MissionManager";
 
 type Params = {
   params: {
@@ -29,7 +18,8 @@ export default async function ParticipantDetailPage({ params }: Params) {
   const participantName = decodeURIComponent(participantId);
 
   let logs: NotionLogEntry[] = [];
-  let missions: MissionEntry[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let missions: any[] = [];
 
   try {
     const [fetchedLogs, fetchedMissions] = await Promise.all([
@@ -37,7 +27,7 @@ export default async function ParticipantDetailPage({ params }: Params) {
       getMissionsByParticipant(participantName),
     ]);
     logs = fetchedLogs;
-    missions = fetchedMissions as MissionEntry[];
+    missions = fetchedMissions;
   } catch (e) {
     console.error("Failed to fetch data:", e);
   }
@@ -47,60 +37,64 @@ export default async function ParticipantDetailPage({ params }: Params) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#F8F7FF]">
       {/* Header */}
-      <header className="bg-white border-b px-4 py-3 flex items-center gap-3">
-        <Link
-          href={`/m/${token}`}
-          className="text-blue-600 hover:text-blue-800 text-sm"
-        >
-          ← 一覧に戻る
-        </Link>
-        <h1 className="text-lg font-bold text-gray-800">{participantName}</h1>
+      <header className="bg-gradient-to-r from-[#4A3FBF] to-[#6B5FEA] text-white px-4 py-4">
+        <div className="max-w-2xl mx-auto flex items-center gap-3">
+          <Link
+            href={`/m/${token}`}
+            className="text-white/80 hover:text-white text-sm"
+          >
+            ← 一覧
+          </Link>
+          <h1 className="text-lg font-bold">{participantName}</h1>
+        </div>
       </header>
 
       <main className="p-4 space-y-6 max-w-2xl mx-auto">
-        {/* Active Mission */}
-        {missions.length > 0 && (
-          <section className="bg-white rounded-xl p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-gray-500 mb-3">現在のミッション</h2>
-            {missions.slice(0, 1).map((m: MissionEntry) => (
-              <div key={m.id} className="border-l-4 border-blue-500 pl-3">
-                <p className="font-medium text-gray-800">{m.title}</p>
-                <p className="text-xs text-gray-500 mt-1">{m.status}</p>
-              </div>
-            ))}
-          </section>
-        )}
+        {/* Mission Manager */}
+        <MissionManager
+          token={token}
+          participantName={participantName}
+          initialMissions={missions}
+        />
 
         {/* Log Entries */}
-        <section className="bg-white rounded-xl p-4 shadow-sm">
-          <h2 className="text-sm font-semibold text-gray-500 mb-3">日報一覧</h2>
+        <section className="bg-white rounded-xl shadow-sm">
+          <div className="p-4 border-b border-gray-100">
+            <h2 className="text-sm font-semibold text-gray-500">📋 日報一覧</h2>
+          </div>
           {logs.length === 0 ? (
-            <p className="text-gray-400 text-sm">まだ日報がありません</p>
+            <div className="p-6 text-center text-gray-400 text-sm">まだ日報がありません</div>
           ) : (
-            <div className="space-y-3">
+            <div className="divide-y divide-gray-50">
               {logs.map((entry: NotionLogEntry) => (
-                <div key={entry.id} className="border rounded-lg p-3">
+                <div key={entry.id} className="p-4">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-gray-700">
-                      {entry.date}
+                    <span className="text-sm font-medium text-[#1E1B3A]">
+                      {entry.date}（{entry.dayOfWeek}）
                     </span>
                     <span className="text-lg">
-                      {entry.energy ? energyMap[entry.energy] || "😐" : "😐"}
+                      {entry.energy ? energyMap[entry.energy] || "😐" : "—"}
                     </span>
                   </div>
                   {entry.morningIntent && (
-                    <p className="text-xs text-gray-600">
-                      <span className="font-semibold">朝の意図：</span>
-                      {entry.morningIntent}
-                    </p>
+                    <div className="mb-1">
+                      <span className="text-xs font-semibold text-[#5B4FD6]">朝の意図：</span>
+                      <span className="text-xs text-gray-700">{entry.morningIntent}</span>
+                    </div>
                   )}
                   {entry.eveningInsight && (
-                    <p className="text-xs text-gray-600 mt-1">
-                      <span className="font-semibold">気づき：</span>
-                      {entry.eveningInsight}
-                    </p>
+                    <div className="mb-1">
+                      <span className="text-xs font-semibold text-[#FF8C42]">夕の気づき：</span>
+                      <span className="text-xs text-gray-700">{entry.eveningInsight}</span>
+                    </div>
+                  )}
+                  {entry.hmFeedback && (
+                    <div className="bg-purple-50 rounded-lg p-2 mt-2">
+                      <span className="text-xs font-semibold text-purple-600">HM FB：</span>
+                      <span className="text-xs text-purple-800">{entry.hmFeedback}</span>
+                    </div>
                   )}
                   <CommentForm
                     token={token}
