@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import { getAllParticipants, getAllManagers } from "@/lib/mock-data";
 
-const ADMIN_TOKENS = ["munetomo-admin"];
+const ADMIN_TOKENS = ["munetomo-admin", "UE8m8SSJAgRBwsSZ"];
 
 export default function AdminDashboard() {
   const params = useParams();

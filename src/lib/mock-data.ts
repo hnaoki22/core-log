@@ -43,6 +43,7 @@ export type Participant = {
   id: string;
   token: string;
   name: string;
+  email: string;
   department: string;
   dojoPhase: string;
   weekNum: number;
@@ -63,6 +64,7 @@ export type Manager = {
   id: string;
   token: string;
   name: string;
+  email: string;
   department: string;
   participantIds: string[];
 };
@@ -87,6 +89,7 @@ const participantA: Participant = {
   id: "p1",
   token: "tanaka-abc123",
   name: "田中 太郎",
+  email: "tanaka@example.com",
   department: "営業企画部",
   dojoPhase: "道場2 探索",
   weekNum: 4,
@@ -247,6 +250,7 @@ const participantB: Participant = {
   id: "p2",
   token: "suzuki-def456",
   name: "鈴木 花子",
+  email: "suzuki@example.com",
   department: "人事総務部",
   dojoPhase: "道場2 探索",
   weekNum: 4,
@@ -327,6 +331,7 @@ const participantC: Participant = {
   id: "p3",
   token: "sato-ghi789",
   name: "佐藤 健一",
+  email: "sato@example.com",
   department: "製造部",
   dojoPhase: "道場2 探索",
   weekNum: 4,
@@ -380,6 +385,7 @@ const participantMunetomo: Participant = {
   id: "p-munetomo",
   token: "munetomo-participant",
   name: "宗友 試用太郎",
+  email: "munetomo@example.com",
   department: "人事部（試用アカウント）",
   dojoPhase: "道場2 探索",
   weekNum: 3,
@@ -517,11 +523,34 @@ const participantMunetomo: Participant = {
   ],
 };
 
+// ===== Human Mature 社内アカウント =====
+const participantDoi: Participant = {
+  id: "p-doi",
+  token: "FAe9diVTAxUR8gRv",
+  name: "土居 由奈",
+  email: "yuna.doi@humanmature.com",
+  department: "Human Mature",
+  dojoPhase: "道場1 基盤",
+  weekNum: 1,
+  startDate: "2026-03-30",
+  totalDays: 0,
+  entryRate: 0,
+  streak: 0,
+  fbCount: 0,
+  averageEnergy: "",
+  managerId: "m-hondo",
+  logs: [],
+  feedbacks: [],
+  managerComments: [],
+  missions: [],
+};
+
 // ===== Mock Managers =====
 const managerA: Manager = {
   id: "m1",
   token: "mgr-suzuki-xyz",
   name: "鈴木部長",
+  email: "mgr-suzuki@example.com",
   department: "営業企画部・人事総務部",
   participantIds: ["p1", "p2"],
 };
@@ -530,6 +559,7 @@ const managerB: Manager = {
   id: "m2",
   token: "mgr-yamamoto-xyz",
   name: "山本課長",
+  email: "mgr-yamamoto@example.com",
   department: "製造部",
   participantIds: ["p3"],
 };
@@ -539,13 +569,24 @@ const managerMunetomo: Manager = {
   id: "m-munetomo-mgr",
   token: "munetomo-manager",
   name: "宗友（試用マネージャー）",
+  email: "munetomo-mgr@example.com",
   department: "人事部（全体管理）",
   participantIds: ["p1", "p2", "p3", "p-munetomo"],
 };
 
+// Human Mature 社内: 本藤さん（上司アカウント）
+const managerHondo: Manager = {
+  id: "m-hondo",
+  token: "pn_Oc1ykCMXUQZpZ",
+  name: "本藤 直樹",
+  email: "naoki.hondo@humanmature.com",
+  department: "Human Mature",
+  participantIds: ["p-doi"],
+};
+
 // ===== Data Access Functions =====
-const participants: Participant[] = [participantA, participantB, participantC, participantMunetomo];
-const managers: Manager[] = [managerA, managerB, managerMunetomo];
+const participants: Participant[] = [participantA, participantB, participantC, participantMunetomo, participantDoi];
+const managers: Manager[] = [managerA, managerB, managerMunetomo, managerHondo];
 
 export function getParticipantByToken(token: string): Participant | null {
   return participants.find((p) => p.token === token) ?? null;
