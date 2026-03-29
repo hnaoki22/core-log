@@ -27,6 +27,7 @@ export default function InputPage() {
   const [todayLog, setTodayLog] = useState<TodayLog | null>(null);
   const [isMorning, setIsMorning] = useState(true);
   const [loadingStatus, setLoadingStatus] = useState(true);
+  const [alreadyCompleted, setAlreadyCompleted] = useState(false);
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -46,7 +47,12 @@ export default function InputPage() {
           const todayEntry = logs.find((log: TodayLog & { date: string }) => log.date === today);
           if (todayEntry && todayEntry.morningIntent) {
             setTodayLog(todayEntry);
-            setIsMorning(false);
+            // Check if both morning and evening are already done
+            if (todayEntry.status === "complete" || todayEntry.status === "fb_done") {
+              setAlreadyCompleted(true);
+            } else {
+              setIsMorning(false);
+            }
           } else {
             setIsMorning(true);
           }
@@ -89,6 +95,26 @@ export default function InputPage() {
         <div className="text-center">
           <div className="w-8 h-8 border-3 border-[#5B4FD6] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-[#8B85A8]">読み込み中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (alreadyCompleted) {
+    return (
+      <div className="min-h-screen bg-[#F8F7FF] flex items-center justify-center p-6">
+        <div className="max-w-md mx-auto text-center">
+          <div className="w-16 h-16 bg-[#22C55E] rounded-full flex items-center justify-center mx-auto mb-6">
+            <span className="text-4xl">✓</span>
+          </div>
+          <h2 className="text-2xl font-bold text-[#1E1B3A] mb-2">今日の記入は完了済みです</h2>
+          <p className="text-[#8B85A8] mb-6">朝の意図と夕方の振り返りが記入されています</p>
+          <button
+            onClick={() => router.push(`/p/${token}`)}
+            className="w-full bg-gradient-to-r from-[#5B4FD6] to-[#7C6FEA] text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-shadow"
+          >
+            ホームに戻る
+          </button>
         </div>
       </div>
     );

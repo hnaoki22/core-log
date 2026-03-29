@@ -1,8 +1,9 @@
 // POST /api/entry
 // Create morning entry or update with evening data
+// Prevents duplicate entries for the same day
 
 import { NextRequest, NextResponse } from "next/server";
-import { createMorningEntry, updateEveningEntry } from "@/lib/notion";
+import { createMorningEntry, updateEveningEntry, hasLoggedToday } from "@/lib/notion";
 
 export async function POST(request: NextRequest) {
   const useMock = !process.env.NOTION_API_TOKEN;
@@ -27,6 +28,16 @@ export async function POST(request: NextRequest) {
     // Real Notion API
     if (type === "morning") {
       const { participantName, date, morningIntent, energy, dojoPhase, weekNum } = body;
+
+      // Check if entry already exists for today
+      const todayStatus = await hasLoggedToday(participantName, date);
+      if (todayStatus.hasMorning) {
+        return NextResponse.json(
+          { error: "今日の朝の記入は既に完了しています" },
+          { status: 409 }
+        );
+      }
+
       const pageId = await createMorningEntry(participantName, date, morningIntent, energy, dojoPhase, weekNum);
       if (!pageId) {
         return NextResponse.json({ error: "Failed to create entry" }, { status: 500 });
@@ -36,6 +47,9 @@ export async function POST(request: NextRequest) {
 
     if (type === "evening") {
       const { pageId, eveningInsight, energy } = body;
+      if (!pageId) {
+        return NextResponse.json({ error: "pageId is required for evening entry" }, { status: 400 });
+      }
       const success = await updateEveningEntry(pageId, eveningInsight, energy);
       if (!success) {
         return NextResponse.json({ error: "Failed to update entry" }, { status: 500 });
