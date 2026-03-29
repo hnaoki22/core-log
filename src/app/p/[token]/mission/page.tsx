@@ -1,7 +1,6 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { getParticipantByToken } from "@/lib/mock-data";
 import { BottomNav } from "@/components/BottomNav";
 import { useState, useEffect } from "react";
 
@@ -19,21 +18,22 @@ type Mission = {
 export default function MissionPage() {
   const params = useParams();
   const token = params.token as string;
-  const participant = getParticipantByToken(token);
 
   const [missions, setMissions] = useState<Mission[]>([]);
   const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
     async function fetchMissions() {
       try {
-        // Fetch missions from the API - logs endpoint also returns missions if available
         const res = await fetch(`/api/logs?token=${token}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.missions) {
-            setMissions(data.missions);
-          }
+        if (!res.ok) {
+          setNotFound(true);
+          return;
+        }
+        const data = await res.json();
+        if (data.missions) {
+          setMissions(data.missions);
         }
       } catch {
         // silently fail
@@ -44,7 +44,7 @@ export default function MissionPage() {
     fetchMissions();
   }, [token]);
 
-  if (!participant) {
+  if (notFound) {
     return (
       <div className="min-h-screen bg-[#F8F7FF] flex items-center justify-center p-6">
         <div className="text-center">
