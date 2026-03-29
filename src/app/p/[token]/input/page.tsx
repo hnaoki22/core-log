@@ -4,6 +4,12 @@ import { useParams, useRouter } from "next/navigation";
 import { getParticipantByToken } from "@/lib/mock-data";
 import { useState, useEffect } from "react";
 
+type TodayLog = {
+  id: string;
+  morningIntent: string;
+  status: string;
+};
+
 export default function InputPage() {
   const params = useParams();
   const router = useRouter();
@@ -18,11 +24,42 @@ export default function InputPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [now, setNow] = useState(new Date());
+  const [todayLog, setTodayLog] = useState<TodayLog | null>(null);
+  const [isMorning, setIsMorning] = useState(true);
+  const [loadingStatus, setLoadingStatus] = useState(true);
+
+  const today = new Date().toISOString().split("T")[0];
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Fetch today's log status from API (Notion) to determine morning/evening mode
+  useEffect(() => {
+    async function checkTodayStatus() {
+      try {
+        const res = await fetch(`/api/logs?token=${token}`);
+        if (res.ok) {
+          const data = await res.json();
+          const logs = data.logs || [];
+          const todayEntry = logs.find((log: TodayLog & { date: string }) => log.date === today);
+          if (todayEntry && todayEntry.morningIntent) {
+            setTodayLog(todayEntry);
+            setIsMorning(false);
+          } else {
+            setIsMorning(true);
+          }
+        }
+      } catch {
+        // If API fails, default to morning mode
+        setIsMorning(true);
+      } finally {
+        setLoadingStatus(false);
+      }
+    }
+    checkTodayStatus();
+  }, [token, today]);
 
   // Format date and time for display
   const displayDate = now.toLocaleDateString("ja-JP", {
@@ -36,16 +73,22 @@ export default function InputPage() {
     minute: "2-digit",
   });
 
-  // Detect if morning or evening mode
-  const today = new Date().toISOString().split("T")[0];
-  const todayLog = participant?.logs.find((log) => log.date === today);
-  const isMorning = !todayLog || todayLog.status === "empty" || !todayLog.morningIntent;
-
   if (!participant) {
     return (
       <div className="min-h-screen bg-[#F8F7FF] flex items-center justify-center p-6">
         <div className="text-center">
           <p className="text-[#8B85A8]">参加者が見つかりません</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadingStatus) {
+    return (
+      <div className="min-h-screen bg-[#F8F7FF] flex items-center justify-center p-6">
+        <div className="text-center">
+          <div className="w-8 h-8 border-3 border-[#5B4FD6] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-[#8B85A8]">読み込み中...</p>
         </div>
       </div>
     );
@@ -113,11 +156,6 @@ export default function InputPage() {
           </div>
           <h2 className="text-2xl font-bold text-[#1E1B3A] mb-2">記入完了！</h2>
           <p className="text-[#8B85A8] mb-2">いい気づきですね</p>
-          {participant.streak > 0 && (
-            <p className="text-lg font-semibold text-[#FF8C42] mb-6">
-              連続 {participant.streak} 日 🔥
-            </p>
-          )}
           <button
             onClick={() => router.push(`/p/${token}`)}
             className="w-full bg-gradient-to-r from-[#5B4FD6] to-[#7C6FEA] text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-shadow"
@@ -141,8 +179,8 @@ export default function InputPage() {
             {isMorning ? "今日、ひとつだけ意識するとしたら？" : "今日やってみてどうでしたか？"}
           </p>
           <div className="flex items-center gap-3 mt-3 text-sm opacity-80">
-            <span>📅 {displayDate}</span>
-            <span>🕐 {displayTime}</span>
+            <span>{displayDate}</span>
+            <span>{displayTime}</span>
           </div>
         </div>
       </div>
