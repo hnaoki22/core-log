@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { getParticipantByToken } from "@/lib/mock-data";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function InputPage() {
   const params = useParams();
@@ -15,6 +15,24 @@ export default function InputPage() {
   const [evening, setEvening] = useState("");
   const [energy, setEnergy] = useState<string | null>(null);
   const [completed, setCompleted] = useState(false);
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Format date and time for display
+  const displayDate = now.toLocaleDateString("ja-JP", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  });
+  const displayTime = now.toLocaleTimeString("ja-JP", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
   // Detect if morning or evening mode
   const today = new Date().toISOString().split("T")[0];
@@ -77,6 +95,10 @@ export default function InputPage() {
           <p className="text-sm opacity-90 mt-2">
             {isMorning ? "今日、ひとつだけ意識するとしたら？" : "今日やってみてどうでしたか？"}
           </p>
+          <div className="flex items-center gap-3 mt-3 text-sm opacity-80">
+            <span>📅 {displayDate}</span>
+            <span>🕐 {displayTime}</span>
+          </div>
         </div>
       </div>
 
