@@ -181,6 +181,9 @@ export async function createMorningEntry(
     const d = new Date(date);
     const title = `${d.getMonth() + 1}/${d.getDate()}（${DOW_MAP[d.getDay()]}）`;
 
+    // JST timestamp for 記入時刻（朝）
+    const nowJST = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString();
+
     const properties: Record<string, unknown> = {
       "タイトル": { title: [{ text: { content: title } }] },
       "日付": { date: { start: date } },
@@ -188,6 +191,7 @@ export async function createMorningEntry(
       "【朝】今日の意図": { rich_text: [{ text: { content: morningIntent } }] },
       "道場フェーズ": { select: { name: dojoPhase } },
       "週番号": { number: weekNum },
+      "記入時刻（朝）": { date: { start: nowJST } },
     };
 
     if (energy) {
@@ -218,9 +222,13 @@ export async function updateEveningEntry(
   energy: string | null
 ) {
   try {
+    // JST timestamp for 記入時刻（夕）
+    const nowJST = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString();
+
     const properties: Record<string, unknown> = {
       "【夕】今日の気づき": { rich_text: [{ text: { content: eveningInsight } }] },
       "ステータス": { select: { name: "完了" } },
+      "記入時刻（夕）": { date: { start: nowJST } },
     };
 
     if (energy) {
@@ -257,6 +265,37 @@ export async function addManagerComment(
   } catch (error) {
     console.error("Error adding manager comment:", error);
     return false;
+  }
+}
+
+/**
+ * Check if a participant has logged today
+ */
+export async function hasLoggedToday(participantName: string, todayStr: string): Promise<{ hasMorning: boolean; hasEvening: boolean }> {
+  if (!CORE_LOG_DB_ID) return { hasMorning: false, hasEvening: false };
+
+  try {
+    const response = await notion.databases.query({
+      database_id: CORE_LOG_DB_ID,
+      filter: {
+        and: [
+          { property: "参加者名", select: { equals: participantName } },
+          { property: "日付", date: { equals: todayStr } },
+        ],
+      },
+    });
+
+    if (response.results.length === 0) return { hasMorning: false, hasEvening: false };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const props = (response.results[0] as any).properties;
+    const morning = getRichText(props["【朝】今日の意図"]);
+    const evening = getRichText(props["【夕】今日の気づき"]);
+
+    return { hasMorning: !!morning, hasEvening: !!evening };
+  } catch (error) {
+    console.error("Error checking today's log:", error);
+    return { hasMorning: false, hasEvening: false };
   }
 }
 
