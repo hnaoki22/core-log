@@ -375,6 +375,148 @@ const participantC: Participant = {
   missions: [],
 };
 
+// ===== 宗友さん Trial: Participant Account =====
+const participantMunetomo: Participant = {
+  id: "p-munetomo",
+  token: "munetomo-participant",
+  name: "宗友 試用太郎",
+  department: "人事部（試用アカウント）",
+  dojoPhase: "道場2 探索",
+  weekNum: 3,
+  startDate: "2026-05-19",
+  totalDays: 18,
+  entryRate: 85,
+  streak: 4,
+  fbCount: 3,
+  averageEnergy: "good",
+  managerId: "m-munetomo-mgr",
+  logs: [
+    {
+      id: "lm1",
+      date: "2026-06-10",
+      dayOfWeek: "水",
+      dayNum: 10,
+      morningIntent: "部門会議で各チームの進捗を整理し、優先順位を明確にする",
+      eveningInsight: null,
+      energy: null,
+      status: "morning_only",
+      hasFeedback: false,
+    },
+    {
+      id: "lm2",
+      date: "2026-06-09",
+      dayOfWeek: "火",
+      dayNum: 9,
+      morningIntent: "1on1で部下の本音を引き出すために「問い」に集中する",
+      eveningInsight: "いつもより沈黙を長く待てた。部下が自分から課題を話してくれた。",
+      energy: "excellent",
+      status: "complete",
+      hasFeedback: false,
+    },
+    {
+      id: "lm3",
+      date: "2026-06-08",
+      dayOfWeek: "月",
+      dayNum: 8,
+      morningIntent: "先週のFBを踏まえ「指示ではなく問いかけ」を意識する",
+      eveningInsight: "つい指示を出しそうになったが、踏みとどまれた。相手の表情が明るくなった。",
+      energy: "good",
+      status: "fb_done",
+      hasFeedback: true,
+    },
+    {
+      id: "lm4",
+      date: "2026-06-06",
+      dayOfWeek: "金",
+      dayNum: 6,
+      morningIntent: "今週の振り返りを全体に共有し、来週の方向性を提示する",
+      eveningInsight: "共有したことで「見えていなかった」という声があった。透明性の大切さを再認識。",
+      energy: "good",
+      status: "complete",
+      hasFeedback: false,
+    },
+    {
+      id: "lm5",
+      date: "2026-06-05",
+      dayOfWeek: "木",
+      dayNum: 5,
+      morningIntent: "経営会議で組織開発の中間報告をデータとストーリーで伝える",
+      eveningInsight: "社長から「具体的でわかりやすい」と言われた。数字と物語の両立が効いた。",
+      energy: "excellent",
+      status: "complete",
+      hasFeedback: false,
+    },
+    {
+      id: "lm6",
+      date: "2026-06-04",
+      dayOfWeek: "水",
+      dayNum: 4,
+      morningIntent: "新人との面談で「傾聴」を実践する",
+      eveningInsight: "自分の話が長くなってしまった。次回は3分以内に抑える。",
+      energy: "okay",
+      status: "complete",
+      hasFeedback: false,
+    },
+    {
+      id: "lm7",
+      date: "2026-06-03",
+      dayOfWeek: "火",
+      dayNum: 3,
+      morningIntent: "チーム横断の課題について関係者と対話する",
+      eveningInsight: "対立する意見があったが、共通のゴールを確認できた。対話の力を実感。",
+      energy: "good",
+      status: "complete",
+      hasFeedback: false,
+    },
+  ],
+  feedbacks: [
+    {
+      id: "fm1",
+      weekLabel: "Week 3（6/2〜6/6）",
+      weekNum: 3,
+      body: "今週は「指示→問いかけ」への転換に挑戦されました。つい指示を出しそうになった場面で踏みとどまれたことは大きな成長です。経営会議での中間報告も「数字と物語の両立」という視点が素晴らしい。",
+      feedforward: "来週は「自分が話さない1on1」を1回やってみてください。相手だけが話す30分間で何が起きますか？",
+      isNew: true,
+    },
+    {
+      id: "fm2",
+      weekLabel: "Week 2（5/26〜5/30）",
+      weekNum: 2,
+      body: "新人面談での傾聴の意識が見えてきました。「自分の話が長い」という自覚は改善の第一歩。組織全体の透明性を高める動きも評価できます。",
+      feedforward: "相手の話を聞いた後、「今の話で一番大事なことは何？」と問いかけてみてください。",
+      isNew: false,
+    },
+  ],
+  managerComments: [
+    {
+      id: "mcm1",
+      date: "2026-06-06",
+      managerName: "プロジェクトCORE事務局",
+      body: "組織開発の推進役として、ご自身が率先してCORE Logに取り組んでいただいていることが、全体の模範になっています。引き続きよろしくお願いします。",
+    },
+  ],
+  missions: [
+    {
+      id: "msm1",
+      title: "組織開発プロジェクト2年目の全社展開プランを完成させる",
+      setDate: "2026-05-20",
+      deadline: "2026-09-30",
+      status: "in_progress",
+      progress: 35,
+      reviewMemo: "方向性は良い。各部門のキーパーソンの巻き込み方を具体化してほしい。",
+    },
+    {
+      id: "msm2",
+      title: "マネジメント層向けの「対話型1on1」研修を設計する",
+      setDate: "2026-05-20",
+      deadline: "2026-08-31",
+      status: "in_progress",
+      progress: 20,
+      reviewMemo: null,
+    },
+  ],
+};
+
 // ===== Mock Managers =====
 const managerA: Manager = {
   id: "m1",
@@ -392,9 +534,18 @@ const managerB: Manager = {
   participantIds: ["p3"],
 };
 
+// 宗友さん Trial: Manager Account (manages all participants)
+const managerMunetomo: Manager = {
+  id: "m-munetomo-mgr",
+  token: "munetomo-manager",
+  name: "宗友（試用マネージャー）",
+  department: "人事部（全体管理）",
+  participantIds: ["p1", "p2", "p3", "p-munetomo"],
+};
+
 // ===== Data Access Functions =====
-const participants: Participant[] = [participantA, participantB, participantC];
-const managers: Manager[] = [managerA, managerB];
+const participants: Participant[] = [participantA, participantB, participantC, participantMunetomo];
+const managers: Manager[] = [managerA, managerB, managerMunetomo];
 
 export function getParticipantByToken(token: string): Participant | null {
   return participants.find((p) => p.token === token) ?? null;
