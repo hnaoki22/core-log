@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { getAllParticipants, getAllManagers, energyEmoji } from "@/lib/mock-data";
+import { getAllParticipants, getAllManagers } from "@/lib/mock-data";
 
 const ADMIN_TOKENS = ["munetomo-admin"];
 
@@ -26,7 +26,6 @@ export default function AdminDashboard() {
 
   const totalLogs = participants.reduce((sum, p) => sum + p.logs.filter(l => l.status !== "empty").length, 0);
   const avgEntryRate = Math.round(participants.reduce((sum, p) => sum + p.entryRate, 0) / participants.length);
-  const activeStreaks = participants.filter(p => p.streak > 0).length;
   const totalFeedbacks = participants.reduce((sum, p) => sum + p.fbCount, 0);
 
   const getStatusBadge = (rate: number, streak: number) => {
