@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { getLogsByParticipant, getMissionsByParticipant, NotionLogEntry } from "@/lib/notion";
+import CommentForm from "./CommentForm";
 
 type MissionEntry = {
   id: string;
@@ -101,14 +102,11 @@ export default async function ParticipantDetailPage({ params }: Params) {
                       {entry.eveningInsight}
                     </p>
                   )}
-                  {entry.managerComment && (
-                    <div className="mt-2 bg-blue-50 rounded p-2">
-                      <p className="text-xs text-blue-700">
-                        <span className="font-semibold">上司コメント：</span>
-                        {entry.managerComment}
-                      </p>
-                    </div>
-                  )}
+                  <CommentForm
+                    token={token}
+                    entryId={entry.id}
+                    existingComment={entry.managerComment}
+                  />
                 </div>
               ))}
             </div>
