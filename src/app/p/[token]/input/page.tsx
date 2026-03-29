@@ -15,6 +15,8 @@ export default function InputPage() {
   const [evening, setEvening] = useState("");
   const [energy, setEnergy] = useState<string | null>(null);
   const [completed, setCompleted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -49,11 +51,54 @@ export default function InputPage() {
     );
   }
 
+  const submitEntry = async () => {
+    setIsSubmitting(true);
+    setSubmitError("");
+
+    try {
+      const body = isMorning
+        ? {
+            type: "morning",
+            token,
+            participantName: participant.name,
+            date: today,
+            morningIntent: morning,
+            energy,
+            dojoPhase: participant.dojoPhase || "守",
+            weekNum: participant.weekNum || 1,
+          }
+        : {
+            type: "evening",
+            token,
+            pageId: todayLog?.id || "",
+            eveningInsight: evening,
+            energy,
+          };
+
+      const res = await fetch("/api/entry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        setCompleted(true);
+      } else {
+        const data = await res.json();
+        setSubmitError(data.error || "保存に失敗しました");
+      }
+    } catch {
+      setSubmitError("通信エラーが発生しました");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleNext = () => {
     if (step === 1 && (isMorning ? !morning : !evening)) return;
     if (step === 2 && !energy) return;
     if (step === 2) {
-      setCompleted(true);
+      submitEntry();
     } else {
       setStep(step + 1);
     }
@@ -169,20 +214,27 @@ export default function InputPage() {
 
         {/* Action Buttons */}
         <div className="mt-8 space-y-3">
+          {submitError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
+              <p className="text-red-600 text-sm">{submitError}</p>
+            </div>
+          )}
           <button
             onClick={handleNext}
             disabled={
+              isSubmitting ||
               (step === 1 && (isMorning ? !morning : !evening)) ||
               (step === 2 && !energy)
             }
             className={`w-full py-3 rounded-lg font-semibold transition-all ${
+              isSubmitting ||
               (step === 1 && (isMorning ? !morning : !evening)) ||
               (step === 2 && !energy)
                 ? "bg-[#E8E5F0] text-[#8B85A8] cursor-not-allowed"
                 : "bg-gradient-to-r from-[#5B4FD6] to-[#7C6FEA] text-white hover:shadow-lg"
             }`}
           >
-            {step === 1 ? "次へ" : "記入を完了する"}
+            {isSubmitting ? "保存中..." : step === 1 ? "次へ" : "記入を完了する"}
           </button>
           {step === 2 && (
             <button
