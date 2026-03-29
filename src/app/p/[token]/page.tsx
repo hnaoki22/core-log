@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { energyEmoji } from "@/lib/mock-data";
+import { getTodayJST, getCurrentHourJST } from "@/lib/date-utils";
 import { BottomNav } from "@/components/BottomNav";
 import Link from "next/link";
 import { useState, useEffect } from "react";
@@ -80,14 +81,14 @@ export default function ParticipantHome() {
   }
 
   const getGreeting = () => {
-    const hour = new Date().getHours();
+    const hour = getCurrentHourJST();
     if (hour < 12) return "おはようございます";
     if (hour < 18) return "こんにちは";
     return "お疲れさまです";
   };
 
   const getTodayStatus = () => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = getTodayJST();
     const todayLog = logs.find((log) => log.date === today);
 
     if (!todayLog || todayLog.status === "empty") {
@@ -125,8 +126,8 @@ export default function ParticipantHome() {
     if (sortedLogs.length === 0) return 0;
 
     let streak = 0;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayStr = getTodayJST();
+    const today = new Date(todayStr + "T00:00:00");
 
     for (let i = 0; i < sortedLogs.length; i++) {
       const checkDate = new Date(today);

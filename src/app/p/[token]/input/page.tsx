@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { getParticipantByToken } from "@/lib/mock-data";
+import { getTodayJST } from "@/lib/date-utils";
 import { useState, useEffect } from "react";
 
 type TodayLog = {
@@ -29,7 +30,7 @@ export default function InputPage() {
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [alreadyCompleted, setAlreadyCompleted] = useState(false);
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = getTodayJST();
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
