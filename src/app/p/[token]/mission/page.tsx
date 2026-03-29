@@ -3,11 +3,46 @@
 import { useParams } from "next/navigation";
 import { getParticipantByToken } from "@/lib/mock-data";
 import { BottomNav } from "@/components/BottomNav";
+import { useState, useEffect } from "react";
+
+type Mission = {
+  id: string;
+  title: string;
+  setDate: string;
+  deadline: string;
+  status: string;
+  purpose: string | null;
+  reviewMemo: string | null;
+  finalReview: string | null;
+};
 
 export default function MissionPage() {
   const params = useParams();
   const token = params.token as string;
   const participant = getParticipantByToken(token);
+
+  const [missions, setMissions] = useState<Mission[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchMissions() {
+      try {
+        // Fetch missions from the API - logs endpoint also returns missions if available
+        const res = await fetch(`/api/logs?token=${token}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.missions) {
+            setMissions(data.missions);
+          }
+        }
+      } catch {
+        // silently fail
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchMissions();
+  }, [token]);
 
   if (!participant) {
     return (
@@ -19,38 +54,48 @@ export default function MissionPage() {
     );
   }
 
-  const inProgress = participant.missions.filter((m) => m.status === "in_progress");
-  const notStarted = participant.missions.filter((m) => m.status === "not_started");
-  const completed = participant.missions.filter((m) => m.status === "completed");
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F8F7FF] flex items-center justify-center p-6">
+        <div className="text-center">
+          <div className="w-8 h-8 border-3 border-[#5B4FD6] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-[#8B85A8]">読み込み中...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const MissionCard = ({ mission }: { mission: typeof participant.missions[0] }) => (
+  const inProgress = missions.filter((m) => m.status === "進行中" || m.status === "in_progress");
+  const notStarted = missions.filter((m) => m.status === "未着手" || m.status === "not_started");
+  const completed = missions.filter((m) => m.status === "完了" || m.status === "completed");
+
+  const MissionCard = ({ mission }: { mission: Mission }) => (
     <div className="bg-white p-4 rounded-xl shadow-sm">
       <h3 className="font-semibold text-[#1E1B3A] mb-2">{mission.title}</h3>
 
       <div className="text-xs text-[#8B85A8] mb-3">
-        <p>開始: {mission.setDate}</p>
-        <p>期限: {mission.deadline}</p>
+        {mission.setDate && <p>開始: {mission.setDate}</p>}
+        {mission.deadline && <p>期限: {mission.deadline}</p>}
       </div>
 
-      {/* Progress Bar */}
-      <div className="mb-3">
-        <div className="flex justify-between mb-1">
-          <span className="text-xs text-[#8B85A8]">進捗</span>
-          <span className="text-xs font-semibold text-[#5B4FD6]">{mission.progress}%</span>
+      {mission.purpose && (
+        <div className="bg-[#F8F7FF] p-3 rounded-lg border border-[#E8E5F0] mb-3">
+          <p className="text-xs font-semibold text-[#8B85A8] mb-1">背景・目的</p>
+          <p className="text-sm text-[#1E1B3A]">{mission.purpose}</p>
         </div>
-        <div className="w-full bg-[#E8E5F0] rounded-full h-2 overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-[#5B4FD6] to-[#7C6FEA] transition-all"
-            style={{ width: `${mission.progress}%` }}
-          ></div>
-        </div>
-      </div>
+      )}
 
-      {/* Review Memo */}
       {mission.reviewMemo && (
         <div className="bg-[#F8F7FF] p-3 rounded-lg border border-[#E8E5F0] mt-3">
-          <p className="text-xs font-semibold text-[#8B85A8] mb-1">レビューメモ</p>
+          <p className="text-xs font-semibold text-[#8B85A8] mb-1">中間レビューメモ</p>
           <p className="text-sm text-[#1E1B3A]">{mission.reviewMemo}</p>
+        </div>
+      )}
+
+      {mission.finalReview && (
+        <div className="bg-[#E0F7E0] p-3 rounded-lg border border-[#22C55E] mt-3">
+          <p className="text-xs font-semibold text-[#22C55E] mb-1">最終振り返り</p>
+          <p className="text-sm text-[#1E1B3A]">{mission.finalReview}</p>
         </div>
       )}
     </div>
@@ -66,14 +111,13 @@ export default function MissionPage() {
       </div>
 
       <div className="max-w-md mx-auto px-6 pt-6">
-        {participant.missions.length === 0 ? (
+        {missions.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-[#8B85A8] mb-2">ミッションはまだ設定されていません</p>
             <p className="text-sm text-[#8B85A8]">マネージャーと相談して、ミッションを設定しましょう</p>
           </div>
         ) : (
           <div className="space-y-8">
-            {/* In Progress */}
             {inProgress.length > 0 && (
               <section>
                 <h2 className="text-lg font-bold text-[#1E1B3A] mb-4 flex items-center gap-2">
@@ -88,7 +132,6 @@ export default function MissionPage() {
               </section>
             )}
 
-            {/* Not Started */}
             {notStarted.length > 0 && (
               <section>
                 <h2 className="text-lg font-bold text-[#1E1B3A] mb-4 flex items-center gap-2">
@@ -103,7 +146,6 @@ export default function MissionPage() {
               </section>
             )}
 
-            {/* Completed */}
             {completed.length > 0 && (
               <section>
                 <h2 className="text-lg font-bold text-[#1E1B3A] mb-4 flex items-center gap-2">

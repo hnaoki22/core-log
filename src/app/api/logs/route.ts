@@ -2,7 +2,7 @@
 // Returns all CORE Log entries for a participant
 
 import { NextRequest, NextResponse } from "next/server";
-import { getLogsByParticipant } from "@/lib/notion";
+import { getLogsByParticipant, getMissionsByParticipant } from "@/lib/notion";
 import { getParticipantByToken } from "@/lib/mock-data";
 
 export async function GET(request: NextRequest) {
@@ -46,7 +46,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Participant not found" }, { status: 404 });
   }
 
-  const logs = await getLogsByParticipant(participant.name);
+  const [logs, missions] = await Promise.all([
+    getLogsByParticipant(participant.name),
+    getMissionsByParticipant(participant.name),
+  ]);
   return NextResponse.json({
     participant: {
       id: participant.id,
@@ -56,5 +59,6 @@ export async function GET(request: NextRequest) {
       weekNum: participant.weekNum,
     },
     logs,
+    missions,
   });
 }

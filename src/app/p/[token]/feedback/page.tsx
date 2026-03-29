@@ -1,23 +1,58 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { getParticipantByToken } from "@/lib/mock-data";
 import { BottomNav } from "@/components/BottomNav";
+import { useState, useEffect } from "react";
+
+type LogEntry = {
+  id: string;
+  date: string;
+  dayOfWeek: string;
+  morningIntent: string;
+  hmFeedback: string | null;
+  managerComment: string | null;
+  hasFeedback: boolean;
+};
 
 export default function FeedbackPage() {
   const params = useParams();
   const token = params.token as string;
-  const participant = getParticipantByToken(token);
 
-  if (!participant) {
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const res = await fetch(`/api/logs?token=${token}`);
+        if (res.ok) {
+          const data = await res.json();
+          setLogs(data.logs || []);
+        }
+      } catch {
+        // silently fail
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [token]);
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-[#F8F7FF] flex items-center justify-center p-6">
         <div className="text-center">
-          <p className="text-[#8B85A8]">参加者が見つかりません</p>
+          <div className="w-8 h-8 border-3 border-[#5B4FD6] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-[#8B85A8]">読み込み中...</p>
         </div>
       </div>
     );
   }
+
+  // Filter logs that have feedback or manager comments
+  const logsWithFeedback = logs.filter(
+    (log) => log.hmFeedback || log.managerComment
+  );
 
   return (
     <div className="min-h-screen bg-[#F8F7FF] pb-24">
@@ -29,64 +64,39 @@ export default function FeedbackPage() {
       </div>
 
       <div className="max-w-md mx-auto px-6 pt-6 space-y-4">
-        {participant.feedbacks.length === 0 ? (
+        {logsWithFeedback.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-[#8B85A8]">フィードバックはまだありません</p>
           </div>
         ) : (
-          <>
-            {/* Latest Feedback */}
-            {participant.feedbacks[0] && (
-              <div className="gradient-orange text-white p-6 rounded-xl shadow-md relative">
-                {participant.feedbacks[0].isNew && (
-                  <div className="absolute top-4 right-4 bg-[#22C55E] text-white text-xs font-bold px-3 py-1 rounded-full">
-                    NEW
+          <div className="space-y-4">
+            {logsWithFeedback.map((log) => (
+              <div key={log.id} className="bg-white p-4 rounded-xl shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-[#1E1B3A]">
+                    {log.date} ({log.dayOfWeek})
+                  </p>
+                </div>
+                <p className="text-xs text-[#8B85A8]">
+                  朝の意図: {log.morningIntent}
+                </p>
+
+                {log.managerComment && (
+                  <div className="bg-[#EDE9FF] p-3 rounded-lg">
+                    <p className="text-xs font-semibold text-[#5B4FD6] mb-1">上司コメント</p>
+                    <p className="text-sm text-[#1E1B3A] leading-relaxed">{log.managerComment}</p>
                   </div>
                 )}
-                <p className="text-sm opacity-90 mb-2">{participant.feedbacks[0].weekLabel}</p>
-                <p className="text-base leading-relaxed mb-4">{participant.feedbacks[0].body}</p>
 
-                <div className="bg-white/20 backdrop-blur-sm p-4 rounded-lg">
-                  <p className="text-xs opacity-90 mb-2 font-semibold">Feedforward</p>
-                  <p className="text-sm">{participant.feedbacks[0].feedforward}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Manager Comments */}
-            {participant.managerComments.length > 0 && (
-              <div className="space-y-3">
-                <p className="text-xs font-semibold text-[#8B85A8] px-1">マネージャーコメント</p>
-                {participant.managerComments.map((comment) => (
-                  <div key={comment.id} className="bg-white p-4 rounded-xl shadow-sm">
-                    <div className="flex items-start justify-between mb-2">
-                      <p className="font-semibold text-[#1E1B3A]">{comment.managerName}</p>
-                      <p className="text-xs text-[#8B85A8]">{comment.date}</p>
-                    </div>
-                    <p className="text-sm text-[#1E1B3A] leading-relaxed">{comment.body}</p>
+                {log.hmFeedback && (
+                  <div className="bg-[#FFE8D0] p-3 rounded-lg">
+                    <p className="text-xs font-semibold text-[#FF8C42] mb-1">HMフィードバック</p>
+                    <p className="text-sm text-[#1E1B3A] leading-relaxed">{log.hmFeedback}</p>
                   </div>
-                ))}
+                )}
               </div>
-            )}
-
-            {/* Past Feedbacks */}
-            {participant.feedbacks.length > 1 && (
-              <div className="space-y-3">
-                <p className="text-xs font-semibold text-[#8B85A8] px-1 pt-4">過去のフィードバック</p>
-                {participant.feedbacks.slice(1).map((fb, index) => (
-                  <div
-                    key={fb.id}
-                    className="bg-white p-4 rounded-xl shadow-sm"
-                    style={{ opacity: 1 - (index + 1) * 0.15 }}
-                  >
-                    <p className="text-sm font-semibold text-[#1E1B3A] mb-1">{fb.weekLabel}</p>
-                    <p className="text-sm text-[#1E1B3A] line-clamp-2 mb-2">{fb.body}</p>
-                    <p className="text-xs text-[#8B85A8]">{fb.feedforward}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
+            ))}
+          </div>
         )}
       </div>
 
