@@ -91,7 +91,7 @@ const participantA: Participant = {
   name: "田中 太郎",
   email: "tanaka@example.com",
   department: "営業企画部",
-  dojoPhase: "道場2 探索",
+  dojoPhase: "道場2 武装",
   weekNum: 4,
   startDate: "2026-05-12",
   totalDays: 23,
@@ -252,7 +252,7 @@ const participantB: Participant = {
   name: "鈴木 花子",
   email: "suzuki@example.com",
   department: "人事総務部",
-  dojoPhase: "道場2 探索",
+  dojoPhase: "道場2 武装",
   weekNum: 4,
   startDate: "2026-05-12",
   totalDays: 20,
@@ -333,7 +333,7 @@ const participantC: Participant = {
   name: "佐藤 健一",
   email: "sato@example.com",
   department: "製造部",
-  dojoPhase: "道場2 探索",
+  dojoPhase: "道場2 武装",
   weekNum: 4,
   startDate: "2026-05-12",
   totalDays: 15,
@@ -387,7 +387,7 @@ const participantMunetomo: Participant = {
   name: "宗友 試用太郎",
   email: "munetomo@example.com",
   department: "人事部（試用アカウント）",
-  dojoPhase: "道場2 探索",
+  dojoPhase: "道場2 武装",
   weekNum: 3,
   startDate: "2026-05-19",
   totalDays: 18,
@@ -523,6 +523,79 @@ const participantMunetomo: Participant = {
   ],
 };
 
+// ===== 大幸薬品 第二期参加者 =====
+const participantFujiiM: Participant = {
+  id: "p-fujii-m", token: "7GHValljeoUrYh0j",
+  name: "藤井 真弓", email: "mayumi.fujii@seirogan.co.jp",
+  department: "国内営業部 営業推進グループ",
+  dojoPhase: "道場1 覚醒", weekNum: 1, startDate: "", totalDays: 0,
+  entryRate: 0, streak: 0, fbCount: 0, averageEnergy: "",
+  managerId: "", logs: [], feedbacks: [], managerComments: [], missions: [],
+};
+
+const participantMouri: Participant = {
+  id: "p-mouri", token: "w54l2YYyVL2-ILej",
+  name: "毛利 友義", email: "tomoyoshi.mouri@seirogan.co.jp",
+  department: "マーケティング部",
+  dojoPhase: "道場1 覚醒", weekNum: 1, startDate: "", totalDays: 0,
+  entryRate: 0, streak: 0, fbCount: 0, averageEnergy: "",
+  managerId: "", logs: [], feedbacks: [], managerComments: [], missions: [],
+};
+
+const participantFujiiR: Participant = {
+  id: "p-fujii-r", token: "A9gerTklb95ZWFWr",
+  name: "藤井 良", email: "ryou.fujii@seirogan.co.jp",
+  department: "製造部 京都製造グループ",
+  dojoPhase: "道場1 覚醒", weekNum: 1, startDate: "", totalDays: 0,
+  entryRate: 0, streak: 0, fbCount: 0, averageEnergy: "",
+  managerId: "", logs: [], feedbacks: [], managerComments: [], missions: [],
+};
+
+const participantAsano: Participant = {
+  id: "p-asano", token: "4xLwOnBzVIiGR6TM",
+  name: "浅野 知史", email: "tomofumi.asano@seirogan.co.jp",
+  department: "経理部",
+  dojoPhase: "道場1 覚醒", weekNum: 1, startDate: "", totalDays: 0,
+  entryRate: 0, streak: 0, fbCount: 0, averageEnergy: "",
+  managerId: "", logs: [], feedbacks: [], managerComments: [], missions: [],
+};
+
+const participantTakeda: Participant = {
+  id: "p-takeda", token: "cNgJ_oBhWHcK8Z7e",
+  name: "竹田 和馬", email: "kazuma.takeda@seirogan.co.jp",
+  department: "製造部 吹田工場総務グループ",
+  dojoPhase: "道場1 覚醒", weekNum: 1, startDate: "", totalDays: 0,
+  entryRate: 0, streak: 0, fbCount: 0, averageEnergy: "",
+  managerId: "", logs: [], feedbacks: [], managerComments: [], missions: [],
+};
+
+const participantChiba: Participant = {
+  id: "p-chiba", token: "40E9fOqPHn0nRj-Q",
+  name: "千葉 亮介", email: "ryosuke.chiba@seirogan.co.jp",
+  department: "マーケティング部",
+  dojoPhase: "道場1 覚醒", weekNum: 1, startDate: "", totalDays: 0,
+  entryRate: 0, streak: 0, fbCount: 0, averageEnergy: "",
+  managerId: "", logs: [], feedbacks: [], managerComments: [], missions: [],
+};
+
+const participantShimoji: Participant = {
+  id: "p-shimoji", token: "S0Nh_5HasNCf4UNf",
+  name: "下地 範明", email: "noriaki.shimoji@seirogan.co.jp",
+  department: "製造部 購買グループ",
+  dojoPhase: "道場1 覚醒", weekNum: 1, startDate: "", totalDays: 0,
+  entryRate: 0, streak: 0, fbCount: 0, averageEnergy: "",
+  managerId: "", logs: [], feedbacks: [], managerComments: [], missions: [],
+};
+
+const participantHayashi: Participant = {
+  id: "p-hayashi", token: "JNQtG6uCbRTOpbtx",
+  name: "林 宏行", email: "hiroyuki.hayashi@seirogan.co.jp",
+  department: "研究開発部 開発グループ",
+  dojoPhase: "道場1 覚醒", weekNum: 1, startDate: "", totalDays: 0,
+  entryRate: 0, streak: 0, fbCount: 0, averageEnergy: "",
+  managerId: "", logs: [], feedbacks: [], managerComments: [], missions: [],
+};
+
 // ===== Human Mature 社内アカウント =====
 const participantDoi: Participant = {
   id: "p-doi",
@@ -530,9 +603,9 @@ const participantDoi: Participant = {
   name: "土居 由奈",
   email: "yuna.doi@humanmature.com",
   department: "Human Mature",
-  dojoPhase: "道場1 基盤",
+  dojoPhase: "道場1 覚醒",
   weekNum: 1,
-  startDate: "2026-03-30",
+  startDate: "",
   totalDays: 0,
   entryRate: 0,
   streak: 0,
@@ -585,7 +658,11 @@ const managerHondo: Manager = {
 };
 
 // ===== Data Access Functions =====
-const participants: Participant[] = [participantA, participantB, participantC, participantMunetomo, participantDoi];
+const participants: Participant[] = [
+  participantA, participantB, participantC, participantMunetomo, participantDoi,
+  participantFujiiM, participantMouri, participantFujiiR, participantAsano,
+  participantTakeda, participantChiba, participantShimoji, participantHayashi,
+];
 const managers: Manager[] = [managerA, managerB, managerMunetomo, managerHondo];
 
 export function getParticipantByToken(token: string): Participant | null {
