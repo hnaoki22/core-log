@@ -36,12 +36,28 @@ type AdminData = {
   managers: ManagerData[];
 };
 
+type ManagerOption = { id: string; name: string };
+
+type AddResult = {
+  type: "participant" | "manager";
+  name: string;
+  token: string;
+  url: string;
+} | null;
+
 export default function AdminDashboard() {
   const params = useParams();
   const token = params.token as string;
   const [data, setData] = useState<AdminData | null>(null);
   const [loading, setLoading] = useState(true);
   const [unauthorized, setUnauthorized] = useState(false);
+
+  // Add member modal state
+  const [showAddParticipant, setShowAddParticipant] = useState(false);
+  const [showAddManager, setShowAddManager] = useState(false);
+  const [managerOptions, setManagerOptions] = useState<ManagerOption[]>([]);
+  const [addResult, setAddResult] = useState<AddResult>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -63,6 +79,104 @@ export default function AdminDashboard() {
     }
     fetchData();
   }, [token]);
+
+  // Fetch manager options when add participant modal opens
+  useEffect(() => {
+    if (showAddParticipant) {
+      fetch(`/api/admin/members?token=${token}`)
+        .then((r) => r.json())
+        .then((d) => setManagerOptions(d.managers || []))
+        .catch(() => setManagerOptions([]));
+    }
+  }, [showAddParticipant, token]);
+
+  const handleAddParticipant = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSubmitting(true);
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    try {
+      const res = await fetch("/api/admin/members", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token,
+          type: "participant",
+          data: {
+            name: formData.get("name"),
+            email: formData.get("email"),
+            department: formData.get("department"),
+            dojoPhase: formData.get("dojoPhase") || "道場1 覚醒",
+            role: formData.get("role") || "参加者",
+            managerId: formData.get("managerId") || "",
+            emailEnabled: formData.get("emailEnabled") === "on",
+          },
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        setAddResult({
+          type: "participant",
+          name: result.participant.name,
+          token: result.participant.token,
+          url: result.participant.url,
+        });
+        setShowAddParticipant(false);
+        // Refresh data
+        const refreshRes = await fetch(`/api/admin?token=${token}`);
+        if (refreshRes.ok) setData(await refreshRes.json());
+      } else {
+        alert(result.error || "追加に失敗しました");
+      }
+    } catch {
+      alert("エラーが発生しました");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleAddManager = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSubmitting(true);
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    try {
+      const res = await fetch("/api/admin/members", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token,
+          type: "manager",
+          data: {
+            name: formData.get("name"),
+            email: formData.get("email"),
+            department: formData.get("department"),
+            isAdmin: formData.get("isAdmin") === "on",
+          },
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        setAddResult({
+          type: "manager",
+          name: result.manager.name,
+          token: result.manager.token,
+          url: result.manager.url,
+        });
+        setShowAddManager(false);
+        const refreshRes = await fetch(`/api/admin?token=${token}`);
+        if (refreshRes.ok) setData(await refreshRes.json());
+      } else {
+        alert(result.error || "追加に失敗しました");
+      }
+    } catch {
+      alert("エラーが発生しました");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (unauthorized) {
     return (
@@ -139,6 +253,47 @@ export default function AdminDashboard() {
       </div>
 
       <div className="max-w-4xl mx-auto px-4 -mt-4">
+        {/* Add Result Banner */}
+        {addResult && (
+          <div className="mb-4 bg-white rounded-xl shadow-lg border-2 border-[#22C55E] p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">&#10003;</span>
+                <h3 className="font-bold text-[#1E1B3A]">
+                  {addResult.name}さんを{addResult.type === "participant" ? "参加者" : "マネージャー"}として追加しました
+                </h3>
+              </div>
+              <button
+                onClick={() => setAddResult(null)}
+                className="text-[#8B85A8] hover:text-[#1E1B3A] text-lg"
+              >
+                x
+              </button>
+            </div>
+            <div className="bg-[#F8F7FF] rounded-lg p-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-[#8B85A8] w-24">トークン:</span>
+                <code className="bg-white px-3 py-1 rounded border border-[#E8E5F0] font-mono text-[#5B4FD6] select-all">
+                  {addResult.token}
+                </code>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-[#8B85A8] w-24">URL:</span>
+                <a
+                  href={addResult.url}
+                  className="text-[#5B4FD6] underline break-all"
+                  target="_blank"
+                >
+                  {typeof window !== "undefined" ? window.location.origin : ""}{addResult.url}
+                </a>
+              </div>
+              <p className="text-xs text-[#FF8C42] mt-2">
+                * このURLを本人にお伝えください。トークンは自動生成済みで、重複チェック済みです。
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Summary Stats */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
           <div className="bg-white rounded-xl p-4 shadow-sm border border-[#E8E5F0]">
@@ -173,10 +328,16 @@ export default function AdminDashboard() {
 
         {/* Participants Table */}
         <div className="bg-white rounded-xl shadow-sm border border-[#E8E5F0] mb-6">
-          <div className="p-4 border-b border-[#E8E5F0]">
+          <div className="p-4 border-b border-[#E8E5F0] flex items-center justify-between">
             <h2 className="text-lg font-bold text-[#1E1B3A] flex items-center gap-2">
-              👤 参加者一覧
+              参加者一覧
             </h2>
+            <button
+              onClick={() => setShowAddParticipant(true)}
+              className="bg-[#5B4FD6] text-white text-sm px-4 py-2 rounded-lg hover:bg-[#4A3FC5] transition-colors"
+            >
+              + 参加者を追加
+            </button>
           </div>
           <div className="divide-y divide-[#E8E5F0]">
             {participants.map((p) => {
@@ -276,10 +437,16 @@ export default function AdminDashboard() {
 
         {/* Managers Table */}
         <div className="bg-white rounded-xl shadow-sm border border-[#E8E5F0] mb-6">
-          <div className="p-4 border-b border-[#E8E5F0]">
+          <div className="p-4 border-b border-[#E8E5F0] flex items-center justify-between">
             <h2 className="text-lg font-bold text-[#1E1B3A] flex items-center gap-2">
-              👔 マネージャー一覧
+              マネージャー一覧
             </h2>
+            <button
+              onClick={() => setShowAddManager(true)}
+              className="bg-[#FF8C42] text-white text-sm px-4 py-2 rounded-lg hover:bg-[#E67A32] transition-colors"
+            >
+              + マネージャーを追加
+            </button>
           </div>
           <div className="divide-y divide-[#E8E5F0]">
             {managers.map((m) => (
@@ -387,6 +554,118 @@ export default function AdminDashboard() {
           CORE Log v1.0 — Powered by Next.js + Notion API
         </div>
       </div>
+
+      {/* Add Participant Modal */}
+      {showAddParticipant && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="p-5 border-b border-[#E8E5F0]">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-[#1E1B3A]">参加者を追加</h3>
+                <button onClick={() => setShowAddParticipant(false)} className="text-[#8B85A8] hover:text-[#1E1B3A] text-xl">x</button>
+              </div>
+              <p className="text-sm text-[#8B85A8] mt-1">トークンは自動生成されます</p>
+            </div>
+            <form onSubmit={handleAddParticipant} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#1E1B3A] mb-1">名前 *</label>
+                <input name="name" required placeholder="例: 山田 太郎" className="w-full border border-[#E8E5F0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#5B4FD6]" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#1E1B3A] mb-1">メール *</label>
+                <input name="email" type="email" required placeholder="例: taro.yamada@example.com" className="w-full border border-[#E8E5F0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#5B4FD6]" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#1E1B3A] mb-1">部署</label>
+                <input name="department" placeholder="例: 製造部" className="w-full border border-[#E8E5F0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#5B4FD6]" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-[#1E1B3A] mb-1">道場フェーズ</label>
+                  <select name="dojoPhase" className="w-full border border-[#E8E5F0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#5B4FD6]">
+                    <option value="道場1 覚醒">道場1 覚醒</option>
+                    <option value="道場2 武装">道場2 武装</option>
+                    <option value="道場3 実践">道場3 実践</option>
+                    <option value="道場4 深化">道場4 深化</option>
+                    <option value="道場5 統合">道場5 統合</option>
+                    <option value="道場6 継承">道場6 継承</option>
+                    <option value="道場7 卒業">道場7 卒業</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#1E1B3A] mb-1">役割</label>
+                  <select name="role" className="w-full border border-[#E8E5F0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#5B4FD6]">
+                    <option value="参加者">参加者</option>
+                    <option value="HM社内">HM社内</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#1E1B3A] mb-1">担当上司</label>
+                <select name="managerId" className="w-full border border-[#E8E5F0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#5B4FD6]">
+                  <option value="">未設定</option>
+                  {managerOptions.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" name="emailEnabled" id="emailEnabled" className="rounded" />
+                <label htmlFor="emailEnabled" className="text-sm text-[#1E1B3A]">メール通知を有効にする</label>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowAddParticipant(false)} className="flex-1 border border-[#E8E5F0] text-[#8B85A8] py-2 rounded-lg text-sm hover:bg-[#F8F7FF]">
+                  キャンセル
+                </button>
+                <button type="submit" disabled={submitting} className="flex-1 bg-[#5B4FD6] text-white py-2 rounded-lg text-sm hover:bg-[#4A3FC5] disabled:opacity-50">
+                  {submitting ? "追加中..." : "追加する"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Manager Modal */}
+      {showAddManager && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="p-5 border-b border-[#E8E5F0]">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-[#1E1B3A]">マネージャーを追加</h3>
+                <button onClick={() => setShowAddManager(false)} className="text-[#8B85A8] hover:text-[#1E1B3A] text-xl">x</button>
+              </div>
+              <p className="text-sm text-[#8B85A8] mt-1">トークンは自動生成されます</p>
+            </div>
+            <form onSubmit={handleAddManager} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#1E1B3A] mb-1">名前 *</label>
+                <input name="name" required placeholder="例: 鈴木 花子" className="w-full border border-[#E8E5F0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#5B4FD6]" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#1E1B3A] mb-1">メール *</label>
+                <input name="email" type="email" required placeholder="例: hanako.suzuki@example.com" className="w-full border border-[#E8E5F0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#5B4FD6]" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#1E1B3A] mb-1">部署</label>
+                <input name="department" placeholder="例: 人事部" className="w-full border border-[#E8E5F0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#5B4FD6]" />
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" name="isAdmin" id="isAdmin" className="rounded" />
+                <label htmlFor="isAdmin" className="text-sm text-[#1E1B3A]">管理者権限を付与する</label>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowAddManager(false)} className="flex-1 border border-[#E8E5F0] text-[#8B85A8] py-2 rounded-lg text-sm hover:bg-[#F8F7FF]">
+                  キャンセル
+                </button>
+                <button type="submit" disabled={submitting} className="flex-1 bg-[#FF8C42] text-white py-2 rounded-lg text-sm hover:bg-[#E67A32] disabled:opacity-50">
+                  {submitting ? "追加中..." : "追加する"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -866,3 +866,140 @@ export async function getMissionComments(missionId: string): Promise<MissionComm
     return [];
   }
 }
+
+// ===== Create Functions =====
+
+/**
+ * Generate a secure random token for URL authentication
+ */
+function generateToken(prefix: string = ""): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz0123456789";
+  // Exclude easily confused characters: l, I, O, 0 are kept but 'l' is removed from chars above
+  let token = prefix;
+  for (let i = 0; i < 16; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+}
+
+/**
+ * Check if a token already exists in the Participants or Managers DB
+ */
+async function isTokenUnique(token: string): Promise<boolean> {
+  try {
+    if (PARTICIPANTS_DB_ID) {
+      const pRes = await notion.databases.query({
+        database_id: PARTICIPANTS_DB_ID,
+        filter: { property: "トークン", rich_text: { equals: token } },
+      });
+      if (pRes.results.length > 0) return false;
+    }
+    if (MANAGERS_DB_ID) {
+      const mRes = await notion.databases.query({
+        database_id: MANAGERS_DB_ID,
+        filter: { property: "トークン", rich_text: { equals: token } },
+      });
+      if (mRes.results.length > 0) return false;
+    }
+    return true;
+  } catch {
+    return true; // On error, assume unique and let Notion handle duplicates
+  }
+}
+
+/**
+ * Generate a unique token with retry
+ */
+export async function generateUniqueToken(prefix: string = ""): Promise<string> {
+  for (let i = 0; i < 5; i++) {
+    const token = generateToken(prefix);
+    if (await isTokenUnique(token)) return token;
+  }
+  // Fallback: add timestamp
+  return generateToken(prefix) + Date.now().toString(36).slice(-4);
+}
+
+/**
+ * Create a new participant in the Notion Participants DB
+ */
+export async function createParticipantInNotion(data: {
+  name: string;
+  email: string;
+  department: string;
+  dojoPhase: string;
+  role: string;
+  managerId?: string;
+  emailEnabled?: boolean;
+}): Promise<{ id: string; token: string; url: string } | null> {
+  if (!PARTICIPANTS_DB_ID) return null;
+
+  try {
+    const token = await generateUniqueToken("");
+
+    const properties: Record<string, unknown> = {
+      "名前": { title: [{ text: { content: data.name } }] },
+      "トークン": { rich_text: [{ text: { content: token } }] },
+      "メール": { email: data.email },
+      "部署": { rich_text: [{ text: { content: data.department } }] },
+      "道場フェーズ": { select: { name: data.dojoPhase } },
+      "役割": { select: { name: data.role } },
+      "メール通知": { checkbox: data.emailEnabled ?? false },
+    };
+
+    if (data.managerId) {
+      properties["担当上司"] = { relation: [{ id: data.managerId }] };
+    }
+
+    const response = await notion.pages.create({
+      parent: { database_id: PARTICIPANTS_DB_ID },
+      properties: properties as Parameters<typeof notion.pages.create>[0]["properties"],
+    });
+
+    return {
+      id: response.id,
+      token,
+      url: `/p/${token}`,
+    };
+  } catch (error) {
+    console.error("Error creating participant:", error);
+    return null;
+  }
+}
+
+/**
+ * Create a new manager in the Notion Managers DB
+ */
+export async function createManagerInNotion(data: {
+  name: string;
+  email: string;
+  department: string;
+  isAdmin?: boolean;
+}): Promise<{ id: string; token: string; url: string } | null> {
+  if (!MANAGERS_DB_ID) return null;
+
+  try {
+    const token = await generateUniqueToken("mgr_");
+
+    const properties: Record<string, unknown> = {
+      "名前": { title: [{ text: { content: data.name } }] },
+      "トークン": { rich_text: [{ text: { content: token } }] },
+      "メール": { email: data.email },
+      "部署": { rich_text: [{ text: { content: data.department } }] },
+      "管理者権限": { checkbox: data.isAdmin ?? false },
+    };
+
+    const response = await notion.pages.create({
+      parent: { database_id: MANAGERS_DB_ID },
+      properties: properties as Parameters<typeof notion.pages.create>[0]["properties"],
+    });
+
+    return {
+      id: response.id,
+      token,
+      url: `/m/${token}`,
+    };
+  } catch (error) {
+    console.error("Error creating manager:", error);
+    return null;
+  }
+}
