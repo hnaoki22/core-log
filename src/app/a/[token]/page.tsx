@@ -59,6 +59,15 @@ export default function AdminDashboard() {
   const [addResult, setAddResult] = useState<AddResult>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Feedback modal state
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [fbTargetName, setFbTargetName] = useState("");
+  const [fbContent, setFbContent] = useState("");
+  const [fbPeriod, setFbPeriod] = useState("");
+  const [fbWeekNum, setFbWeekNum] = useState(1);
+  const [fbSubmitting, setFbSubmitting] = useState(false);
+  const [fbSuccess, setFbSuccess] = useState(false);
+
   useEffect(() => {
     async function fetchData() {
       try {
@@ -175,6 +184,51 @@ export default function AdminDashboard() {
       alert("エラーが発生しました");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const openFeedbackModal = (participantName: string) => {
+    setFbTargetName(participantName);
+    setFbContent("");
+    setFbPeriod("");
+    setFbWeekNum(1);
+    setFbSuccess(false);
+    setShowFeedbackModal(true);
+  };
+
+  const handleSubmitFeedback = async () => {
+    if (!fbContent.trim()) return;
+    setFbSubmitting(true);
+    try {
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token,
+          participantName: fbTargetName,
+          content: fbContent,
+          period: fbPeriod,
+          weekNum: fbWeekNum,
+          type: "HMフィードバック",
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        setFbSuccess(true);
+        setTimeout(() => {
+          setShowFeedbackModal(false);
+          setFbSuccess(false);
+        }, 1500);
+        // Refresh data
+        const refreshRes = await fetch(`/api/admin?token=${token}`);
+        if (refreshRes.ok) setData(await refreshRes.json());
+      } else {
+        alert(result.error || "フィードバックの送信に失敗しました");
+      }
+    } catch {
+      alert("エラーが発生しました");
+    } finally {
+      setFbSubmitting(false);
     }
   };
 
@@ -402,6 +456,12 @@ export default function AdminDashboard() {
                       )}
                     </div>
                     <div className="flex flex-col items-end gap-1 ml-4">
+                      <button
+                        onClick={() => openFeedbackModal(p.name)}
+                        className="text-xs px-3 py-1 rounded-full bg-[#FF8C42] text-white hover:bg-[#E67A32] transition-colors mb-1"
+                      >
+                        FB送信
+                      </button>
                       <span className="text-xs px-2 py-1 rounded-full bg-[#F0EEFF] text-[#5B4FD6]">
                         {status.label}
                       </span>
@@ -622,6 +682,96 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Modal */}
+      {showFeedbackModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="p-5 border-b border-[#E8E5F0]">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-[#1E1B3A]">
+                  HMフィードバック送信
+                </h3>
+                <button
+                  onClick={() => setShowFeedbackModal(false)}
+                  className="text-[#8B85A8] hover:text-[#1E1B3A] text-xl"
+                >
+                  x
+                </button>
+              </div>
+              <p className="text-sm text-[#FF8C42] mt-1 font-semibold">
+                対象: {fbTargetName}
+              </p>
+            </div>
+            {fbSuccess ? (
+              <div className="p-8 text-center">
+                <div className="text-4xl mb-3">&#10003;</div>
+                <p className="text-[#22C55E] font-bold">送信完了しました</p>
+                <p className="text-xs text-[#8B85A8] mt-1">
+                  本人にメール通知が送信されます
+                </p>
+              </div>
+            ) : (
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-[#1E1B3A] mb-1">
+                      対象期間
+                    </label>
+                    <input
+                      value={fbPeriod}
+                      onChange={(e) => setFbPeriod(e.target.value)}
+                      placeholder="例: 2026年3月第4週"
+                      className="w-full border border-[#E8E5F0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#5B4FD6]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[#1E1B3A] mb-1">
+                      週番号
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={52}
+                      value={fbWeekNum}
+                      onChange={(e) => setFbWeekNum(Number(e.target.value))}
+                      className="w-full border border-[#E8E5F0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#5B4FD6]"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#1E1B3A] mb-1">
+                    フィードバック内容 *
+                  </label>
+                  <textarea
+                    value={fbContent}
+                    onChange={(e) => setFbContent(e.target.value)}
+                    rows={6}
+                    placeholder="今週のCORE Logを拝見しました。..."
+                    className="w-full border border-[#E8E5F0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#5B4FD6] resize-none"
+                  />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowFeedbackModal(false)}
+                    className="flex-1 border border-[#E8E5F0] text-[#8B85A8] py-2 rounded-lg text-sm hover:bg-[#F8F7FF]"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    onClick={handleSubmitFeedback}
+                    disabled={fbSubmitting || !fbContent.trim()}
+                    className="flex-1 bg-[#FF8C42] text-white py-2 rounded-lg text-sm hover:bg-[#E67A32] disabled:opacity-50"
+                  >
+                    {fbSubmitting ? "送信中..." : "送信する"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
