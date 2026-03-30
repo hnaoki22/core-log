@@ -673,6 +673,14 @@ export function getParticipantById(id: string): Participant | null {
   return participants.find((p) => p.id === id) ?? null;
 }
 
+export function getParticipantByName(name: string): Participant | null {
+  return participants.find((p) => p.name === name || p.name.replace(/\s/g, "") === name.replace(/\s/g, "")) ?? null;
+}
+
+export function getManagerById(id: string): Manager | null {
+  return managers.find((m) => m.id === id) ?? null;
+}
+
 export function getManagerByToken(token: string): Manager | null {
   return managers.find((m) => m.token === token) ?? null;
 }

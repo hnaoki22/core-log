@@ -2,8 +2,9 @@
 // POST /api/mission/comments - Add a comment to a mission
 
 import { NextRequest, NextResponse } from "next/server";
-import { addMissionComment, getMissionComments } from "@/lib/notion";
-import { getManagerByToken, getParticipantByToken } from "@/lib/mock-data";
+import { addMissionComment, getMissionComments, getMissionById } from "@/lib/notion";
+import { getManagerByToken, getParticipantByToken, getParticipantByName, getManagerById } from "@/lib/mock-data";
+import { sendNotificationEmail } from "@/lib/email";
 
 export async function GET(request: NextRequest) {
   const missionId = request.nextUrl.searchParams.get("missionId");
@@ -48,6 +49,42 @@ export async function POST(request: NextRequest) {
 
     if (!success) {
       return NextResponse.json({ error: "Failed to add comment" }, { status: 500 });
+    }
+
+    // Send notification email to the other party (non-blocking)
+    try {
+      if (manager) {
+        // Manager commented → notify participant
+        const mission = await getMissionById(missionId);
+        if (mission) {
+          const targetParticipant = getParticipantByName(mission.participantName);
+          if (targetParticipant?.email && !targetParticipant.email.includes("example.com")) {
+            sendNotificationEmail({
+              to: targetParticipant.email,
+              recipientName: targetParticipant.name.split(" ")[0],
+              senderName: manager.name,
+              token: targetParticipant.token,
+              type: "mission_comment",
+              detail: comment.length > 100 ? comment.substring(0, 100) + "..." : comment,
+            }).catch(console.error); // fire-and-forget
+          }
+        }
+      } else if (participant) {
+        // Participant commented → notify their manager
+        const mgr = participant.managerId ? getManagerById(participant.managerId) : null;
+        if (mgr?.email && !mgr.email.includes("example.com")) {
+          sendNotificationEmail({
+            to: mgr.email,
+            recipientName: mgr.name.split(" ")[0],
+            senderName: participant.name,
+            token: mgr.token,
+            type: "mission_comment",
+            detail: comment.length > 100 ? comment.substring(0, 100) + "..." : comment,
+          }).catch(console.error);
+        }
+      }
+    } catch (notifyError) {
+      console.error("Notification error (non-critical):", notifyError);
     }
 
     return NextResponse.json({ success: true });

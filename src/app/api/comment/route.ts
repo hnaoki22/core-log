@@ -3,6 +3,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { addManagerComment } from "@/lib/notion";
+import { getManagerByToken, getParticipantById } from "@/lib/mock-data";
+import { sendNotificationEmail } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   const useMock = !process.env.NOTION_API_TOKEN;
@@ -31,6 +33,34 @@ export async function POST(request: NextRequest) {
       if (!success) {
         return NextResponse.json({ error: "Failed to save comment" }, { status: 500 });
       }
+    }
+
+    // Notify participant about manager's comment (non-blocking)
+    try {
+      const manager = getManagerByToken(token);
+      if (manager) {
+        // Find the participant this comment belongs to
+        // participantId here is the Notion page ID; we need participant info from URL context
+        // The manager page includes participantId in the URL, which maps to participant registry
+        const allParticipants = manager.participantIds;
+        for (const pid of allParticipants) {
+          const p = getParticipantById(pid);
+          if (p?.email && !p.email.includes("example.com")) {
+            // For now, notify all participants of this manager (usually just one)
+            // In future, pass participant identifier from frontend
+            sendNotificationEmail({
+              to: p.email,
+              recipientName: p.name.split(" ")[0],
+              senderName: manager.name,
+              token: p.token,
+              type: "manager_comment",
+              detail: comment.length > 100 ? comment.substring(0, 100) + "..." : comment,
+            }).catch(console.error);
+          }
+        }
+      }
+    } catch (notifyError) {
+      console.error("Comment notification error (non-critical):", notifyError);
     }
 
     return NextResponse.json({ success: true });

@@ -323,6 +323,31 @@ export type MissionComment = {
 /**
  * Get missions for a participant
  */
+/**
+ * Get a single mission by ID (for notification lookups)
+ */
+export async function getMissionById(missionId: string): Promise<MissionEntry | null> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const page = await notion.pages.retrieve({ page_id: missionId }) as any;
+    const props = page.properties;
+    return {
+      id: page.id,
+      title: getTitle(props["ミッション名"]),
+      participantName: getSelect(props["参加者名"]),
+      setDate: getDate(props["設定日"]),
+      deadline: getDate(props["達成期限"]),
+      status: getSelect(props["ステータス"]),
+      purpose: getRichText(props["背景・目的"]) || null,
+      reviewMemo: getRichText(props["中間レビューメモ"]) || null,
+      finalReview: getRichText(props["最終振り返り"]) || null,
+    };
+  } catch (error) {
+    console.error("Error fetching mission by ID:", error);
+    return null;
+  }
+}
+
 export async function getMissionsByParticipant(participantName: string): Promise<MissionEntry[]> {
   if (!MISSION_DB_ID) return [];
 

@@ -8,8 +8,9 @@ import {
   updateMissionStatus,
   getMissionsByParticipant,
 } from "@/lib/notion";
-import { getManagerByToken } from "@/lib/mock-data";
+import { getManagerByToken, getParticipantByName } from "@/lib/mock-data";
 import { getTodayJST } from "@/lib/date-utils";
+import { sendNotificationEmail } from "@/lib/email";
 
 export async function GET(request: NextRequest) {
   const participantName = request.nextUrl.searchParams.get("participantName");
@@ -56,6 +57,23 @@ export async function POST(request: NextRequest) {
 
     if (!missionId) {
       return NextResponse.json({ error: "Failed to create mission" }, { status: 500 });
+    }
+
+    // Notify participant about new mission (non-blocking)
+    try {
+      const targetParticipant = getParticipantByName(participantName);
+      if (targetParticipant?.email && !targetParticipant.email.includes("example.com")) {
+        sendNotificationEmail({
+          to: targetParticipant.email,
+          recipientName: targetParticipant.name.split(" ")[0],
+          senderName: manager.name,
+          token: targetParticipant.token,
+          type: "mission_created",
+          detail: title,
+        }).catch(console.error);
+      }
+    } catch (notifyError) {
+      console.error("Mission notification error (non-critical):", notifyError);
     }
 
     return NextResponse.json({ success: true, missionId });
