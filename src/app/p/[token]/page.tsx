@@ -34,6 +34,7 @@ export default function ParticipantHome() {
   const [participant, setParticipant] = useState<ParticipantData | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [badges, setBadges] = useState<{ feedback: number; mission: number }>({ feedback: 0, mission: 0 });
+  const [unreadFeedback, setUnreadFeedback] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -49,6 +50,14 @@ export default function ParticipantHome() {
         setParticipant(data.participant);
         setLogs(data.logs || []);
         if (data.badges) setBadges(data.badges);
+
+        // Fetch unread feedback count
+        const fbRes = await fetch(`/api/feedback?token=${token}`);
+        if (fbRes.ok) {
+          const fbData = await fbRes.json();
+          setUnreadFeedback(fbData.unreadCount || 0);
+          setBadges((prev) => ({ ...prev, feedback: fbData.unreadCount || 0 }));
+        }
       } catch {
         setError("通信エラーが発生しました");
       } finally {
@@ -163,6 +172,22 @@ export default function ParticipantHome() {
       </div>
 
       <div className="max-w-md mx-auto px-6 pt-6 space-y-6">
+        {/* Unread Feedback Banner */}
+        {unreadFeedback > 0 && (
+          <Link href={`/p/${token}/feedback`}>
+            <div className="bg-[#FF8C42] text-white p-4 rounded-xl shadow-md flex items-center gap-3 cursor-pointer hover:bg-[#E67A32] transition-colors">
+              <div className="bg-white/20 rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0">
+                <span className="text-lg font-bold">{unreadFeedback}</span>
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-sm">新しいフィードバックが届いています</p>
+                <p className="text-xs text-white/80">タップして確認する</p>
+              </div>
+              <span className="text-white/80">→</span>
+            </div>
+          </Link>
+        )}
+
         {/* Today CTA Card */}
         {todayStatus.href ? (
           <Link href={todayStatus.href}>

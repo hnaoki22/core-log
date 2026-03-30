@@ -67,6 +67,10 @@ export default function AdminDashboard() {
   const [fbWeekNum, setFbWeekNum] = useState(1);
   const [fbSubmitting, setFbSubmitting] = useState(false);
   const [fbSuccess, setFbSuccess] = useState(false);
+  const [fbRecentLogs, setFbRecentLogs] = useState<
+    { date: string; dayOfWeek: string; morningIntent: string; eveningInsight: string | null; energy: string | null; status: string }[]
+  >([]);
+  const [fbLogsLoading, setFbLogsLoading] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -193,7 +197,15 @@ export default function AdminDashboard() {
     setFbPeriod("");
     setFbWeekNum(1);
     setFbSuccess(false);
+    setFbRecentLogs([]);
+    setFbLogsLoading(true);
     setShowFeedbackModal(true);
+    // Fetch recent logs for this participant
+    fetch(`/api/feedback?token=${token}&participant=${encodeURIComponent(participantName)}&includeLogs=true`)
+      .then((r) => r.json())
+      .then((d) => setFbRecentLogs(d.recentLogs || []))
+      .catch(() => setFbRecentLogs([]))
+      .finally(() => setFbLogsLoading(false));
   };
 
   const handleSubmitFeedback = async () => {
@@ -715,7 +727,34 @@ export default function AdminDashboard() {
                 </p>
               </div>
             ) : (
-              <div className="p-5 space-y-4">
+              <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+                {/* Recent Logs Summary */}
+                <div className="bg-[#F8F7FF] rounded-lg p-3">
+                  <p className="text-xs font-bold text-[#5B4FD6] mb-2">📋 直近1週間のログ</p>
+                  {fbLogsLoading ? (
+                    <div className="text-center py-2">
+                      <div className="w-4 h-4 border-2 border-[#5B4FD6] border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    </div>
+                  ) : fbRecentLogs.length === 0 ? (
+                    <p className="text-xs text-[#8B85A8] text-center py-2">直近のログがありません</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {fbRecentLogs.map((log, i) => (
+                        <div key={i} className="bg-white rounded-md px-3 py-2 text-xs">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-semibold text-[#1E1B3A]">{log.date} ({log.dayOfWeek})</span>
+                            <span>{log.energy === "excellent" ? "🔥" : log.energy === "good" ? "😊" : log.energy === "okay" ? "😐" : log.energy === "low" ? "😔" : "—"}</span>
+                          </div>
+                          <p className="text-[#5B4FD6]">朝: {log.morningIntent || "—"}</p>
+                          {log.eveningInsight && (
+                            <p className="text-[#FF8C42] mt-0.5">夜: {log.eveningInsight}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-[#1E1B3A] mb-1">
