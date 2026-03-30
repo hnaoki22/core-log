@@ -986,7 +986,7 @@ export async function createManagerInNotion(data: {
     const token = await generateUniqueToken("mgr_");
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://core-log-lilac.vercel.app";
-    const accessUrl = data.isAdmin ? `${baseUrl}/a/${token}` : `${baseUrl}/m/${token}`;
+    const accessUrl = `${baseUrl}/m/${token}`;
 
     const properties: Record<string, unknown> = {
       "名前": { title: [{ text: { content: data.name } }] },

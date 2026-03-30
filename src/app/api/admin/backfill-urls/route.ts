@@ -44,9 +44,7 @@ export async function POST(req: NextRequest) {
     const managers = await getAllManagersFromNotion();
     for (const m of managers) {
       if (!m.token) continue;
-      const accessUrl = m.isAdmin
-        ? `${baseUrl}/a/${m.token}`
-        : `${baseUrl}/m/${m.token}`;
+      const accessUrl = `${baseUrl}/m/${m.token}`;
       try {
         await notion.pages.update({
           page_id: m.id,
