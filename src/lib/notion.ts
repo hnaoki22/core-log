@@ -936,6 +936,9 @@ export async function createParticipantInNotion(data: {
   try {
     const token = await generateUniqueToken("");
 
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://core-log-lilac.vercel.app";
+    const accessUrl = `${baseUrl}/p/${token}`;
+
     const properties: Record<string, unknown> = {
       "名前": { title: [{ text: { content: data.name } }] },
       "トークン": { rich_text: [{ text: { content: token } }] },
@@ -944,6 +947,7 @@ export async function createParticipantInNotion(data: {
       "道場フェーズ": { select: { name: data.dojoPhase } },
       "役割": { select: { name: data.role } },
       "メール通知": { checkbox: data.emailEnabled ?? false },
+      "アクセスURL": { url: accessUrl },
     };
 
     if (data.managerId) {
@@ -980,12 +984,16 @@ export async function createManagerInNotion(data: {
   try {
     const token = await generateUniqueToken("mgr_");
 
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://core-log-lilac.vercel.app";
+    const accessUrl = data.isAdmin ? `${baseUrl}/a/${token}` : `${baseUrl}/m/${token}`;
+
     const properties: Record<string, unknown> = {
       "名前": { title: [{ text: { content: data.name } }] },
       "トークン": { rich_text: [{ text: { content: token } }] },
       "メール": { email: data.email },
       "部署": { rich_text: [{ text: { content: data.department } }] },
       "管理者権限": { checkbox: data.isAdmin ?? false },
+      "アクセスURL": { url: accessUrl },
     };
 
     const response = await notion.pages.create({
@@ -996,7 +1004,7 @@ export async function createManagerInNotion(data: {
     return {
       id: response.id,
       token,
-      url: `/m/${token}`,
+      url: data.isAdmin ? `/a/${token}` : `/m/${token}`,
     };
   } catch (error) {
     console.error("Error creating manager:", error);
