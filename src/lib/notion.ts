@@ -11,7 +11,8 @@ const notion = new Client({
 // Database IDs from the existing Notion workspace
 const CORE_LOG_DB_ID = process.env.NOTION_CORELOG_DB_ID || "";
 const MISSION_DB_ID = process.env.NOTION_MISSION_DB_ID || "";
-// const PARTICIPANTS_DB_ID = process.env.NOTION_PARTICIPANTS_DB_ID || "";
+const PARTICIPANTS_DB_ID = process.env.NOTION_PARTICIPANTS_DB_ID || "";
+const MANAGERS_DB_ID = process.env.NOTION_MANAGERS_DB_ID || "";
 
 // ===== Types =====
 export type NotionLogEntry = {
@@ -32,6 +33,25 @@ export type NotionLogEntry = {
 };
 
 // ===== Helper: Parse Notion properties =====
+function getEmail(prop: unknown): string {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const p = prop as any;
+  return p?.email || "";
+}
+
+function getCheckbox(prop: unknown): boolean {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const p = prop as any;
+  return p?.checkbox || false;
+}
+
+function getRelationIds(prop: unknown): string[] {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const p = prop as any;
+  if (!p?.relation?.length) return [];
+  return p.relation.map((r: { id: string }) => r.id);
+}
+
 function getRichText(prop: unknown): string {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const p = prop as any;
@@ -471,6 +491,339 @@ export async function addMissionComment(
   } catch (error) {
     console.error("Error adding mission comment:", error);
     return false;
+  }
+}
+
+// ===== Participant & Manager Types (Notion DB) =====
+export type NotionParticipant = {
+  id: string;          // Notion page ID
+  token: string;
+  name: string;
+  email: string;
+  department: string;
+  dojoPhase: string;
+  emailEnabled: boolean;
+  startDate: string;
+  role: string;        // "参加者" | "HM社内"
+  managerId: string;   // Notion page ID of related manager (from relation)
+};
+
+export type NotionManager = {
+  id: string;          // Notion page ID
+  token: string;
+  name: string;
+  email: string;
+  department: string;
+  isAdmin: boolean;    // 管理者権限 checkbox
+  participantIds: string[]; // Notion page IDs from relation
+};
+
+// ===== Participant DB Functions =====
+
+/**
+ * Get all participants from Notion DB
+ */
+export async function getAllParticipantsFromNotion(): Promise<NotionParticipant[]> {
+  if (!PARTICIPANTS_DB_ID) return [];
+
+  try {
+    const response = await notion.databases.query({
+      database_id: PARTICIPANTS_DB_ID,
+      sorts: [{ property: "名前", direction: "ascending" }],
+    });
+
+    return response.results.map((page) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const props = (page as any).properties;
+      return {
+        id: page.id,
+        token: getRichText(props["トークン"]),
+        name: getTitle(props["名前"]),
+        email: getEmail(props["メール"]),
+        department: getRichText(props["部署"]),
+        dojoPhase: getSelect(props["道場フェーズ"]),
+        emailEnabled: getCheckbox(props["メール通知"]),
+        startDate: getDate(props["開始日"]),
+        role: getSelect(props["役割"]),
+        managerId: getRelationIds(props["担当上司"])[0] || "",
+      };
+    });
+  } catch (error) {
+    console.error("Error fetching participants from Notion:", error);
+    return [];
+  }
+}
+
+/**
+ * Get a single participant by token from Notion DB
+ */
+export async function getParticipantByTokenFromNotion(token: string): Promise<NotionParticipant | null> {
+  if (!PARTICIPANTS_DB_ID || !token) return null;
+
+  try {
+    const response = await notion.databases.query({
+      database_id: PARTICIPANTS_DB_ID,
+      filter: {
+        property: "トークン",
+        rich_text: { equals: token },
+      },
+    });
+
+    if (response.results.length === 0) return null;
+
+    const page = response.results[0];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const props = (page as any).properties;
+    return {
+      id: page.id,
+      token: getRichText(props["トークン"]),
+      name: getTitle(props["名前"]),
+      email: getEmail(props["メール"]),
+      department: getRichText(props["部署"]),
+      dojoPhase: getSelect(props["道場フェーズ"]),
+      emailEnabled: getCheckbox(props["メール通知"]),
+      startDate: getDate(props["開始日"]),
+      role: getSelect(props["役割"]),
+      managerId: getRelationIds(props["担当上司"])[0] || "",
+    };
+  } catch (error) {
+    console.error("Error fetching participant by token:", error);
+    return null;
+  }
+}
+
+/**
+ * Get a participant by name from Notion DB
+ */
+export async function getParticipantByNameFromNotion(name: string): Promise<NotionParticipant | null> {
+  if (!PARTICIPANTS_DB_ID || !name) return null;
+
+  try {
+    const response = await notion.databases.query({
+      database_id: PARTICIPANTS_DB_ID,
+      filter: {
+        property: "名前",
+        title: { equals: name },
+      },
+    });
+
+    if (response.results.length === 0) {
+      // Try without spaces (e.g. "藤井真弓" vs "藤井 真弓")
+      const noSpaceName = name.replace(/\s/g, "");
+      const all = await getAllParticipantsFromNotion();
+      return all.find((p) => p.name.replace(/\s/g, "") === noSpaceName) || null;
+    }
+
+    const page = response.results[0];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const props = (page as any).properties;
+    return {
+      id: page.id,
+      token: getRichText(props["トークン"]),
+      name: getTitle(props["名前"]),
+      email: getEmail(props["メール"]),
+      department: getRichText(props["部署"]),
+      dojoPhase: getSelect(props["道場フェーズ"]),
+      emailEnabled: getCheckbox(props["メール通知"]),
+      startDate: getDate(props["開始日"]),
+      role: getSelect(props["役割"]),
+      managerId: getRelationIds(props["担当上司"])[0] || "",
+    };
+  } catch (error) {
+    console.error("Error fetching participant by name:", error);
+    return null;
+  }
+}
+
+/**
+ * Get a participant by email from Notion DB
+ */
+export async function getParticipantByEmailFromNotion(email: string): Promise<NotionParticipant | null> {
+  if (!PARTICIPANTS_DB_ID || !email) return null;
+
+  try {
+    const response = await notion.databases.query({
+      database_id: PARTICIPANTS_DB_ID,
+      filter: {
+        property: "メール",
+        email: { equals: email },
+      },
+    });
+
+    if (response.results.length === 0) return null;
+
+    const page = response.results[0];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const props = (page as any).properties;
+    return {
+      id: page.id,
+      token: getRichText(props["トークン"]),
+      name: getTitle(props["名前"]),
+      email: getEmail(props["メール"]),
+      department: getRichText(props["部署"]),
+      dojoPhase: getSelect(props["道場フェーズ"]),
+      emailEnabled: getCheckbox(props["メール通知"]),
+      startDate: getDate(props["開始日"]),
+      role: getSelect(props["役割"]),
+      managerId: getRelationIds(props["担当上司"])[0] || "",
+    };
+  } catch (error) {
+    console.error("Error fetching participant by email:", error);
+    return null;
+  }
+}
+
+// ===== Manager DB Functions =====
+
+/**
+ * Get all managers from Notion DB
+ */
+export async function getAllManagersFromNotion(): Promise<NotionManager[]> {
+  if (!MANAGERS_DB_ID) return [];
+
+  try {
+    const response = await notion.databases.query({
+      database_id: MANAGERS_DB_ID,
+      sorts: [{ property: "名前", direction: "ascending" }],
+    });
+
+    return response.results.map((page) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const props = (page as any).properties;
+      return {
+        id: page.id,
+        token: getRichText(props["トークン"]),
+        name: getTitle(props["名前"]),
+        email: getEmail(props["メール"]),
+        department: getRichText(props["部署"]),
+        isAdmin: getCheckbox(props["管理者権限"]),
+        participantIds: getRelationIds(props["担当参加者"]),
+      };
+    });
+  } catch (error) {
+    console.error("Error fetching managers from Notion:", error);
+    return [];
+  }
+}
+
+/**
+ * Get a manager by token from Notion DB
+ */
+export async function getManagerByTokenFromNotion(token: string): Promise<NotionManager | null> {
+  if (!MANAGERS_DB_ID || !token) return null;
+
+  try {
+    const response = await notion.databases.query({
+      database_id: MANAGERS_DB_ID,
+      filter: {
+        property: "トークン",
+        rich_text: { equals: token },
+      },
+    });
+
+    if (response.results.length === 0) return null;
+
+    const page = response.results[0];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const props = (page as any).properties;
+    return {
+      id: page.id,
+      token: getRichText(props["トークン"]),
+      name: getTitle(props["名前"]),
+      email: getEmail(props["メール"]),
+      department: getRichText(props["部署"]),
+      isAdmin: getCheckbox(props["管理者権限"]),
+      participantIds: getRelationIds(props["担当参加者"]),
+    };
+  } catch (error) {
+    console.error("Error fetching manager by token:", error);
+    return null;
+  }
+}
+
+/**
+ * Get a manager by Notion page ID
+ */
+export async function getManagerByIdFromNotion(managerId: string): Promise<NotionManager | null> {
+  if (!managerId) return null;
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const page = await notion.pages.retrieve({ page_id: managerId }) as any;
+    const props = page.properties;
+    return {
+      id: page.id,
+      token: getRichText(props["トークン"]),
+      name: getTitle(props["名前"]),
+      email: getEmail(props["メール"]),
+      department: getRichText(props["部署"]),
+      isAdmin: getCheckbox(props["管理者権限"]),
+      participantIds: getRelationIds(props["担当参加者"]),
+    };
+  } catch (error) {
+    console.error("Error fetching manager by ID:", error);
+    return null;
+  }
+}
+
+/**
+ * Check if a token belongs to an admin (manager with 管理者権限=true)
+ */
+export async function isAdminTokenFromNotion(token: string): Promise<boolean> {
+  if (!MANAGERS_DB_ID || !token) return false;
+
+  try {
+    const response = await notion.databases.query({
+      database_id: MANAGERS_DB_ID,
+      filter: {
+        and: [
+          { property: "トークン", rich_text: { equals: token } },
+          { property: "管理者権限", checkbox: { equals: true } },
+        ],
+      },
+    });
+
+    return response.results.length > 0;
+  } catch (error) {
+    console.error("Error checking admin token:", error);
+    return false;
+  }
+}
+
+/**
+ * Get participants managed by a specific manager (from relation)
+ */
+export async function getParticipantsForManagerFromNotion(managerId: string): Promise<NotionParticipant[]> {
+  if (!PARTICIPANTS_DB_ID || !managerId) return [];
+
+  try {
+    const response = await notion.databases.query({
+      database_id: PARTICIPANTS_DB_ID,
+      filter: {
+        property: "担当上司",
+        relation: { contains: managerId },
+      },
+    });
+
+    return response.results.map((page) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const props = (page as any).properties;
+      return {
+        id: page.id,
+        token: getRichText(props["トークン"]),
+        name: getTitle(props["名前"]),
+        email: getEmail(props["メール"]),
+        department: getRichText(props["部署"]),
+        dojoPhase: getSelect(props["道場フェーズ"]),
+        emailEnabled: getCheckbox(props["メール通知"]),
+        startDate: getDate(props["開始日"]),
+        role: getSelect(props["役割"]),
+        managerId: managerId,
+      };
+    });
+  } catch (error) {
+    console.error("Error fetching participants for manager:", error);
+    return [];
   }
 }
 

@@ -6,7 +6,7 @@ import { getLogsByParticipant } from "@/lib/notion";
 import {
   getManagerByToken,
   getParticipantsForManager,
-} from "@/lib/mock-data";
+} from "@/lib/participant-db";
 import { computeParticipantStats } from "@/lib/stats";
 import { getTodayJST } from "@/lib/date-utils";
 
@@ -17,12 +17,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Token required" }, { status: 400 });
   }
 
-  const manager = getManagerByToken(token);
+  const manager = await getManagerByToken(token);
   if (!manager) {
     return NextResponse.json({ error: "Manager not found" }, { status: 404 });
   }
 
-  const participantMocks = getParticipantsForManager(manager.id);
+  const participantMocks = await getParticipantsForManager(manager.id);
   const todayJST = getTodayJST();
   const useMock = !process.env.NOTION_API_TOKEN;
 
@@ -31,25 +31,26 @@ export async function GET(request: NextRequest) {
     participantMocks.map(async (p) => {
       if (useMock) {
         // Mock mode: return mock data stats
-        const hasLogToday = p.logs.some((l) => l.date === todayJST && l.morningIntent);
+        const logs = p.logs || [];
+        const hasLogToday = logs.some((l) => l.date === todayJST && l.morningIntent);
         return {
           name: p.name,
           department: p.department,
           dojoPhase: p.dojoPhase,
-          entryDays: p.entryRate > 0 ? p.logs.filter((l) => l.morningIntent).length : 0,
-          entryRate: p.entryRate,
-          streak: p.streak,
-          fbCount: p.fbCount,
+          entryDays: (p.entryRate || 0) > 0 ? logs.filter((l) => l.morningIntent).length : 0,
+          entryRate: p.entryRate || 0,
+          streak: p.streak || 0,
+          fbCount: p.fbCount || 0,
           todayHasLog: hasLogToday,
-          latestLog: p.logs[0]
+          latestLog: logs[0]
             ? {
-                date: p.logs[0].date,
-                morningIntent: p.logs[0].morningIntent,
-                status: p.logs[0].status,
-                energy: p.logs[0].energy,
+                date: logs[0].date,
+                morningIntent: logs[0].morningIntent,
+                status: logs[0].status,
+                energy: logs[0].energy,
               }
             : null,
-          recentEnergy: p.logs.slice(0, 5).map((l) => l.energy),
+          recentEnergy: logs.slice(0, 5).map((l) => l.energy),
         };
       }
 

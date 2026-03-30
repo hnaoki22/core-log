@@ -2,7 +2,7 @@
 // Uses Resend for transactional email delivery
 // Free tier: 100 emails/day (enough for 9 participants × 2 times/day)
 
-import { getParticipantByEmail } from "./mock-data";
+import { getParticipantByEmail } from "./participant-db";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const FROM_EMAIL = process.env.REMIND_FROM_EMAIL || "CORE Log <noreply@resend.dev>";
@@ -188,7 +188,7 @@ function buildNotificationEmail(options: NotificationOptions) {
 
 export async function sendNotificationEmail(options: NotificationOptions): Promise<boolean> {
   // emailEnabled チェック（参加者DBのフラグで制御）
-  const participant = getParticipantByEmail(options.to);
+  const participant = await getParticipantByEmail(options.to);
   if (participant && !participant.emailEnabled) {
     console.log(`[Notify SKIP] emailEnabled=false for ${options.to} — skipping ${options.type} notification`);
     return false;
@@ -234,7 +234,7 @@ export async function sendNotificationEmail(options: NotificationOptions): Promi
 
 export async function sendReminderEmail(options: SendEmailOptions): Promise<boolean> {
   // emailEnabled チェック（参加者DBのフラグで制御）
-  const participant = getParticipantByEmail(options.to);
+  const participant = await getParticipantByEmail(options.to);
   if (participant && !participant.emailEnabled) {
     console.log(`[Email SKIP] emailEnabled=false for ${options.to} — skipping ${options.type} reminder`);
     return false;

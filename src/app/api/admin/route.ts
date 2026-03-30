@@ -6,21 +6,26 @@ import { getLogsByParticipant } from "@/lib/notion";
 import {
   getAllParticipants,
   getAllManagers,
-} from "@/lib/mock-data";
+  isAdminToken,
+} from "@/lib/participant-db";
 import { computeParticipantStats } from "@/lib/stats";
 import { getTodayJST } from "@/lib/date-utils";
-
-const ADMIN_TOKENS = ["munetomo-admin", "UE8m8SSJAgRBwsSZ"];
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
 
-  if (!token || !ADMIN_TOKENS.includes(token)) {
+  if (!token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
-  const participantMocks = getAllParticipants();
-  const managers = getAllManagers();
+  // Check admin authorization from Notion DB (管理者権限 checkbox)
+  const authorized = await isAdminToken(token);
+  if (!authorized) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
+  const participantMocks = await getAllParticipants();
+  const managers = await getAllManagers();
   const todayJST = getTodayJST();
   const useMock = !process.env.NOTION_API_TOKEN;
 
@@ -28,27 +33,28 @@ export async function GET(request: NextRequest) {
   const enrichedParticipants = await Promise.all(
     participantMocks.map(async (p) => {
       if (useMock) {
-        const hasLogToday = p.logs.some((l) => l.date === todayJST && l.morningIntent);
+        const logs = p.logs || [];
+        const hasLogToday = logs.some((l) => l.date === todayJST && l.morningIntent);
         return {
           id: p.id,
           name: p.name,
           department: p.department,
           dojoPhase: p.dojoPhase,
-          entryDays: p.logs.filter((l) => l.morningIntent).length,
-          entryRate: p.entryRate,
-          streak: p.streak,
-          fbCount: p.fbCount,
+          entryDays: logs.filter((l) => l.morningIntent).length,
+          entryRate: p.entryRate || 0,
+          streak: p.streak || 0,
+          fbCount: p.fbCount || 0,
           managerId: p.managerId,
           todayHasLog: hasLogToday,
-          latestLog: p.logs[0]
+          latestLog: logs[0]
             ? {
-                date: p.logs[0].date,
-                morningIntent: p.logs[0].morningIntent,
-                status: p.logs[0].status,
-                energy: p.logs[0].energy,
+                date: logs[0].date,
+                morningIntent: logs[0].morningIntent,
+                status: logs[0].status,
+                energy: logs[0].energy,
               }
             : null,
-          recentEnergy: p.logs.slice(0, 7).map((l) => l.energy),
+          recentEnergy: logs.slice(0, 7).map((l) => l.energy),
         };
       }
 

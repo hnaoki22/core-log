@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isBusinessDay, getJSTDateString, getJSTHour } from "@/lib/calendar";
 import { sendReminderEmail, type ReminderType } from "@/lib/email";
 import { hasLoggedToday } from "@/lib/notion";
-import { getAllParticipants } from "@/lib/mock-data";
+import { getAllParticipants } from "@/lib/participant-db";
 
 // Vercel Cron secret for authentication
 const CRON_SECRET = process.env.CRON_SECRET || "";
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
   const type: ReminderType = jstHour < 12 ? "morning" : "evening";
 
   // Get all active participants (those with email and startDate or in pilot)
-  const participants = getAllParticipants();
+  const participants = await getAllParticipants();
   const activeParticipants = participants.filter(
     (p) => p.email && p.email !== "" && !p.email.includes("example.com")
   );

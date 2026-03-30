@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { addManagerComment } from "@/lib/notion";
-import { getManagerByToken, getParticipantById } from "@/lib/mock-data";
+import { getManagerByToken, getParticipantById } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
@@ -37,14 +37,11 @@ export async function POST(request: NextRequest) {
 
     // Notify participant about manager's comment (non-blocking)
     try {
-      const manager = getManagerByToken(token);
+      const manager = await getManagerByToken(token);
       if (manager) {
-        // Find the participant this comment belongs to
-        // participantId here is the Notion page ID; we need participant info from URL context
-        // The manager page includes participantId in the URL, which maps to participant registry
         const allParticipants = manager.participantIds;
         for (const pid of allParticipants) {
-          const p = getParticipantById(pid);
+          const p = await getParticipantById(pid);
           if (p?.email && !p.email.includes("example.com")) {
             // For now, notify all participants of this manager (usually just one)
             // In future, pass participant identifier from frontend

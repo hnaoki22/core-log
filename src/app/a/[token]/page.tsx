@@ -3,8 +3,6 @@
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 
-const ADMIN_TOKENS = ["munetomo-admin", "UE8m8SSJAgRBwsSZ"];
-
 type ParticipantData = {
   id: string;
   name: string;
@@ -43,16 +41,16 @@ export default function AdminDashboard() {
   const token = params.token as string;
   const [data, setData] = useState<AdminData | null>(null);
   const [loading, setLoading] = useState(true);
-  const isAuthorized = ADMIN_TOKENS.includes(token);
+  const [unauthorized, setUnauthorized] = useState(false);
 
   useEffect(() => {
-    if (!isAuthorized) {
-      setLoading(false);
-      return;
-    }
     async function fetchData() {
       try {
         const res = await fetch(`/api/admin?token=${token}`);
+        if (res.status === 403) {
+          setUnauthorized(true);
+          return;
+        }
         if (res.ok) {
           const json = await res.json();
           setData(json);
@@ -64,9 +62,9 @@ export default function AdminDashboard() {
       }
     }
     fetchData();
-  }, [token, isAuthorized]);
+  }, [token]);
 
-  if (!isAuthorized) {
+  if (unauthorized) {
     return (
       <div className="min-h-screen bg-[#F8F7FF] flex items-center justify-center p-6">
         <div className="text-center">

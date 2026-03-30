@@ -1,7 +1,6 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { getParticipantByToken } from "@/lib/mock-data";
 import { getTodayJST } from "@/lib/date-utils";
 import { useState, useEffect } from "react";
 
@@ -11,12 +10,18 @@ type TodayLog = {
   status: string;
 };
 
+type ParticipantBasic = {
+  name: string;
+  dojoPhase: string;
+  weekNum?: number;
+};
+
 export default function InputPage() {
   const params = useParams();
   const router = useRouter();
   const token = params.token as string;
-  const participant = getParticipantByToken(token);
 
+  const [participant, setParticipant] = useState<ParticipantBasic | null>(null);
   const [step, setStep] = useState(1);
   const [morning, setMorning] = useState("");
   const [evening, setEvening] = useState("");
@@ -37,13 +42,21 @@ export default function InputPage() {
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch today's log status from API (Notion) to determine morning/evening mode
+  // Fetch participant data and today's log status from API
   useEffect(() => {
     async function checkTodayStatus() {
       try {
         const res = await fetch(`/api/logs?token=${token}`);
         if (res.ok) {
           const data = await res.json();
+          // Extract participant info from API response
+          if (data.participant) {
+            setParticipant({
+              name: data.participant.name,
+              dojoPhase: data.participant.dojoPhase,
+              weekNum: data.participant.weekNum,
+            });
+          }
           const logs = data.logs || [];
           const todayEntry = logs.find((log: TodayLog & { date: string }) => log.date === today);
           if (todayEntry && todayEntry.morningIntent) {

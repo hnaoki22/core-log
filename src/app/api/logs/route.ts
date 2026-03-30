@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getLogsByParticipant, getMissionsByParticipant } from "@/lib/notion";
-import { getParticipantByToken } from "@/lib/mock-data";
+import { getParticipantByToken } from "@/lib/participant-db";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -16,15 +16,16 @@ export async function GET(request: NextRequest) {
 
   // If Notion is not configured, return mock data
   if (useMock) {
-    const participant = getParticipantByToken(token);
+    const participant = await getParticipantByToken(token);
     if (!participant) {
       return NextResponse.json({ error: "Participant not found" }, { status: 404 });
     }
     // バッジカウント計算
-    const newFeedbackCount = participant.feedbacks.filter((f) => f.isNew).length;
-    const newManagerCommentCount = participant.managerComments.length > 0 ?
-      participant.managerComments.filter((mc) => {
-        // 直近7日以内のコメントを「新着」とみなす
+    const feedbacks = participant.feedbacks || [];
+    const managerComments = participant.managerComments || [];
+    const newFeedbackCount = feedbacks.filter((f) => f.isNew).length;
+    const newManagerCommentCount = managerComments.length > 0 ?
+      managerComments.filter((mc) => {
         const commentDate = new Date(mc.date);
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -44,10 +45,10 @@ export async function GET(request: NextRequest) {
         fbCount: participant.fbCount,
         averageEnergy: participant.averageEnergy,
       },
-      logs: participant.logs,
-      feedbacks: participant.feedbacks,
-      managerComments: participant.managerComments,
-      missions: participant.missions,
+      logs: participant.logs || [],
+      feedbacks: participant.feedbacks || [],
+      managerComments: participant.managerComments || [],
+      missions: participant.missions || [],
       badges: {
         feedback: newFeedbackCount + newManagerCommentCount,
         mission: 0,  // ミッションコメントの未読はNotion移行後に対応
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Use Notion API
-  const participant = getParticipantByToken(token); // Still use token mapping
+  const participant = await getParticipantByToken(token);
   if (!participant) {
     return NextResponse.json({ error: "Participant not found" }, { status: 404 });
   }

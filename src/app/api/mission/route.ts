@@ -8,7 +8,7 @@ import {
   updateMissionStatus,
   getMissionsByParticipant,
 } from "@/lib/notion";
-import { getManagerByToken, getParticipantByName } from "@/lib/mock-data";
+import { getManagerByToken, getParticipantByName } from "@/lib/participant-db";
 import { getTodayJST } from "@/lib/date-utils";
 import { sendNotificationEmail } from "@/lib/email";
 
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify manager token
-    const manager = getManagerByToken(token);
+    const manager = await getManagerByToken(token);
     if (!manager) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
 
     // Notify participant about new mission (non-blocking)
     try {
-      const targetParticipant = getParticipantByName(participantName);
+      const targetParticipant = await getParticipantByName(participantName);
       if (targetParticipant?.email && !targetParticipant.email.includes("example.com")) {
         sendNotificationEmail({
           to: targetParticipant.email,
@@ -96,7 +96,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Verify manager token
-    const manager = getManagerByToken(token);
+    const manager = await getManagerByToken(token);
     if (!manager) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }

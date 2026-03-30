@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { addMissionComment, getMissionComments, getMissionById } from "@/lib/notion";
-import { getManagerByToken, getParticipantByToken, getParticipantByName, getManagerById } from "@/lib/mock-data";
+import { getManagerByToken, getParticipantByToken, getParticipantByName, getManagerById } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
 
 export async function GET(request: NextRequest) {
@@ -35,8 +35,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine who is commenting: manager or participant
-    const manager = getManagerByToken(token);
-    const participant = getParticipantByToken(token);
+    const manager = await getManagerByToken(token);
+    const participant = await getParticipantByToken(token);
 
     if (!manager && !participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
         // Manager commented → notify participant
         const mission = await getMissionById(missionId);
         if (mission) {
-          const targetParticipant = getParticipantByName(mission.participantName);
+          const targetParticipant = await getParticipantByName(mission.participantName);
           if (targetParticipant?.email && !targetParticipant.email.includes("example.com")) {
             sendNotificationEmail({
               to: targetParticipant.email,
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
         }
       } else if (participant) {
         // Participant commented → notify their manager
-        const mgr = participant.managerId ? getManagerById(participant.managerId) : null;
+        const mgr = participant.managerId ? await getManagerById(participant.managerId) : null;
         if (mgr?.email && !mgr.email.includes("example.com")) {
           sendNotificationEmail({
             to: mgr.email,
