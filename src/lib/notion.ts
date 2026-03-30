@@ -13,6 +13,7 @@ const CORE_LOG_DB_ID = process.env.NOTION_CORELOG_DB_ID || "";
 const MISSION_DB_ID = process.env.NOTION_MISSION_DB_ID || "";
 const PARTICIPANTS_DB_ID = process.env.NOTION_PARTICIPANTS_DB_ID || "";
 const MANAGERS_DB_ID = process.env.NOTION_MANAGERS_DB_ID || "";
+const FEEDBACK_DB_ID = process.env.NOTION_FEEDBACK_DB_ID || "";
 
 // ===== Types =====
 export type NotionLogEntry = {
@@ -1009,5 +1010,136 @@ export async function createManagerInNotion(data: {
   } catch (error) {
     console.error("Error creating manager:", error);
     return null;
+  }
+}
+
+// ===== Feedback DB Functions =====
+
+export type NotionFeedback = {
+  id: string;
+  participantName: string;
+  authorName: string;
+  type: "HMフィードバック" | "上司コメント";
+  content: string;
+  period: string;
+  weekNum: number;
+  date: string;
+  isRead: boolean;
+};
+
+/**
+ * Get all feedback for a specific participant
+ */
+export async function getFeedbackByParticipant(participantName: string): Promise<NotionFeedback[]> {
+  if (!FEEDBACK_DB_ID) return [];
+
+  try {
+    const response = await notion.databases.query({
+      database_id: FEEDBACK_DB_ID,
+      filter: {
+        property: "参加者名",
+        select: { equals: participantName },
+      },
+      sorts: [{ property: "日付", direction: "descending" }],
+    });
+
+    return response.results.map((page) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const props = (page as any).properties;
+      return {
+        id: page.id,
+        participantName: getSelect(props["参加者名"]),
+        authorName: getRichText(props["記入者名"]),
+        type: getSelect(props["種別"]) as "HMフィードバック" | "上司コメント",
+        content: getRichText(props["フィードバック"]),
+        period: getRichText(props["対象期間"]),
+        weekNum: getNumber(props["週番号"]),
+        date: getDate(props["日付"]),
+        isRead: getCheckbox(props["既読"]),
+      };
+    });
+  } catch (error) {
+    console.error("Error fetching feedback:", error);
+    return [];
+  }
+}
+
+/**
+ * Get unread feedback count for a participant
+ */
+export async function getUnreadFeedbackCount(participantName: string): Promise<number> {
+  if (!FEEDBACK_DB_ID) return 0;
+
+  try {
+    const response = await notion.databases.query({
+      database_id: FEEDBACK_DB_ID,
+      filter: {
+        and: [
+          { property: "参加者名", select: { equals: participantName } },
+          { property: "既読", checkbox: { equals: false } },
+        ],
+      },
+    });
+    return response.results.length;
+  } catch (error) {
+    console.error("Error counting unread feedback:", error);
+    return 0;
+  }
+}
+
+/**
+ * Create a new feedback entry
+ */
+export async function createFeedback(data: {
+  participantName: string;
+  authorName: string;
+  type: "HMフィードバック" | "上司コメント";
+  content: string;
+  period: string;
+  weekNum: number;
+}): Promise<{ id: string } | null> {
+  if (!FEEDBACK_DB_ID) return null;
+
+  try {
+    const today = new Date();
+    const dateStr = today.toISOString().split("T")[0];
+
+    const response = await notion.pages.create({
+      parent: { database_id: FEEDBACK_DB_ID },
+      properties: {
+        "Name": { title: [{ text: { content: `${data.participantName} - 第${data.weekNum}週` } }] },
+        "参加者名": { select: { name: data.participantName } },
+        "記入者名": { rich_text: [{ text: { content: data.authorName } }] },
+        "種別": { select: { name: data.type } },
+        "フィードバック": { rich_text: [{ text: { content: data.content } }] },
+        "対象期間": { rich_text: [{ text: { content: data.period } }] },
+        "週番号": { number: data.weekNum },
+        "日付": { date: { start: dateStr } },
+        "既読": { checkbox: false },
+      } as Parameters<typeof notion.pages.create>[0]["properties"],
+    });
+
+    return { id: response.id };
+  } catch (error) {
+    console.error("Error creating feedback:", error);
+    return null;
+  }
+}
+
+/**
+ * Mark feedback as read
+ */
+export async function markFeedbackAsRead(feedbackId: string): Promise<boolean> {
+  try {
+    await notion.pages.update({
+      page_id: feedbackId,
+      properties: {
+        "既読": { checkbox: true },
+      } as Parameters<typeof notion.pages.update>[0]["properties"],
+    });
+    return true;
+  } catch (error) {
+    console.error("Error marking feedback as read:", error);
+    return false;
   }
 }
