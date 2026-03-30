@@ -2,6 +2,8 @@
 // Uses Resend for transactional email delivery
 // Free tier: 100 emails/day (enough for 9 participants × 2 times/day)
 
+import { getParticipantByEmail } from "./mock-data";
+
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const FROM_EMAIL = process.env.REMIND_FROM_EMAIL || "CORE Log <noreply@resend.dev>";
 const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://core-log-lilac.vercel.app";
@@ -185,6 +187,13 @@ function buildNotificationEmail(options: NotificationOptions) {
 }
 
 export async function sendNotificationEmail(options: NotificationOptions): Promise<boolean> {
+  // emailEnabled チェック（参加者DBのフラグで制御）
+  const participant = getParticipantByEmail(options.to);
+  if (participant && !participant.emailEnabled) {
+    console.log(`[Notify SKIP] emailEnabled=false for ${options.to} — skipping ${options.type} notification`);
+    return false;
+  }
+
   if (!RESEND_API_KEY) {
     console.log(`[Notify SKIP] No RESEND_API_KEY — would send ${options.type} notification to ${options.to}`);
     return false;
@@ -224,6 +233,13 @@ export async function sendNotificationEmail(options: NotificationOptions): Promi
 // ===== Daily Reminder Emails =====
 
 export async function sendReminderEmail(options: SendEmailOptions): Promise<boolean> {
+  // emailEnabled チェック（参加者DBのフラグで制御）
+  const participant = getParticipantByEmail(options.to);
+  if (participant && !participant.emailEnabled) {
+    console.log(`[Email SKIP] emailEnabled=false for ${options.to} — skipping ${options.type} reminder`);
+    return false;
+  }
+
   if (!RESEND_API_KEY) {
     console.log(`[Email SKIP] No RESEND_API_KEY — would send ${options.type} reminder to ${options.to}`);
     return false;

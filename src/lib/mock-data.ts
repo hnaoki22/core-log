@@ -58,6 +58,7 @@ export type Participant = {
   managerComments: ManagerComment[];
   missions: Mission[];
   managerId: string;
+  emailEnabled: boolean;  // メール通知ON/OFF（Notion参加者DBのチェックボックスに対応）
 };
 
 export type Manager = {
@@ -100,6 +101,7 @@ const participantA: Participant = {
   fbCount: 4,
   averageEnergy: "good",
   managerId: "m1",
+  emailEnabled: false,
   logs: [
     {
       id: "l1",
@@ -261,6 +263,7 @@ const participantB: Participant = {
   fbCount: 4,
   averageEnergy: "good",
   managerId: "m1",
+  emailEnabled: false,
   logs: [
     {
       id: "l20",
@@ -342,6 +345,7 @@ const participantC: Participant = {
   fbCount: 3,
   averageEnergy: "okay",
   managerId: "m2",
+  emailEnabled: false,
   logs: [
     {
       id: "l30",
@@ -396,6 +400,7 @@ const participantMunetomo: Participant = {
   fbCount: 3,
   averageEnergy: "good",
   managerId: "m-munetomo-mgr",
+  emailEnabled: false,
   logs: [
     {
       id: "lm1",
@@ -530,7 +535,7 @@ const participantFujiiM: Participant = {
   department: "国内営業部 営業推進グループ",
   dojoPhase: "道場1 覚醒", weekNum: 1, startDate: "", totalDays: 0,
   entryRate: 0, streak: 0, fbCount: 0, averageEnergy: "",
-  managerId: "", logs: [], feedbacks: [], managerComments: [], missions: [],
+  managerId: "", emailEnabled: false, logs: [], feedbacks: [], managerComments: [], missions: [],
 };
 
 const participantMouri: Participant = {
@@ -539,7 +544,7 @@ const participantMouri: Participant = {
   department: "マーケティング部",
   dojoPhase: "道場1 覚醒", weekNum: 1, startDate: "", totalDays: 0,
   entryRate: 0, streak: 0, fbCount: 0, averageEnergy: "",
-  managerId: "", logs: [], feedbacks: [], managerComments: [], missions: [],
+  managerId: "", emailEnabled: false, logs: [], feedbacks: [], managerComments: [], missions: [],
 };
 
 const participantFujiiR: Participant = {
@@ -548,7 +553,7 @@ const participantFujiiR: Participant = {
   department: "製造部 京都製造グループ",
   dojoPhase: "道場1 覚醒", weekNum: 1, startDate: "", totalDays: 0,
   entryRate: 0, streak: 0, fbCount: 0, averageEnergy: "",
-  managerId: "", logs: [], feedbacks: [], managerComments: [], missions: [],
+  managerId: "", emailEnabled: false, logs: [], feedbacks: [], managerComments: [], missions: [],
 };
 
 const participantAsano: Participant = {
@@ -557,7 +562,7 @@ const participantAsano: Participant = {
   department: "経理部",
   dojoPhase: "道場1 覚醒", weekNum: 1, startDate: "", totalDays: 0,
   entryRate: 0, streak: 0, fbCount: 0, averageEnergy: "",
-  managerId: "", logs: [], feedbacks: [], managerComments: [], missions: [],
+  managerId: "", emailEnabled: false, logs: [], feedbacks: [], managerComments: [], missions: [],
 };
 
 const participantTakeda: Participant = {
@@ -566,7 +571,7 @@ const participantTakeda: Participant = {
   department: "製造部 吹田工場総務グループ",
   dojoPhase: "道場1 覚醒", weekNum: 1, startDate: "", totalDays: 0,
   entryRate: 0, streak: 0, fbCount: 0, averageEnergy: "",
-  managerId: "", logs: [], feedbacks: [], managerComments: [], missions: [],
+  managerId: "", emailEnabled: false, logs: [], feedbacks: [], managerComments: [], missions: [],
 };
 
 const participantChiba: Participant = {
@@ -575,7 +580,7 @@ const participantChiba: Participant = {
   department: "マーケティング部",
   dojoPhase: "道場1 覚醒", weekNum: 1, startDate: "", totalDays: 0,
   entryRate: 0, streak: 0, fbCount: 0, averageEnergy: "",
-  managerId: "", logs: [], feedbacks: [], managerComments: [], missions: [],
+  managerId: "", emailEnabled: false, logs: [], feedbacks: [], managerComments: [], missions: [],
 };
 
 const participantShimoji: Participant = {
@@ -584,7 +589,7 @@ const participantShimoji: Participant = {
   department: "製造部 購買グループ",
   dojoPhase: "道場1 覚醒", weekNum: 1, startDate: "", totalDays: 0,
   entryRate: 0, streak: 0, fbCount: 0, averageEnergy: "",
-  managerId: "", logs: [], feedbacks: [], managerComments: [], missions: [],
+  managerId: "", emailEnabled: false, logs: [], feedbacks: [], managerComments: [], missions: [],
 };
 
 const participantHayashi: Participant = {
@@ -593,7 +598,7 @@ const participantHayashi: Participant = {
   department: "研究開発部 開発グループ",
   dojoPhase: "道場1 覚醒", weekNum: 1, startDate: "", totalDays: 0,
   entryRate: 0, streak: 0, fbCount: 0, averageEnergy: "",
-  managerId: "", logs: [], feedbacks: [], managerComments: [], missions: [],
+  managerId: "", emailEnabled: false, logs: [], feedbacks: [], managerComments: [], missions: [],
 };
 
 // ===== Human Mature 社内アカウント =====
@@ -612,6 +617,7 @@ const participantDoi: Participant = {
   fbCount: 0,
   averageEnergy: "",
   managerId: "m-hondo",
+  emailEnabled: true,
   logs: [],
   feedbacks: [],
   managerComments: [],
@@ -675,6 +681,10 @@ export function getParticipantById(id: string): Participant | null {
 
 export function getParticipantByName(name: string): Participant | null {
   return participants.find((p) => p.name === name || p.name.replace(/\s/g, "") === name.replace(/\s/g, "")) ?? null;
+}
+
+export function getParticipantByEmail(email: string): Participant | null {
+  return participants.find((p) => p.email === email) ?? null;
 }
 
 export function getManagerById(id: string): Manager | null {
