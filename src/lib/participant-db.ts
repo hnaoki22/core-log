@@ -33,7 +33,9 @@ import {
 } from "./mock-data";
 
 // Check if Notion participant/manager DBs are configured
-const useNotionDB = () => !!process.env.NOTION_PARTICIPANTS_DB_ID;
+function hasNotionParticipantDB(): boolean {
+  return !!process.env.NOTION_PARTICIPANTS_DB_ID;
+}
 
 // ===== Unified types that both Notion and mock data can provide =====
 export type ParticipantInfo = {
@@ -136,7 +138,7 @@ function mockManagerToInfo(mm: Manager): ManagerInfo {
 // ===== Public API =====
 
 export async function getAllParticipants(): Promise<ParticipantInfo[]> {
-  if (useNotionDB()) {
+  if (hasNotionParticipantDB()) {
     const nps = await getAllParticipantsFromNotion();
     return nps.map(notionParticipantToInfo);
   }
@@ -144,7 +146,7 @@ export async function getAllParticipants(): Promise<ParticipantInfo[]> {
 }
 
 export async function getParticipantByToken(token: string): Promise<ParticipantInfo | null> {
-  if (useNotionDB()) {
+  if (hasNotionParticipantDB()) {
     const np = await getParticipantByTokenFromNotion(token);
     return np ? notionParticipantToInfo(np) : null;
   }
@@ -153,7 +155,7 @@ export async function getParticipantByToken(token: string): Promise<ParticipantI
 }
 
 export async function getParticipantByName(name: string): Promise<ParticipantInfo | null> {
-  if (useNotionDB()) {
+  if (hasNotionParticipantDB()) {
     const np = await getParticipantByNameFromNotion(name);
     return np ? notionParticipantToInfo(np) : null;
   }
@@ -162,7 +164,7 @@ export async function getParticipantByName(name: string): Promise<ParticipantInf
 }
 
 export async function getParticipantByEmail(email: string): Promise<ParticipantInfo | null> {
-  if (useNotionDB()) {
+  if (hasNotionParticipantDB()) {
     const np = await getParticipantByEmailFromNotion(email);
     return np ? notionParticipantToInfo(np) : null;
   }
@@ -171,7 +173,7 @@ export async function getParticipantByEmail(email: string): Promise<ParticipantI
 }
 
 export async function getParticipantById(id: string): Promise<ParticipantInfo | null> {
-  if (useNotionDB()) {
+  if (hasNotionParticipantDB()) {
     // In Notion mode, ID is a Notion page ID — retrieve directly
     try {
       // Use getAllParticipants and find by ID (no direct page retrieval for participants)
@@ -187,7 +189,7 @@ export async function getParticipantById(id: string): Promise<ParticipantInfo | 
 }
 
 export async function getAllManagers(): Promise<ManagerInfo[]> {
-  if (useNotionDB()) {
+  if (hasNotionParticipantDB()) {
     const nms = await getAllManagersFromNotion();
     return nms.map(notionManagerToInfo);
   }
@@ -195,7 +197,7 @@ export async function getAllManagers(): Promise<ManagerInfo[]> {
 }
 
 export async function getManagerByToken(token: string): Promise<ManagerInfo | null> {
-  if (useNotionDB()) {
+  if (hasNotionParticipantDB()) {
     const nm = await getManagerByTokenFromNotion(token);
     return nm ? notionManagerToInfo(nm) : null;
   }
@@ -204,7 +206,7 @@ export async function getManagerByToken(token: string): Promise<ManagerInfo | nu
 }
 
 export async function getManagerById(id: string): Promise<ManagerInfo | null> {
-  if (useNotionDB()) {
+  if (hasNotionParticipantDB()) {
     const nm = await getManagerByIdFromNotion(id);
     return nm ? notionManagerToInfo(nm) : null;
   }
@@ -213,7 +215,7 @@ export async function getManagerById(id: string): Promise<ManagerInfo | null> {
 }
 
 export async function getParticipantsForManager(managerId: string): Promise<ParticipantInfo[]> {
-  if (useNotionDB()) {
+  if (hasNotionParticipantDB()) {
     const nps = await getParticipantsForManagerFromNotion(managerId);
     return nps.map(notionParticipantToInfo);
   }
@@ -221,7 +223,7 @@ export async function getParticipantsForManager(managerId: string): Promise<Part
 }
 
 export async function isAdminToken(token: string): Promise<boolean> {
-  if (useNotionDB()) {
+  if (hasNotionParticipantDB()) {
     return await isAdminTokenFromNotion(token);
   }
   // Fallback: hardcoded admin tokens for mock mode
