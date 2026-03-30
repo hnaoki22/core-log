@@ -15,6 +15,7 @@ type ParticipantData = {
   streak: number;
   fbCount: number;
   managerId: string;
+  todayHasLog: boolean;
   latestLog: {
     date: string;
     morningIntent: string;
@@ -113,6 +114,7 @@ export default function AdminDashboard() {
         )
       : 0;
   const totalFeedbacks = participants.reduce((sum, p) => sum + p.fbCount, 0);
+  const todayLogCount = participants.filter((p) => p.todayHasLog).length;
 
   const getStatusBadge = (rate: number, streak: number, entryDays: number) => {
     if (entryDays === 0) return { emoji: "⚪", label: "未開始" };
@@ -140,7 +142,7 @@ export default function AdminDashboard() {
 
       <div className="max-w-4xl mx-auto px-4 -mt-4">
         {/* Summary Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
           <div className="bg-white rounded-xl p-4 shadow-sm border border-[#E8E5F0]">
             <div className="text-3xl font-bold text-[#5B4FD6]">
               {participants.length}
@@ -152,6 +154,12 @@ export default function AdminDashboard() {
               {avgEntryRate}%
             </div>
             <div className="text-xs text-[#8B85A8] mt-1">平均記入率</div>
+          </div>
+          <div className="bg-white rounded-xl p-4 shadow-sm border-2 border-[#5B4FD6]">
+            <div className="text-3xl font-bold text-[#5B4FD6]">
+              {todayLogCount}
+            </div>
+            <div className="text-xs text-[#8B85A8] mt-1">今日の記入</div>
           </div>
           <div className="bg-white rounded-xl p-4 shadow-sm border border-[#E8E5F0]">
             <div className="text-3xl font-bold text-[#FF8C42]">{totalLogs}</div>
@@ -190,6 +198,11 @@ export default function AdminDashboard() {
                         <span className="text-xs bg-[#EDE9FF] text-[#5B4FD6] px-2 py-0.5 rounded-full">
                           {p.dojoPhase}
                         </span>
+                        {p.todayHasLog && (
+                          <span className="bg-[#FF4444] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                            NEW
+                          </span>
+                        )}
                       </div>
                       <div className="text-sm text-[#8B85A8] mb-2">
                         {p.department}

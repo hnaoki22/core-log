@@ -28,6 +28,7 @@ export default function MissionPage() {
   const token = params.token as string;
 
   const [missions, setMissions] = useState<Mission[]>([]);
+  const [badges, setBadges] = useState<{ feedback: number; mission: number }>({ feedback: 0, mission: 0 });
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [expandedMission, setExpandedMission] = useState<string | null>(null);
@@ -48,6 +49,7 @@ export default function MissionPage() {
         if (data.missions) {
           setMissions(data.missions);
         }
+        if (data.badges) setBadges(data.badges);
       } catch {
         // silently fail
       } finally {
@@ -328,7 +330,7 @@ export default function MissionPage() {
         )}
       </div>
 
-      <BottomNav active="mission" baseUrl={`/p/${token}`} />
+      <BottomNav active="mission" baseUrl={`/p/${token}`} badges={badges} />
     </div>
   );
 }

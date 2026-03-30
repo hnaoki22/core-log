@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
     participantMocks.map(async (p) => {
       if (useMock) {
         // Mock mode: return mock data stats
+        const hasLogToday = p.logs.some((l) => l.date === todayJST && l.morningIntent);
         return {
           name: p.name,
           department: p.department,
@@ -39,6 +40,7 @@ export async function GET(request: NextRequest) {
           entryRate: p.entryRate,
           streak: p.streak,
           fbCount: p.fbCount,
+          todayHasLog: hasLogToday,
           latestLog: p.logs[0]
             ? {
                 date: p.logs[0].date,
@@ -57,6 +59,7 @@ export async function GET(request: NextRequest) {
         const stats = computeParticipantStats(logs, todayJST);
         const latestLog = logs[0] || null;
 
+        const hasLogToday = logs.some((l) => l.date === todayJST && l.morningIntent);
         return {
           name: p.name,
           department: p.department,
@@ -65,6 +68,7 @@ export async function GET(request: NextRequest) {
           entryRate: stats.entryRate,
           streak: stats.streak,
           fbCount: stats.fbCount,
+          todayHasLog: hasLogToday,
           latestLog: latestLog
             ? {
                 date: latestLog.date,
@@ -85,6 +89,7 @@ export async function GET(request: NextRequest) {
           entryRate: 0,
           streak: 0,
           fbCount: 0,
+          todayHasLog: false,
           latestLog: null,
           recentEnergy: [],
         };

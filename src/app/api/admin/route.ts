@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
   const enrichedParticipants = await Promise.all(
     participantMocks.map(async (p) => {
       if (useMock) {
+        const hasLogToday = p.logs.some((l) => l.date === todayJST && l.morningIntent);
         return {
           id: p.id,
           name: p.name,
@@ -38,6 +39,7 @@ export async function GET(request: NextRequest) {
           streak: p.streak,
           fbCount: p.fbCount,
           managerId: p.managerId,
+          todayHasLog: hasLogToday,
           latestLog: p.logs[0]
             ? {
                 date: p.logs[0].date,
@@ -56,6 +58,7 @@ export async function GET(request: NextRequest) {
         const stats = computeParticipantStats(logs, todayJST);
         const latestLog = logs[0] || null;
 
+        const hasLogToday = logs.some((l) => l.date === todayJST && l.morningIntent);
         return {
           id: p.id,
           name: p.name,
@@ -66,6 +69,7 @@ export async function GET(request: NextRequest) {
           streak: stats.streak,
           fbCount: stats.fbCount,
           managerId: p.managerId,
+          todayHasLog: hasLogToday,
           latestLog: latestLog
             ? {
                 date: latestLog.date,
@@ -88,6 +92,7 @@ export async function GET(request: NextRequest) {
           streak: 0,
           fbCount: 0,
           managerId: p.managerId,
+          todayHasLog: false,
           latestLog: null,
           recentEnergy: [],
         };

@@ -12,6 +12,7 @@ type ParticipantData = {
   entryRate: number;
   streak: number;
   fbCount: number;
+  todayHasLog: boolean;
   latestLog: {
     date: string;
     morningIntent: string;
@@ -90,6 +91,7 @@ export default function ManagerHome() {
   const fbWaitingCount = participants.reduce((sum, p) => {
     return sum + (p.latestLog?.status === "morning_only" ? 1 : 0);
   }, 0);
+  const todayLogCount = participants.filter((p) => p.todayHasLog).length;
 
   const getStatusIndicator = (participant: ParticipantData) => {
     if (participant.streak > 0) {
@@ -118,24 +120,30 @@ export default function ManagerHome() {
 
       <div className="max-w-md mx-auto px-6 pt-6 space-y-6">
         {/* Summary Stats */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="bg-white p-4 rounded-xl text-center shadow-sm">
-            <div className="text-2xl font-bold text-[#5B4FD6] mb-1">
+        <div className="grid grid-cols-4 gap-2">
+          <div className="bg-white p-3 rounded-xl text-center shadow-sm">
+            <div className="text-xl font-bold text-[#5B4FD6] mb-1">
               {totalParticipants}
             </div>
-            <div className="text-xs text-[#8B85A8]">参加者数</div>
+            <div className="text-[10px] text-[#8B85A8]">参加者数</div>
           </div>
-          <div className="bg-white p-4 rounded-xl text-center shadow-sm">
-            <div className="text-2xl font-bold text-[#22C55E] mb-1">
+          <div className="bg-white p-3 rounded-xl text-center shadow-sm">
+            <div className="text-xl font-bold text-[#22C55E] mb-1">
               {avgEntryRate}%
             </div>
-            <div className="text-xs text-[#8B85A8]">平均記入率</div>
+            <div className="text-[10px] text-[#8B85A8]">平均記入率</div>
           </div>
-          <div className="bg-white p-4 rounded-xl text-center shadow-sm border-2 border-[#FF8C42]">
-            <div className="text-2xl font-bold text-[#FF8C42] mb-1">
+          <div className="bg-white p-3 rounded-xl text-center shadow-sm border-2 border-[#5B4FD6]">
+            <div className="text-xl font-bold text-[#5B4FD6] mb-1">
+              {todayLogCount}
+            </div>
+            <div className="text-[10px] text-[#8B85A8]">今日の記入</div>
+          </div>
+          <div className="bg-white p-3 rounded-xl text-center shadow-sm border-2 border-[#FF8C42]">
+            <div className="text-xl font-bold text-[#FF8C42] mb-1">
               {fbWaitingCount}
             </div>
-            <div className="text-xs text-[#8B85A8]">FB待ち</div>
+            <div className="text-[10px] text-[#8B85A8]">FB待ち</div>
           </div>
         </div>
 
@@ -157,9 +165,16 @@ export default function ManagerHome() {
                   {/* Header Row */}
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-[#1E1B3A]">
-                        {participant.name}
-                      </h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-[#1E1B3A]">
+                          {participant.name}
+                        </h3>
+                        {participant.todayHasLog && (
+                          <span className="bg-[#FF4444] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
+                            NEW
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-[#8B85A8]">
                         {participant.department}
                       </p>

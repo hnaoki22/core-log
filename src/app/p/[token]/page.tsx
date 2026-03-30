@@ -33,6 +33,7 @@ export default function ParticipantHome() {
 
   const [participant, setParticipant] = useState<ParticipantData | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [badges, setBadges] = useState<{ feedback: number; mission: number }>({ feedback: 0, mission: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -47,6 +48,7 @@ export default function ParticipantHome() {
         const data = await res.json();
         setParticipant(data.participant);
         setLogs(data.logs || []);
+        if (data.badges) setBadges(data.badges);
       } catch {
         setError("通信エラーが発生しました");
       } finally {
@@ -254,7 +256,7 @@ export default function ParticipantHome() {
         </div>
       </div>
 
-      <BottomNav active="home" baseUrl={`/p/${token}`} />
+      <BottomNav active="home" baseUrl={`/p/${token}`} badges={badges} />
     </div>
   );
 }

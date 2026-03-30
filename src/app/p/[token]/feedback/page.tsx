@@ -19,6 +19,7 @@ export default function FeedbackPage() {
   const token = params.token as string;
 
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [badges, setBadges] = useState<{ feedback: number; mission: number }>({ feedback: 0, mission: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,6 +29,7 @@ export default function FeedbackPage() {
         if (res.ok) {
           const data = await res.json();
           setLogs(data.logs || []);
+          if (data.badges) setBadges(data.badges);
         }
       } catch {
         // silently fail
@@ -100,7 +102,7 @@ export default function FeedbackPage() {
         )}
       </div>
 
-      <BottomNav active="feedback" baseUrl={`/p/${token}`} />
+      <BottomNav active="feedback" baseUrl={`/p/${token}`} badges={badges} />
     </div>
   );
 }

@@ -24,6 +24,7 @@ export default function LogsPage() {
   const token = params.token as string;
 
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [badges, setBadges] = useState<{ feedback: number; mission: number }>({ feedback: 0, mission: 0 });
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -34,6 +35,7 @@ export default function LogsPage() {
         if (res.ok) {
           const data = await res.json();
           setLogs(data.logs || []);
+          if (data.badges) setBadges(data.badges);
         }
       } catch {
         // silently fail
@@ -167,7 +169,7 @@ export default function LogsPage() {
         )}
       </div>
 
-      <BottomNav active="logs" baseUrl={`/p/${token}`} />
+      <BottomNav active="logs" baseUrl={`/p/${token}`} badges={badges} />
     </div>
   );
 }
