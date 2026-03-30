@@ -1120,9 +1120,10 @@ export async function createFeedback(data: {
     });
 
     return { id: response.id };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error creating feedback:", error);
-    return null;
+    const errMsg = error instanceof Error ? error.message : String(error);
+    throw new Error(`Feedback creation failed: ${errMsg}`);
   }
 }
 

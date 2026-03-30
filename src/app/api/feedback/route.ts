@@ -66,17 +66,23 @@ export async function POST(req: NextRequest) {
     const authorName = manager?.name || "Human Mature";
     const feedbackType = type || (isAdmin ? "HMフィードバック" : "上司コメント");
 
-    const result = await createFeedback({
-      participantName,
-      authorName,
-      type: feedbackType,
-      content,
-      period: period || "",
-      weekNum: weekNum || 1,
-    });
+    let result;
+    try {
+      result = await createFeedback({
+        participantName,
+        authorName,
+        type: feedbackType,
+        content,
+        period: period || "",
+        weekNum: weekNum || 1,
+      });
+    } catch (fbError: unknown) {
+      const msg = fbError instanceof Error ? fbError.message : String(fbError);
+      return NextResponse.json({ error: "Failed to create feedback", detail: msg }, { status: 500 });
+    }
 
     if (!result) {
-      return NextResponse.json({ error: "Failed to create feedback" }, { status: 500 });
+      return NextResponse.json({ error: "Failed to create feedback", detail: "FEEDBACK_DB_ID may be empty" }, { status: 500 });
     }
 
     // Send email notification to participant (non-blocking)
