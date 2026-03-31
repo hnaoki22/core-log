@@ -110,7 +110,7 @@ export default function ManagerHome() {
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-5 -mt-4 space-y-4 animate-fade-up">
+      <div className="max-w-md mx-auto px-5 -mt-4 space-y-4 animate-fade-up relative z-10">
         {/* Summary Stats */}
         <div className="grid grid-cols-3 gap-2.5">
           <div className="card p-3.5 text-center">

@@ -156,7 +156,7 @@ export default function ParticipantHome() {
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-5 -mt-3 space-y-4 animate-fade-up">
+      <div className="max-w-md mx-auto px-5 -mt-3 space-y-4 animate-fade-up relative z-10">
         {/* Unread Feedback Banner */}
         {unreadFeedback > 0 && (
           <Link href={`/p/${token}/feedback`}>

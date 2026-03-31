@@ -89,7 +89,7 @@ export default function FeedbackPage() {
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-5 -mt-3 space-y-3 animate-fade-up">
+      <div className="max-w-md mx-auto px-5 -mt-3 space-y-3 animate-fade-up relative z-10">
         {feedbacks.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-12 h-12 bg-[#F3F4F6] rounded-2xl flex items-center justify-center mx-auto mb-4">

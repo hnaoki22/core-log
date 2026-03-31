@@ -245,7 +245,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-5 -mt-4 animate-fade-up">
+      <div className="max-w-4xl mx-auto px-5 -mt-4 animate-fade-up relative z-10">
         {/* Add Result Banner */}
         {addResult && (
           <div className="mb-4 card-elevated p-5 border-l-[3px] border-l-emerald-500">
