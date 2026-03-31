@@ -22,36 +22,24 @@ export default function FeedbackPage() {
 
   const [feedbacks, setFeedbacks] = useState<FeedbackEntry[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [badges, setBadges] = useState<{ feedback: number; mission: number }>({
-    feedback: 0,
-    mission: 0,
-  });
+  const [badges, setBadges] = useState<{ feedback: number; mission: number }>({ feedback: 0, mission: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        // Fetch from new Feedback DB
         const fbRes = await fetch(`/api/feedback?token=${token}`);
         if (fbRes.ok) {
           const fbData = await fbRes.json();
           setFeedbacks(fbData.feedback || []);
           setUnreadCount(fbData.unreadCount || 0);
-          setBadges((prev) => ({
-            ...prev,
-            feedback: fbData.unreadCount || 0,
-          }));
+          setBadges((prev) => ({ ...prev, feedback: fbData.unreadCount || 0 }));
         }
-
-        // Also fetch badges from logs API for mission badge
         const logsRes = await fetch(`/api/logs?token=${token}`);
         if (logsRes.ok) {
           const logsData = await logsRes.json();
           if (logsData.badges) {
-            setBadges((prev) => ({
-              ...prev,
-              mission: logsData.badges.mission || 0,
-            }));
+            setBadges((prev) => ({ ...prev, mission: logsData.badges.mission || 0 }));
           }
         }
       } catch {
@@ -70,14 +58,9 @@ export default function FeedbackPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, feedbackId }),
       });
-      setFeedbacks((prev) =>
-        prev.map((f) => (f.id === feedbackId ? { ...f, isRead: true } : f))
-      );
+      setFeedbacks((prev) => prev.map((f) => (f.id === feedbackId ? { ...f, isRead: true } : f)));
       setUnreadCount((prev) => Math.max(0, prev - 1));
-      setBadges((prev) => ({
-        ...prev,
-        feedback: Math.max(0, prev.feedback - 1),
-      }));
+      setBadges((prev) => ({ ...prev, feedback: Math.max(0, prev.feedback - 1) }));
     } catch {
       // silently fail
     }
@@ -85,43 +68,46 @@ export default function FeedbackPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F8F7FF] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
         <div className="text-center">
-          <div className="w-8 h-8 border-3 border-[#5B4FD6] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-[#8B85A8]">読み込み中...</p>
+          <div className="w-8 h-8 border-2 border-[#4338CA] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-[#9CA3AF] text-sm">読み込み中...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F7FF] pb-24">
+    <div className="min-h-screen bg-[#F9FAFB] pb-24">
       {/* Header */}
-      <div className="gradient-purple text-white p-6 rounded-b-3xl">
-        <div className="max-w-md mx-auto">
-          <h1 className="text-2xl font-bold">フィードバック</h1>
+      <div className="gradient-header text-white px-6 pt-12 pb-8 rounded-b-[2rem]">
+        <div className="max-w-md mx-auto relative z-10">
+          <h1 className="text-xl font-semibold tracking-tight">フィードバック</h1>
           {unreadCount > 0 && (
-            <p className="text-white/80 text-sm mt-1">
-              未読 {unreadCount}件
-            </p>
+            <p className="text-indigo-200 text-sm mt-1 font-light">未読 {unreadCount}件</p>
           )}
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-6 pt-6 space-y-4">
+      <div className="max-w-md mx-auto px-5 -mt-3 space-y-3 animate-fade-up">
         {feedbacks.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-[#8B85A8]">フィードバックはまだありません</p>
+          <div className="text-center py-16">
+            <div className="w-12 h-12 bg-[#F3F4F6] rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
+            <p className="text-[#6B7280] text-sm">フィードバックはまだありません</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {feedbacks.map((fb) => {
               const isHM = fb.type === "HMフィードバック";
               return (
                 <div
                   key={fb.id}
-                  className={`bg-white p-4 rounded-xl shadow-sm space-y-3 ${
-                    !fb.isRead ? "border-l-4 border-[#FF8C42]" : ""
+                  className={`card p-4 space-y-3 transition-all ${
+                    !fb.isRead ? "border-l-[3px] border-l-[#4338CA] bg-white" : "bg-white"
                   }`}
                   onClick={() => {
                     if (!fb.isRead) markAsRead(fb.id);
@@ -129,42 +115,30 @@ export default function FeedbackPage() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span
-                        className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                          isHM
-                            ? "bg-[#FFE8D0] text-[#FF8C42]"
-                            : "bg-[#EDE9FF] text-[#5B4FD6]"
-                        }`}
-                      >
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
+                        isHM ? "bg-amber-50 text-amber-600" : "bg-indigo-50 text-[#4338CA]"
+                      }`}>
                         {fb.type}
                       </span>
                       {!fb.isRead && (
-                        <span className="bg-[#FF4444] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                        <span className="bg-[#DC2626] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">
                           NEW
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-[#8B85A8]">{fb.date}</p>
+                    <p className="text-[11px] text-[#9CA3AF]">{fb.date}</p>
                   </div>
 
                   {fb.period && (
-                    <p className="text-xs text-[#8B85A8]">
+                    <p className="text-[11px] text-[#9CA3AF]">
                       対象: {fb.period}
                       {fb.weekNum > 0 && ` (第${fb.weekNum}週)`}
                     </p>
                   )}
 
-                  <div
-                    className={`p-3 rounded-lg ${
-                      isHM ? "bg-[#FFE8D0]/50" : "bg-[#EDE9FF]/50"
-                    }`}
-                  >
-                    <p className="text-xs text-[#8B85A8] mb-1">
-                      from: {fb.authorName}
-                    </p>
-                    <p className="text-sm text-[#1E1B3A] leading-relaxed whitespace-pre-wrap">
-                      {fb.content}
-                    </p>
+                  <div className={`p-3 rounded-xl ${isHM ? "bg-amber-50/50" : "bg-indigo-50/50"}`}>
+                    <p className="text-[11px] text-[#9CA3AF] mb-1.5">from: {fb.authorName}</p>
+                    <p className="text-sm text-[#374151] leading-relaxed whitespace-pre-wrap">{fb.content}</p>
                   </div>
                 </div>
               );

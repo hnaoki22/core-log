@@ -1,7 +1,6 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { energyEmoji } from "@/lib/mock-data";
 import { BottomNav } from "@/components/BottomNav";
 import { useState, useEffect } from "react";
 
@@ -20,6 +19,20 @@ type LogEntry = {
   managerCommentTime?: string | null;
   morningTime?: string | null;
   eveningTime?: string | null;
+};
+
+const energyColor: Record<string, string> = {
+  excellent: "#F59E0B",
+  good: "#059669",
+  okay: "#9CA3AF",
+  low: "#DC2626",
+};
+
+const energyLabel: Record<string, string> = {
+  excellent: "絶好調",
+  good: "良い",
+  okay: "まあまあ",
+  low: "低調",
 };
 
 function formatTime(isoStr: string | null | undefined): string {
@@ -61,128 +74,139 @@ export default function LogsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F8F7FF] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
         <div className="text-center">
-          <div className="w-8 h-8 border-3 border-[#5B4FD6] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-[#8B85A8]">読み込み中...</p>
+          <div className="w-8 h-8 border-2 border-[#4338CA] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-[#9CA3AF] text-sm">読み込み中...</p>
         </div>
       </div>
     );
   }
 
+  const statusConfig = {
+    morning_only: { label: "朝のみ", bg: "bg-indigo-50", text: "text-[#4338CA]" },
+    complete: { label: "完了", bg: "bg-emerald-50", text: "text-emerald-600" },
+    fb_done: { label: "FB済", bg: "bg-amber-50", text: "text-amber-600" },
+    empty: { label: "未記入", bg: "bg-gray-50", text: "text-gray-400" },
+  };
+
   return (
-    <div className="min-h-screen bg-[#F8F7FF] pb-24">
+    <div className="min-h-screen bg-[#F9FAFB] pb-24">
       {/* Header */}
-      <div className="gradient-purple text-white p-6 rounded-b-3xl">
-        <div className="max-w-md mx-auto">
-          <h1 className="text-2xl font-bold">📋 ログ一覧</h1>
+      <div className="gradient-header text-white px-6 pt-12 pb-8 rounded-b-[2rem]">
+        <div className="max-w-md mx-auto relative z-10">
+          <h1 className="text-xl font-semibold tracking-tight">ログ一覧</h1>
+          <p className="text-indigo-200 text-sm mt-1 font-light">{logs.length}件の記録</p>
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-6 pt-6">
+      <div className="max-w-md mx-auto px-5 -mt-3 animate-fade-up">
         {logs.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-[#8B85A8]">まだログがありません</p>
+          <div className="text-center py-16">
+            <div className="w-12 h-12 bg-[#F3F4F6] rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+            </div>
+            <p className="text-[#6B7280] text-sm">まだログがありません</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {logs.map((log) => (
-              <div key={log.id} className="bg-white rounded-xl overflow-hidden shadow-sm">
-                <button
-                  onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
-                  className="w-full p-4 flex gap-3 hover:bg-[#F8F7FF] transition-colors text-left"
-                >
-                  {/* Date Circle */}
-                  <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-white text-sm font-bold ${
-                    log.hasFeedback ? "bg-[#FF8C42]" : "bg-[#5B4FD6]"
-                  }`}>
-                    <div className="text-center">
-                      <div className="font-bold">{log.dayNum}</div>
-                      <div className="text-xs opacity-80">{log.dayOfWeek}</div>
+            {logs.map((log) => {
+              const config = statusConfig[log.status] || statusConfig.empty;
+              return (
+                <div key={log.id} className="card overflow-hidden">
+                  <button
+                    onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
+                    className="w-full p-4 flex gap-3 hover:bg-[#FAFAFA] transition-colors text-left"
+                  >
+                    <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-semibold ${
+                      log.hasFeedback ? "bg-amber-500" : "bg-[#4338CA]"
+                    }`}>
+                      <div className="text-center leading-tight">
+                        <div className="font-bold text-sm">{log.dayNum}</div>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-[#1E1B3A] font-medium truncate">
-                      {log.morningIntent || "(未記入)"}
-                    </p>
-                    <p className="text-xs text-[#8B85A8] mt-1">{log.date}</p>
-                    <div className="flex gap-2 mt-2">
-                      {log.energy && <span className="text-lg">{energyEmoji[log.energy]}</span>}
-                      {log.status === "morning_only" && (
-                        <span className="inline-block px-2 py-0.5 bg-[#EDE9FF] text-[#5B4FD6] text-xs rounded font-medium">
-                          朝のみ
-                        </span>
-                      )}
-                      {log.status === "complete" && (
-                        <span className="inline-block px-2 py-0.5 bg-[#E0F7E0] text-[#22C55E] text-xs rounded font-medium">
-                          完了
-                        </span>
-                      )}
-                      {log.hasFeedback && (
-                        <span className="inline-block px-2 py-0.5 bg-[#FFE8D0] text-[#FF8C42] text-xs rounded font-medium">
-                          FB済
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex-shrink-0 flex items-center justify-center w-6 h-6 text-[#8B85A8]">
-                    {expandedId === log.id ? "▼" : "▶"}
-                  </div>
-                </button>
-
-                {/* Expanded View */}
-                {expandedId === log.id && (
-                  <div className="border-t border-[#E8E5F0] p-4 bg-[#F8F7FF]/50 space-y-4">
-                    {/* Morning Intent */}
-                    <div>
-                      <p className="text-xs font-semibold text-[#8B85A8] mb-1">朝の意図</p>
-                      <p className="text-sm text-[#1E1B3A]">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-[#111827] font-medium truncate leading-tight">
                         {log.morningIntent || "(未記入)"}
                       </p>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className="text-[11px] text-[#9CA3AF]">{log.date} ({log.dayOfWeek})</span>
+                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${config.bg} ${config.text}`}>
+                          {config.label}
+                        </span>
+                      </div>
                     </div>
 
-                    {/* Evening Insight */}
-                    {log.eveningInsight && (
-                      <div>
-                        <p className="text-xs font-semibold text-[#8B85A8] mb-1">夜の振り返り</p>
-                        <p className="text-sm text-[#1E1B3A]">{log.eveningInsight}</p>
-                      </div>
-                    )}
+                    <div className="flex-shrink-0 flex items-center gap-2">
+                      {log.energy && (
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: energyColor[log.energy] }}></div>
+                      )}
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                        className={`transition-transform duration-200 ${expandedId === log.id ? "rotate-90" : ""}`}>
+                        <polyline points="9 18 15 12 9 6"/>
+                      </svg>
+                    </div>
+                  </button>
 
-                    {/* Energy */}
-                    {log.energy && (
+                  {/* Expanded View */}
+                  {expandedId === log.id && (
+                    <div className="border-t border-[#F3F4F6] p-4 bg-[#FAFAFA] space-y-3">
                       <div>
-                        <p className="text-xs font-semibold text-[#8B85A8] mb-1">エネルギー</p>
-                        <p className="text-lg">{energyEmoji[log.energy]}</p>
-                      </div>
-                    )}
-
-                    {/* Manager Comment */}
-                    {log.managerComment && (
-                      <div className="bg-[#EDE9FF] border border-[#5B4FD6] p-3 rounded-lg">
                         <div className="flex items-center gap-2 mb-1">
-                          <p className="text-xs font-semibold text-[#5B4FD6]">上司コメント</p>
-                          {log.managerCommentTime && (
-                            <span className="text-[10px] text-[#8B85A8]">🕐 {formatTime(log.managerCommentTime)}</span>
+                          <p className="text-[10px] font-medium text-[#4338CA] tracking-wide uppercase">朝の意図</p>
+                          {log.morningTime && (
+                            <span className="text-[10px] text-[#D1D5DB]">{formatTime(log.morningTime)}</span>
                           )}
                         </div>
-                        <p className="text-sm text-[#1E1B3A]">{log.managerComment}</p>
+                        <p className="text-sm text-[#374151] leading-relaxed">{log.morningIntent || "(未記入)"}</p>
                       </div>
-                    )}
 
-                    {/* HM Feedback */}
-                    {log.hmFeedback && (
-                      <div className="bg-[#FFE8D0] border border-[#FF8C42] p-3 rounded-lg">
-                        <p className="text-xs font-semibold text-[#FF8C42] mb-1">HMフィードバック</p>
-                        <p className="text-sm text-[#1E1B3A]">{log.hmFeedback}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+                      {log.eveningInsight && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-[10px] font-medium text-amber-600 tracking-wide uppercase">夜の振り返り</p>
+                            {log.eveningTime && (
+                              <span className="text-[10px] text-[#D1D5DB]">{formatTime(log.eveningTime)}</span>
+                            )}
+                          </div>
+                          <p className="text-sm text-[#374151] leading-relaxed">{log.eveningInsight}</p>
+                        </div>
+                      )}
+
+                      {log.energy && (
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: energyColor[log.energy] }}></div>
+                          <span className="text-xs text-[#6B7280]">{energyLabel[log.energy]}</span>
+                        </div>
+                      )}
+
+                      {log.managerComment && (
+                        <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-xl">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-[10px] font-medium text-[#4338CA] tracking-wide">上司コメント</p>
+                            {log.managerCommentTime && (
+                              <span className="text-[10px] text-[#D1D5DB]">{formatTime(log.managerCommentTime)}</span>
+                            )}
+                          </div>
+                          <p className="text-sm text-[#374151] leading-relaxed">{log.managerComment}</p>
+                        </div>
+                      )}
+
+                      {log.hmFeedback && (
+                        <div className="bg-amber-50 border border-amber-100 p-3 rounded-xl">
+                          <p className="text-[10px] font-medium text-amber-600 tracking-wide mb-1">HMフィードバック</p>
+                          <p className="text-sm text-[#374151] leading-relaxed">{log.hmFeedback}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
