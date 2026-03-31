@@ -96,7 +96,7 @@ export default function ManagerHome() {
   return (
     <div className="min-h-screen bg-[#F9FAFB] pb-8">
       {/* Header */}
-      <div className="gradient-header-manager text-white px-6 pt-12 pb-8">
+      <div className="gradient-header-manager text-white px-6 pt-12 pb-6">
         <div className="max-w-md mx-auto relative z-10">
           <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-3 py-1 rounded-lg text-xs font-medium text-indigo-200 mb-3">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -110,7 +110,7 @@ export default function ManagerHome() {
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-5 -mt-4 space-y-4 animate-fade-up relative z-10">
+      <div className="max-w-md mx-auto px-5 pt-5 space-y-4 animate-fade-up relative z-10">
         {/* Summary Stats */}
         <div className="grid grid-cols-3 gap-2.5">
           <div className="card p-3.5 text-center">

@@ -93,14 +93,14 @@ export default function LogsPage() {
   return (
     <div className="min-h-screen bg-[#F9FAFB] pb-24">
       {/* Header */}
-      <div className="gradient-header text-white px-6 pt-12 pb-8 rounded-b-[2rem]">
+      <div className="gradient-header text-white px-6 pt-12 pb-6 rounded-b-[2rem]">
         <div className="max-w-md mx-auto relative z-10">
           <h1 className="text-xl font-semibold tracking-tight">ログ一覧</h1>
           <p className="text-indigo-200 text-sm mt-1 font-light">{logs.length}件の記録</p>
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-5 -mt-3 animate-fade-up relative z-10">
+      <div className="max-w-md mx-auto px-5 pt-5 animate-fade-up relative z-10">
         {logs.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-12 h-12 bg-[#F3F4F6] rounded-2xl flex items-center justify-center mx-auto mb-4">

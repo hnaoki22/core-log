@@ -145,7 +145,7 @@ export default function ParticipantHome() {
   return (
     <div className="min-h-screen bg-[#F9FAFB] pb-24">
       {/* Header */}
-      <div className="gradient-header text-white px-6 pt-12 pb-8 rounded-b-[2rem]">
+      <div className="gradient-header text-white px-6 pt-12 pb-6 rounded-b-[2rem]">
         <div className="max-w-md mx-auto relative z-10">
           <p className="text-indigo-200 text-sm font-light tracking-wide mb-1">{getGreeting()}</p>
           <h1 className="text-2xl font-semibold tracking-tight mb-3">{participant.name}</h1>
@@ -156,7 +156,7 @@ export default function ParticipantHome() {
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-5 -mt-3 space-y-4 animate-fade-up relative z-10">
+      <div className="max-w-md mx-auto px-5 pt-5 space-y-4 animate-fade-up relative z-10">
         {/* Unread Feedback Banner */}
         {unreadFeedback > 0 && (
           <Link href={`/p/${token}/feedback`}>

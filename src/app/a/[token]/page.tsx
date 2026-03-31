@@ -233,7 +233,7 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-[#F9FAFB]">
       {/* Header */}
-      <div className="gradient-header-admin text-white px-6 pt-12 pb-8">
+      <div className="gradient-header-admin text-white px-6 pt-12 pb-6">
         <div className="max-w-4xl mx-auto relative z-10">
           <div className="flex items-center gap-2.5 mb-1">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -245,7 +245,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-5 -mt-4 animate-fade-up relative z-10">
+      <div className="max-w-4xl mx-auto px-5 pt-5 animate-fade-up relative z-10">
         {/* Add Result Banner */}
         {addResult && (
           <div className="mb-4 card-elevated p-5 border-l-[3px] border-l-emerald-500">

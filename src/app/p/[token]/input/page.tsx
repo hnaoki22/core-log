@@ -214,7 +214,7 @@ export default function InputPage() {
   return (
     <div className="min-h-screen bg-[#F9FAFB] pb-32">
       {/* Header */}
-      <div className="gradient-header text-white px-6 pt-12 pb-8 rounded-b-[2rem]">
+      <div className="gradient-header text-white px-6 pt-12 pb-6 rounded-b-[2rem]">
         <div className="max-w-md mx-auto relative z-10">
           <button
             onClick={() => router.push(`/p/${token}`)}
