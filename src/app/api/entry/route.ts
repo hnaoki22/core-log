@@ -4,6 +4,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createMorningEntry, updateEveningEntry, hasLoggedToday } from "@/lib/notion";
+import { getParticipantByToken, getManagerById } from "@/lib/participant-db";
+import { sendNotificationEmail } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   const useMock = !process.env.NOTION_API_TOKEN;
@@ -42,11 +44,32 @@ export async function POST(request: NextRequest) {
       if (!pageId) {
         return NextResponse.json({ error: "Failed to create entry" }, { status: 500 });
       }
+
+      // Notify manager that subordinate submitted morning log
+      try {
+        const participant = await getParticipantByToken(token);
+        if (participant?.managerId) {
+          const mgr = await getManagerById(participant.managerId);
+          if (mgr?.email && !mgr.email.includes("example.com")) {
+            sendNotificationEmail({
+              to: mgr.email,
+              recipientName: mgr.name.split(" ")[0],
+              senderName: participantName,
+              token: mgr.token,
+              type: "daily_log_submitted",
+              detail: `朝の意図：${morningIntent.substring(0, 60)}${morningIntent.length > 60 ? "…" : ""}`,
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to send manager notification:", e);
+      }
+
       return NextResponse.json({ success: true, pageId });
     }
 
     if (type === "evening") {
-      const { pageId, eveningInsight, energy } = body;
+      const { pageId, eveningInsight, energy, participantName } = body;
       if (!pageId) {
         return NextResponse.json({ error: "pageId is required for evening entry" }, { status: 400 });
       }
@@ -54,6 +77,27 @@ export async function POST(request: NextRequest) {
       if (!success) {
         return NextResponse.json({ error: "Failed to update entry" }, { status: 500 });
       }
+
+      // Notify manager that subordinate submitted evening log
+      try {
+        const participant = await getParticipantByToken(token);
+        if (participant?.managerId) {
+          const mgr = await getManagerById(participant.managerId);
+          if (mgr?.email && !mgr.email.includes("example.com")) {
+            sendNotificationEmail({
+              to: mgr.email,
+              recipientName: mgr.name.split(" ")[0],
+              senderName: participantName || participant.name,
+              token: mgr.token,
+              type: "daily_log_submitted",
+              detail: `夕の気づき：${eveningInsight.substring(0, 60)}${eveningInsight.length > 60 ? "…" : ""}`,
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to send manager notification:", e);
+      }
+
       return NextResponse.json({ success: true });
     }
 

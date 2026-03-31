@@ -17,7 +17,20 @@ type LogEntry = {
   hasFeedback: boolean;
   hmFeedback?: string | null;
   managerComment?: string | null;
+  managerCommentTime?: string | null;
+  morningTime?: string | null;
+  eveningTime?: string | null;
 };
+
+function formatTime(isoStr: string | null | undefined): string {
+  if (!isoStr) return "";
+  try {
+    const d = new Date(isoStr);
+    const h = d.getUTCHours().toString().padStart(2, "0");
+    const m = d.getUTCMinutes().toString().padStart(2, "0");
+    return `${h}:${m}`;
+  } catch { return ""; }
+}
 
 export default function LogsPage() {
   const params = useParams();
@@ -149,7 +162,12 @@ export default function LogsPage() {
                     {/* Manager Comment */}
                     {log.managerComment && (
                       <div className="bg-[#EDE9FF] border border-[#5B4FD6] p-3 rounded-lg">
-                        <p className="text-xs font-semibold text-[#5B4FD6] mb-1">上司コメント</p>
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="text-xs font-semibold text-[#5B4FD6]">上司コメント</p>
+                          {log.managerCommentTime && (
+                            <span className="text-[10px] text-[#8B85A8]">🕐 {formatTime(log.managerCommentTime)}</span>
+                          )}
+                        </div>
                         <p className="text-sm text-[#1E1B3A]">{log.managerComment}</p>
                       </div>
                     )}

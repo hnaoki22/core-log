@@ -75,7 +75,8 @@ export type NotificationType =
   | "mission_comment"      // 上司/部下がミッションにコメント
   | "mission_created"      // 上司がミッションを新規設定
   | "manager_comment"      // 上司が日報にコメントした
-  | "hm_feedback";         // HMがフィードバックを送信
+  | "hm_feedback"          // HMがフィードバックを送信
+  | "daily_log_submitted"; // 部下が日報を投稿した → 上司に通知
 
 interface NotificationOptions {
   to: string;
@@ -177,6 +178,32 @@ function buildNotificationEmail(options: NotificationOptions) {
               </a>
             </div>
             <p style="color: #666; font-size: 13px;">フィードバックを読んだら、次の一歩を日報に記入しましょう。</p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+            <p style="color: #999; font-size: 11px;">Project CORE — Powered by Human Mature</p>
+          </div>
+        `,
+      };
+    }
+    case "daily_log_submitted": {
+      const url = `${baseUrl}/m/${token}`;
+      const nowJST = new Date(Date.now() + 9 * 60 * 60 * 1000);
+      const timeStr = `${nowJST.getUTCHours().toString().padStart(2, "0")}:${nowJST.getUTCMinutes().toString().padStart(2, "0")}`;
+      return {
+        subject: `【CORE Log】${senderName}さんが日報を投稿しました`,
+        html: `
+          <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+            <div style="background: linear-gradient(135deg, #22C55E, #16A34A); border-radius: 12px; padding: 20px; color: white; text-align: center; margin-bottom: 24px;">
+              <h1 style="margin: 0; font-size: 20px;">📝 日報投稿通知</h1>
+              <p style="margin: 8px 0 0; opacity: 0.9; font-size: 14px;">${timeStr} 投稿</p>
+            </div>
+            <p>${recipientName}さん</p>
+            <p><strong>${senderName}</strong>さんが日報を投稿しました。</p>
+            ${detail ? `<div style="background: #F0FDF4; border-left: 4px solid #22C55E; padding: 12px 16px; margin: 16px 0; border-radius: 4px;"><p style="margin: 0; color: #166534; font-size: 14px;">${detail}</p></div>` : ""}
+            <div style="text-align: center; margin: 24px 0;">
+              <a href="${url}" style="display: inline-block; background: #22C55E; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
+                ダッシュボードを確認する →
+              </a>
+            </div>
             <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
             <p style="color: #999; font-size: 11px;">Project CORE — Powered by Human Mature</p>
           </div>

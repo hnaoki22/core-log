@@ -29,6 +29,9 @@ export type NotionLogEntry = {
   hasFeedback: boolean;
   hmFeedback: string | null;
   managerComment: string | null;
+  managerCommentTime: string | null;
+  morningTime: string | null;
+  eveningTime: string | null;
   dojoPhase: string;
   weekNum: number;
 };
@@ -175,6 +178,9 @@ export async function getLogsByParticipant(participantName: string): Promise<Not
         hasFeedback: !!hmFeedback,
         hmFeedback,
         managerComment,
+        managerCommentTime: getDate(props["上司コメント時刻"]) || null,
+        morningTime: getDate(props["記入時刻（朝）"]) || null,
+        eveningTime: getDate(props["記入時刻（夕）"]) || null,
         dojoPhase: getSelect(props["道場フェーズ"]),
         weekNum: getNumber(props["週番号"]),
       };
@@ -276,10 +282,12 @@ export async function addManagerComment(
   comment: string
 ) {
   try {
+    const nowJST = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString();
     await notion.pages.update({
       page_id: pageId,
       properties: {
         "上司コメント": { rich_text: [{ text: { content: comment } }] },
+        "上司コメント時刻": { date: { start: nowJST } },
       } as Parameters<typeof notion.pages.update>[0]["properties"],
     });
     return true;

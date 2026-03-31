@@ -36,6 +36,16 @@ export default async function ParticipantDetailPage({ params }: Params) {
     excellent: "🔥", good: "😊", okay: "😐", low: "😟",
   };
 
+  function formatTime(isoStr: string | null | undefined): string {
+    if (!isoStr) return "";
+    try {
+      const d = new Date(isoStr);
+      const h = d.getUTCHours().toString().padStart(2, "0");
+      const m = d.getUTCMinutes().toString().padStart(2, "0");
+      return `${h}:${m}`;
+    } catch { return ""; }
+  }
+
   return (
     <div className="min-h-screen bg-[#F8F7FF]">
       {/* Header */}
@@ -80,13 +90,23 @@ export default async function ParticipantDetailPage({ params }: Params) {
                   </div>
                   {entry.morningIntent && (
                     <div className="mb-1">
-                      <span className="text-xs font-semibold text-[#5B4FD6]">朝の意図：</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-[#5B4FD6]">朝の意図：</span>
+                        {entry.morningTime && (
+                          <span className="text-[10px] text-gray-400">🕐 {formatTime(entry.morningTime)}</span>
+                        )}
+                      </div>
                       <span className="text-xs text-gray-700">{entry.morningIntent}</span>
                     </div>
                   )}
                   {entry.eveningInsight && (
                     <div className="mb-1">
-                      <span className="text-xs font-semibold text-[#FF8C42]">夕の気づき：</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-[#FF8C42]">夕の気づき：</span>
+                        {entry.eveningTime && (
+                          <span className="text-[10px] text-gray-400">🕐 {formatTime(entry.eveningTime)}</span>
+                        )}
+                      </div>
                       <span className="text-xs text-gray-700">{entry.eveningInsight}</span>
                     </div>
                   )}

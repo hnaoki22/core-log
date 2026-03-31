@@ -5,6 +5,7 @@ import {
   getFeedbackByParticipant,
   markFeedbackAsRead,
   getUnreadFeedbackCount,
+  getLogsByParticipant,
 } from "@/lib/notion";
 import { getParticipantByToken, getManagerByToken } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
@@ -31,8 +32,20 @@ export async function GET(req: NextRequest) {
 
   // Check if manager/admin token with participant name
   const manager = await getManagerByToken(token);
-  if (manager && participantName) {
+  const isAdmin = await isAdminToken(token);
+  if ((manager || isAdmin) && participantName) {
+    const includeLogs = req.nextUrl.searchParams.get("includeLogs") === "true";
     const feedback = await getFeedbackByParticipant(participantName);
+    if (includeLogs) {
+      const allLogs = await getLogsByParticipant(participantName);
+      // Return only last 7 days of logs
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const recentLogs = allLogs
+        .filter((log) => new Date(log.date) >= sevenDaysAgo)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      return NextResponse.json({ feedback, recentLogs });
+    }
     return NextResponse.json({ feedback });
   }
 
