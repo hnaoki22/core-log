@@ -13,11 +13,11 @@ type Params = {
   };
 };
 
-const energyColor: Record<string, string> = {
-  excellent: "#F59E0B",
-  good: "#059669",
-  okay: "#9CA3AF",
-  low: "#DC2626",
+const energyEmoji: Record<string, string> = {
+  excellent: "🔥",
+  good: "😊",
+  okay: "😐",
+  low: "😞",
 };
 
 const energyLabel: Record<string, string> = {
@@ -99,7 +99,7 @@ export default async function ParticipantDetailPage({ params }: Params) {
                     </span>
                     {entry.energy && (
                       <div className="flex items-center gap-1.5">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: energyColor[entry.energy] || "#9CA3AF" }}></div>
+                        <span className="text-base leading-none">{energyEmoji[entry.energy] || ""}</span>
                         <span className="text-[11px] text-[#9CA3AF]">{energyLabel[entry.energy] || ""}</span>
                       </div>
                     )}

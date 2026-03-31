@@ -27,11 +27,11 @@ type ManagerData = {
   participants: ParticipantData[];
 };
 
-const energyColor: Record<string, string> = {
-  excellent: "#F59E0B",
-  good: "#059669",
-  okay: "#9CA3AF",
-  low: "#DC2626",
+const energyEmoji: Record<string, string> = {
+  excellent: "🔥",
+  good: "😊",
+  okay: "😐",
+  low: "😞",
 };
 
 export default function ManagerHome() {
@@ -192,11 +192,9 @@ export default function ManagerHome() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         {(participant.recentEnergy || []).map((energy, idx) => (
-                          <div
-                            key={idx}
-                            className="w-1.5 h-1.5 rounded-full"
-                            style={{ backgroundColor: energy ? energyColor[energy] : "#E5E7EB" }}
-                          />
+                          <span key={idx} className="text-sm leading-none">
+                            {energy ? energyEmoji[energy] : "·"}
+                          </span>
                         ))}
                       </div>
                       <div className="flex items-center gap-1 text-[10px] text-[#4338CA] font-medium">

@@ -21,11 +21,11 @@ type LogEntry = {
   eveningTime?: string | null;
 };
 
-const energyColor: Record<string, string> = {
-  excellent: "#F59E0B",
-  good: "#059669",
-  okay: "#9CA3AF",
-  low: "#DC2626",
+const energyEmoji: Record<string, string> = {
+  excellent: "🔥",
+  good: "😊",
+  okay: "😐",
+  low: "😞",
 };
 
 const energyLabel: Record<string, string> = {
@@ -143,7 +143,7 @@ export default function LogsPage() {
 
                     <div className="flex-shrink-0 flex items-center gap-2">
                       {log.energy && (
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: energyColor[log.energy] }}></div>
+                        <span className="text-base leading-none">{energyEmoji[log.energy]}</span>
                       )}
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
                         className={`transition-transform duration-200 ${expandedId === log.id ? "rotate-90" : ""}`}>
@@ -179,7 +179,7 @@ export default function LogsPage() {
 
                       {log.energy && (
                         <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: energyColor[log.energy] }}></div>
+                          <span className="text-base leading-none">{energyEmoji[log.energy]}</span>
                           <span className="text-xs text-[#6B7280]">{energyLabel[log.energy]}</span>
                         </div>
                       )}

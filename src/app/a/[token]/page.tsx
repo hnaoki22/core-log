@@ -39,11 +39,11 @@ type AdminData = {
 type ManagerOption = { id: string; name: string };
 type AddResult = { type: "participant" | "manager"; name: string; token: string; url: string } | null;
 
-const energyColor: Record<string, string> = {
-  excellent: "#F59E0B",
-  good: "#059669",
-  okay: "#9CA3AF",
-  low: "#DC2626",
+const energyEmoji: Record<string, string> = {
+  excellent: "🔥",
+  good: "😊",
+  okay: "😐",
+  low: "😞",
 };
 
 export default function AdminDashboard() {
@@ -345,8 +345,9 @@ export default function AdminDashboard() {
                       {p.recentEnergy.length > 0 && (
                         <div className="flex gap-0.5 mt-0.5">
                           {p.recentEnergy.map((energy, i) => (
-                            <div key={i} className="w-1.5 h-1.5 rounded-full"
-                              style={{ backgroundColor: energy ? energyColor[energy] : "#E5E7EB" }} />
+                            <span key={i} className="text-xs leading-none">
+                              {energy ? energyEmoji[energy] : "·"}
+                            </span>
                           ))}
                         </div>
                       )}
@@ -535,7 +536,7 @@ export default function AdminDashboard() {
                         <div key={i} className="bg-white rounded-lg px-3 py-2 text-xs border border-[#F3F4F6]">
                           <div className="flex items-center justify-between mb-1">
                             <span className="font-medium text-[#111827]">{log.date} ({log.dayOfWeek})</span>
-                            {log.energy && <div className="w-2 h-2 rounded-full" style={{ backgroundColor: energyColor[log.energy] || "#E5E7EB" }}></div>}
+                            {log.energy && <span className="text-sm leading-none">{energyEmoji[log.energy] || ""}</span>}
                           </div>
                           <p className="text-[#4338CA]">朝: {log.morningIntent || "—"}</p>
                           {log.eveningInsight && <p className="text-amber-600 mt-0.5">夜: {log.eveningInsight}</p>}

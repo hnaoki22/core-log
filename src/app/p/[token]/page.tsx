@@ -33,6 +33,13 @@ const energyColor: Record<string, string> = {
   low: "#DC2626",
 };
 
+const energyEmoji: Record<string, string> = {
+  excellent: "🔥",
+  good: "😊",
+  okay: "😐",
+  low: "😞",
+};
+
 export default function ParticipantHome() {
   const params = useParams();
   const token = params.token as string;
@@ -251,11 +258,14 @@ export default function ParticipantHome() {
                 const height = log.energy ? heightMap[log.energy] : "h-[6px]";
                 const color = log.energy ? energyColor[log.energy] : "#E5E7EB";
                 return (
-                  <div key={log.id} className="flex-1 flex items-end justify-center">
-                    <div
-                      className={`w-full ${height} rounded-md transition-all`}
-                      style={{ backgroundColor: color, minHeight: "4px" }}
-                    ></div>
+                  <div key={log.id} className="flex-1 flex flex-col items-center gap-1">
+                    <span className="text-xs leading-none">{log.energy ? energyEmoji[log.energy] : ""}</span>
+                    <div className="w-full flex-1 flex items-end">
+                      <div
+                        className={`w-full ${height} rounded-md transition-all`}
+                        style={{ backgroundColor: color, minHeight: "4px" }}
+                      ></div>
+                    </div>
                   </div>
                 );
               })}
@@ -297,7 +307,7 @@ export default function ParticipantHome() {
                     </div>
                     <div className="flex-shrink-0 flex items-center gap-2">
                       {log.energy && (
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: energyColor[log.energy] }}></div>
+                        <span className="text-base leading-none">{energyEmoji[log.energy]}</span>
                       )}
                       {log.hasFeedback && (
                         <div className="w-1.5 h-1.5 bg-amber-400 rounded-full"></div>

@@ -17,10 +17,10 @@ type ParticipantBasic = {
 };
 
 const energyOptions = [
-  { id: "excellent", label: "絶好調", color: "#F59E0B", bg: "bg-amber-50", border: "border-amber-300", ring: "ring-amber-200" },
-  { id: "good", label: "良い", color: "#059669", bg: "bg-emerald-50", border: "border-emerald-300", ring: "ring-emerald-200" },
-  { id: "okay", label: "まあまあ", color: "#6B7280", bg: "bg-gray-50", border: "border-gray-300", ring: "ring-gray-200" },
-  { id: "low", label: "低調", color: "#DC2626", bg: "bg-red-50", border: "border-red-300", ring: "ring-red-200" },
+  { id: "excellent", label: "絶好調", emoji: "🔥", color: "#F59E0B", bg: "bg-amber-50", border: "border-amber-300", ring: "ring-amber-200" },
+  { id: "good", label: "良い", emoji: "😊", color: "#059669", bg: "bg-emerald-50", border: "border-emerald-300", ring: "ring-emerald-200" },
+  { id: "okay", label: "まあまあ", emoji: "😐", color: "#6B7280", bg: "bg-gray-50", border: "border-gray-300", ring: "ring-gray-200" },
+  { id: "low", label: "低調", emoji: "😞", color: "#DC2626", bg: "bg-red-50", border: "border-red-300", ring: "ring-red-200" },
 ];
 
 export default function InputPage() {
@@ -290,10 +290,7 @@ export default function InputPage() {
                       : "border-[#E5E7EB] bg-white hover:border-[#D1D5DB]"
                   }`}
                 >
-                  <div
-                    className="w-3 h-3 rounded-full mx-auto mb-3"
-                    style={{ backgroundColor: option.color }}
-                  ></div>
+                  <div className="text-2xl mx-auto mb-2">{option.emoji}</div>
                   <div className="text-sm font-medium text-[#111827]">{option.label}</div>
                 </button>
               ))}
