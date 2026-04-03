@@ -102,6 +102,7 @@ export async function GET(request: NextRequest) {
     manager: {
       name: manager.name,
       department: manager.department,
+      isAdmin: manager.isAdmin || false,
     },
     participants: enrichedParticipants,
   });
