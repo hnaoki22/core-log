@@ -40,15 +40,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify manager token
+    // Verify manager or participant token
     const manager = await getManagerByToken(token);
-    if (!manager) {
+    const participant = !manager ? await getParticipantByToken(token) : null;
+    if (!manager && !participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
+    // If participant creates their own mission, use their name
+    const effectiveName = participant ? participant.name : participantName;
+    if (!effectiveName) {
+      return NextResponse.json({ error: "participantName required" }, { status: 400 });
     }
 
     const setDate = getTodayJST();
     const missionId = await createMission(
-      participantName,
+      effectiveName,
       title,
       purpose || "",
       deadline || "",
@@ -59,19 +66,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to create mission" }, { status: 500 });
     }
 
-    // Notify participant about new mission (non-blocking)
+    // Notify about new mission (non-blocking)
     try {
-      const targetParticipant = await getParticipantByName(participantName);
-      if (targetParticipant?.email && !targetParticipant.email.includes("example.com")) {
-        sendNotificationEmail({
-          to: targetParticipant.email,
-          recipientName: targetParticipant.name.split(" ")[0],
-          senderName: manager.name,
-          token: targetParticipant.token,
-          type: "mission_created",
-          detail: title,
-        }).catch(console.error);
+      if (manager) {
+        // Manager created → notify participant
+        const targetParticipant = await getParticipantByName(effectiveName);
+        if (targetParticipant?.email && !targetParticipant.email.includes("example.com")) {
+          sendNotificationEmail({
+            to: targetParticipant.email,
+            recipientName: targetParticipant.name.split(" ")[0],
+            senderName: manager.name,
+            token: targetParticipant.token,
+            type: "mission_created",
+            detail: title,
+          }).catch(console.error);
+        }
       }
+      // Participant created → no notification needed for now
     } catch (notifyError) {
       console.error("Mission notification error (non-critical):", notifyError);
     }

@@ -28,6 +28,7 @@ export default function MissionPage() {
   const token = params.token as string;
 
   const [missions, setMissions] = useState<Mission[]>([]);
+  const [participantName, setParticipantName] = useState("");
   const [badges, setBadges] = useState<{ feedback: number; mission: number }>({ feedback: 0, mission: 0 });
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -40,6 +41,13 @@ export default function MissionPage() {
   const [closingMission, setClosingMission] = useState<string | null>(null);
   const [closeReview, setCloseReview] = useState("");
 
+  // Create form state
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newPurpose, setNewPurpose] = useState("");
+  const [newDeadline, setNewDeadline] = useState("");
+  const [creating, setCreating] = useState(false);
+
   useEffect(() => {
     async function fetchMissions() {
       try {
@@ -48,6 +56,7 @@ export default function MissionPage() {
         const data = await res.json();
         if (data.missions) setMissions(data.missions);
         if (data.badges) setBadges(data.badges);
+        if (data.participant?.name) setParticipantName(data.participant.name);
       } catch {
         // silently fail
       } finally {
@@ -96,6 +105,40 @@ export default function MissionPage() {
       // silently fail
     } finally {
       setSendingComment((prev) => ({ ...prev, [missionId]: false }));
+    }
+  };
+
+  const handleCreate = async () => {
+    if (!newTitle.trim()) return;
+    setCreating(true);
+    try {
+      const res = await fetch("/api/mission", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token,
+          participantName,
+          title: newTitle.trim(),
+          purpose: newPurpose.trim(),
+          deadline: newDeadline,
+        }),
+      });
+      if (res.ok) {
+        // Refresh missions
+        const refreshRes = await fetch(`/api/logs?token=${token}`);
+        if (refreshRes.ok) {
+          const data = await refreshRes.json();
+          if (data.missions) setMissions(data.missions);
+        }
+        setNewTitle("");
+        setNewPurpose("");
+        setNewDeadline("");
+        setShowCreateForm(false);
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -349,17 +392,83 @@ export default function MissionPage() {
       </div>
 
       <div className="max-w-md mx-auto px-5 pt-5 animate-fade-up relative z-10">
-        {missions.length === 0 ? (
-          <div className="text-center py-16">
+        {/* New Mission Button */}
+        {!showCreateForm && (
+          <button
+            onClick={() => setShowCreateForm(true)}
+            className="w-full mb-5 flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-[#E5E7EB] text-sm text-[#6B7280] hover:border-[#4338CA] hover:text-[#4338CA] transition-colors"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            新しいミッションを設定
+          </button>
+        )}
+
+        {/* Create Form */}
+        {showCreateForm && (
+          <div className="card p-5 mb-5">
+            <h3 className="font-semibold text-sm text-[#111827] mb-4">新しいミッションを設定</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] font-medium text-[#9CA3AF] tracking-wide uppercase block mb-1.5">ミッション名 *</label>
+                <input
+                  type="text"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="例: Q3営業戦略の提案書を自力で完成させる"
+                  className="w-full text-sm border border-[#E5E7EB] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#4338CA]/10 focus:border-[#4338CA] bg-white transition-all"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-medium text-[#9CA3AF] tracking-wide uppercase block mb-1.5">背景・目的</label>
+                <textarea
+                  value={newPurpose}
+                  onChange={(e) => setNewPurpose(e.target.value)}
+                  placeholder="このミッションを設定する背景や、達成に向けた期待を記入"
+                  className="w-full text-sm border border-[#E5E7EB] rounded-xl px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-[#4338CA]/10 focus:border-[#4338CA] bg-white transition-all"
+                  rows={3}
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-medium text-[#9CA3AF] tracking-wide uppercase block mb-1.5">達成期限</label>
+                <input
+                  type="date"
+                  value={newDeadline}
+                  onChange={(e) => setNewDeadline(e.target.value)}
+                  className="text-sm border border-[#E5E7EB] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#4338CA]/10 focus:border-[#4338CA] bg-white transition-all"
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-1">
+                <button
+                  onClick={() => { setShowCreateForm(false); setNewTitle(""); setNewPurpose(""); setNewDeadline(""); }}
+                  className="text-xs text-[#9CA3AF] hover:text-[#6B7280] px-3 py-2 transition-colors"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleCreate}
+                  disabled={creating || !newTitle.trim()}
+                  className="text-xs bg-[#111827] text-white rounded-xl px-4 py-2 hover:bg-[#1F2937] disabled:bg-[#D1D5DB] disabled:text-[#9CA3AF] transition-colors"
+                >
+                  {creating ? "作成中..." : "ミッションを設定"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {missions.length === 0 && !showCreateForm ? (
+          <div className="text-center py-12">
             <div className="w-12 h-12 bg-[#F3F4F6] rounded-2xl flex items-center justify-center mx-auto mb-4">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
               </svg>
             </div>
-            <p className="text-[#6B7280] text-sm mb-1">ミッションはまだ設定されていません</p>
-            <p className="text-xs text-[#D1D5DB]">上司がミッションを設定すると、ここに表示されます</p>
+            <p className="text-[#6B7280] text-sm mb-1">ミッションはまだありません</p>
+            <p className="text-xs text-[#D1D5DB]">上のボタンから自分でミッションを設定できます</p>
           </div>
-        ) : (
+        ) : missions.length > 0 ? (
           <div className="space-y-6">
             {inProgress.length > 0 && (
               <section>
@@ -397,7 +506,7 @@ export default function MissionPage() {
               </section>
             )}
           </div>
-        )}
+        ) : null}
       </div>
 
       <BottomNav active="mission" baseUrl={`/p/${token}`} badges={badges} />
