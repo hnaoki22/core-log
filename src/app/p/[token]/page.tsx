@@ -84,7 +84,7 @@ export default function ParticipantHome() {
       <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-[#4338CA] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-[#9CA3AF] text-sm">読み込み中...</p>
+          <p className="text-[#9CA3AF] text-sm">データを準備しています...</p>
         </div>
       </div>
     );
@@ -94,8 +94,8 @@ export default function ParticipantHome() {
     return (
       <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
         <div className="text-center">
-          <p className="text-[#6B7280] mb-4">{error || "参加者が見つかりません"}</p>
-          <a href="/" className="text-[#4338CA] font-medium hover:underline">ホームに戻る</a>
+          <p className="text-[#6B7280] mb-4">{error || "ページを読み込めませんでした。再度お試しください。"}</p>
+          <button onClick={() => window.location.reload()} className="text-[#4338CA] font-medium hover:underline">再読み込み</button>
         </div>
       </div>
     );
@@ -148,6 +148,29 @@ export default function ParticipantHome() {
   const streak = computeStreak();
   const todayStatus = getTodayStatus();
   const recentLogs = logs.slice(0, 5);
+
+  // Energy chart data
+  const chartLogs = logs.slice(0, 10).reverse();
+  const energyValue: Record<string, number> = { excellent: 4, good: 3, okay: 2, low: 1 };
+  const chartWidth = 300;
+  const chartHeight = 100;
+  const paddingX = 20;
+  const paddingTop = 8;
+  const paddingBottom = 8;
+  const plotWidth = chartWidth - paddingX * 2;
+  const plotHeight = chartHeight - paddingTop - paddingBottom;
+  const chartPoints = chartLogs.map((log, i) => {
+    const x = chartLogs.length === 1 ? chartWidth / 2 : paddingX + (i / (chartLogs.length - 1)) * plotWidth;
+    const val = log.energy ? energyValue[log.energy] : 0;
+    const y = val > 0 ? paddingTop + plotHeight - ((val - 1) / 3) * plotHeight : paddingTop + plotHeight;
+    return { x, y, log, val };
+  }).filter(p => p.val > 0);
+  const linePath = chartPoints.length > 1
+    ? chartPoints.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ")
+    : "";
+  const areaPath = chartPoints.length > 1
+    ? `${linePath} L${chartPoints[chartPoints.length - 1].x},${paddingTop + plotHeight} L${chartPoints[0].x},${paddingTop + plotHeight} Z`
+    : "";
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] pb-24">
@@ -240,39 +263,74 @@ export default function ParticipantHome() {
           </div>
         </div>
 
-        {/* Energy Chart */}
+        {/* Energy Chart - Line Graph */}
         {logs.length > 0 && (
           <div className="card p-5">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-sm text-[#111827]">エネルギーの推移</h3>
-              <span className="text-[10px] text-[#9CA3AF] font-medium">直近10日</span>
+              <span className="text-[10px] text-[#9CA3AF] font-medium">直近{chartLogs.length}日</span>
             </div>
-            <div className="flex items-end gap-1.5 h-24">
-              {logs.slice(0, 10).reverse().map((log) => {
-                const heightMap: Record<string, string> = {
-                  excellent: "h-full",
-                  good: "h-3/4",
-                  okay: "h-1/2",
-                  low: "h-1/4",
-                };
-                const height = log.energy ? heightMap[log.energy] : "h-[6px]";
-                const color = log.energy ? energyColor[log.energy] : "#E5E7EB";
-                return (
-                  <div key={log.id} className="flex-1 flex flex-col items-center gap-1">
-                    <span className="text-xs leading-none">{log.energy ? energyEmoji[log.energy] : ""}</span>
-                    <div className="w-full flex-1 flex items-end">
-                      <div
-                        className={`w-full ${height} rounded-md transition-all`}
-                        style={{ backgroundColor: color, minHeight: "4px" }}
-                      ></div>
-                    </div>
-                  </div>
-                );
-              })}
+
+            <div className="relative">
+              <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-between py-2 text-[9px] text-[#D1D5DB] pointer-events-none" style={{ width: "16px" }}>
+                <span>🔥</span>
+                <span>😊</span>
+                <span>😐</span>
+                <span>😞</span>
+              </div>
+
+              <svg
+                viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+                className="w-full"
+                style={{ height: "120px", marginLeft: "4px" }}
+                preserveAspectRatio="none"
+              >
+                {[0, 1, 2, 3].map((i) => {
+                  const gridY = paddingTop + (i / 3) * plotHeight;
+                  return (
+                    <line key={i} x1={paddingX} y1={gridY} x2={chartWidth - paddingX} y2={gridY}
+                      stroke="#F3F4F6" strokeWidth="0.5" />
+                  );
+                })}
+
+                {areaPath && (
+                  <path d={areaPath} fill="url(#energyGradient)" opacity="0.3" />
+                )}
+
+                {linePath && (
+                  <path d={linePath} fill="none" stroke="#4338CA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                )}
+
+                {chartPoints.map((p, i) => (
+                  <circle key={i} cx={p.x} cy={p.y} r="3.5"
+                    fill={p.log.energy ? energyColor[p.log.energy] : "#E5E7EB"}
+                    stroke="white" strokeWidth="1.5" />
+                ))}
+
+                <defs>
+                  <linearGradient id="energyGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#4338CA" stopOpacity="0.4" />
+                    <stop offset="100%" stopColor="#4338CA" stopOpacity="0.02" />
+                  </linearGradient>
+                </defs>
+              </svg>
             </div>
-            <div className="flex justify-between mt-3 px-0.5">
-              <span className="text-[9px] text-[#D1D5DB]">10日前</span>
-              <span className="text-[9px] text-[#D1D5DB]">今日</span>
+
+            <div className="flex justify-between mt-1 px-5">
+              {chartLogs.map((log, i) => (
+                <span key={i} className="text-xs leading-none text-center" style={{ width: `${100 / chartLogs.length}%` }}>
+                  {log.energy ? energyEmoji[log.energy] : ""}
+                </span>
+              ))}
+            </div>
+
+            <div className="flex justify-between mt-1.5 px-5">
+              {chartLogs.length >= 2 && (
+                <>
+                  <span className="text-[9px] text-[#D1D5DB]">{chartLogs[0]?.date?.slice(5) || ""}</span>
+                  <span className="text-[9px] text-[#D1D5DB]">{chartLogs[chartLogs.length - 1]?.date?.slice(5) || ""}</span>
+                </>
+              )}
             </div>
           </div>
         )}

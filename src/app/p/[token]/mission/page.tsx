@@ -36,6 +36,9 @@ export default function MissionPage() {
   const [loadingComments, setLoadingComments] = useState<Record<string, boolean>>({});
   const [commentText, setCommentText] = useState<Record<string, string>>({});
   const [sendingComment, setSendingComment] = useState<Record<string, boolean>>({});
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const [closingMission, setClosingMission] = useState<string | null>(null);
+  const [closeReview, setCloseReview] = useState("");
 
   useEffect(() => {
     async function fetchMissions() {
@@ -96,6 +99,30 @@ export default function MissionPage() {
     }
   };
 
+  const handleStatusChange = async (missionId: string, newStatus: string, review?: string) => {
+    setUpdatingStatus(missionId);
+    try {
+      const res = await fetch("/api/mission", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, missionId, status: newStatus, finalReview: review }),
+      });
+      if (res.ok) {
+        setMissions((prev) =>
+          prev.map((m) =>
+            m.id === missionId ? { ...m, status: newStatus, finalReview: review || m.finalReview } : m
+          )
+        );
+        setClosingMission(null);
+        setCloseReview("");
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "";
     const d = new Date(dateStr);
@@ -117,7 +144,7 @@ export default function MissionPage() {
   if (notFound) {
     return (
       <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
-        <p className="text-[#6B7280] text-sm">参加者が見つかりません</p>
+        <p className="text-[#6B7280] text-sm">ページを読み込めませんでした</p>
       </div>
     );
   }
@@ -127,7 +154,7 @@ export default function MissionPage() {
       <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-[#4338CA] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-[#9CA3AF] text-sm">読み込み中...</p>
+          <p className="text-[#9CA3AF] text-sm">データを準備しています...</p>
         </div>
       </div>
     );
@@ -191,6 +218,65 @@ export default function MissionPage() {
                 <p className="text-sm text-[#374151] leading-relaxed">{mission.finalReview}</p>
               </div>
             )}
+
+            {/* Status Actions */}
+            <div className="flex gap-2 mt-3">
+              {(mission.status !== "完了" && mission.status !== "completed") ? (
+                <>
+                  {mission.status === "未着手" || mission.status === "not_started" ? (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleStatusChange(mission.id, "進行中"); }}
+                      disabled={updatingStatus === mission.id}
+                      className="text-xs bg-[#4338CA] text-white px-3.5 py-2 rounded-xl hover:bg-[#3730A3] disabled:opacity-50 transition-colors"
+                    >
+                      {updatingStatus === mission.id ? "更新中..." : "着手する"}
+                    </button>
+                  ) : null}
+                  {closingMission !== mission.id ? (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setClosingMission(mission.id); }}
+                      className="text-xs bg-emerald-600 text-white px-3.5 py-2 rounded-xl hover:bg-emerald-700 transition-colors"
+                    >
+                      完了にする
+                    </button>
+                  ) : (
+                    <div className="w-full space-y-2">
+                      <textarea
+                        value={closeReview}
+                        onChange={(e) => setCloseReview(e.target.value)}
+                        placeholder="振り返りコメント（任意）"
+                        className="w-full text-xs border border-[#E5E7EB] rounded-xl p-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400 bg-white transition-all"
+                        rows={2}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setClosingMission(null); setCloseReview(""); }}
+                          className="text-xs text-[#9CA3AF] px-2 py-1"
+                        >
+                          キャンセル
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleStatusChange(mission.id, "完了", closeReview); }}
+                          disabled={updatingStatus === mission.id}
+                          className="text-xs bg-emerald-600 text-white rounded-xl px-3 py-1.5 hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                        >
+                          {updatingStatus === mission.id ? "更新中..." : "完了にする"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleStatusChange(mission.id, "進行中"); }}
+                  disabled={updatingStatus === mission.id}
+                  className="text-xs bg-[#4338CA] text-white px-3.5 py-2 rounded-xl hover:bg-[#3730A3] disabled:opacity-50 transition-colors"
+                >
+                  {updatingStatus === mission.id ? "更新中..." : "再開する"}
+                </button>
+              )}
+            </div>
 
             {/* Comments */}
             <div className="border-t border-[#F3F4F6] pt-3 mt-3">

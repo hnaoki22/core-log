@@ -8,7 +8,7 @@ import {
   updateMissionStatus,
   getMissionsByParticipant,
 } from "@/lib/notion";
-import { getManagerByToken, getParticipantByName } from "@/lib/participant-db";
+import { getManagerByToken, getParticipantByToken, getParticipantByName } from "@/lib/participant-db";
 import { getTodayJST } from "@/lib/date-utils";
 import { sendNotificationEmail } from "@/lib/email";
 
@@ -95,9 +95,10 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // Verify manager token
+    // Verify manager or participant token
     const manager = await getManagerByToken(token);
-    if (!manager) {
+    const participant = !manager ? await getParticipantByToken(token) : null;
+    if (!manager && !participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

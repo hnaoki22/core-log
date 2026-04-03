@@ -77,7 +77,7 @@ export default function LogsPage() {
       <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-[#4338CA] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-[#9CA3AF] text-sm">読み込み中...</p>
+          <p className="text-[#9CA3AF] text-sm">データを準備しています...</p>
         </div>
       </div>
     );
