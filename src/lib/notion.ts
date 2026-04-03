@@ -523,6 +523,7 @@ export type NotionParticipant = {
   startDate: string;
   role: string;        // "参加者" | "HM社内"
   managerId: string;   // Notion page ID of related manager (from relation)
+  fbPolicy: string;    // FB方針（参加者ごとのAIフィードバックカスタマイズ）
 };
 
 export type NotionManager = {
@@ -563,6 +564,7 @@ export async function getAllParticipantsFromNotion(): Promise<NotionParticipant[
         startDate: getDate(props["開始日"]),
         role: getSelect(props["役割"]),
         managerId: getRelationIds(props["担当上司"])[0] || "",
+        fbPolicy: getRichText(props["FB方針"]) || "",
       };
     });
   } catch (error) {
@@ -602,6 +604,7 @@ export async function getParticipantByTokenFromNotion(token: string): Promise<No
       startDate: getDate(props["開始日"]),
       role: getSelect(props["役割"]),
       managerId: getRelationIds(props["担当上司"])[0] || "",
+      fbPolicy: getRichText(props["FB方針"]) || "",
     };
   } catch (error) {
     console.error("Error fetching participant by token:", error);
@@ -645,6 +648,7 @@ export async function getParticipantByNameFromNotion(name: string): Promise<Noti
       startDate: getDate(props["開始日"]),
       role: getSelect(props["役割"]),
       managerId: getRelationIds(props["担当上司"])[0] || "",
+      fbPolicy: getRichText(props["FB方針"]) || "",
     };
   } catch (error) {
     console.error("Error fetching participant by name:", error);
@@ -683,6 +687,7 @@ export async function getParticipantByEmailFromNotion(email: string): Promise<No
       startDate: getDate(props["開始日"]),
       role: getSelect(props["役割"]),
       managerId: getRelationIds(props["担当上司"])[0] || "",
+      fbPolicy: getRichText(props["FB方針"]) || "",
     };
   } catch (error) {
     console.error("Error fetching participant by email:", error);
@@ -836,6 +841,7 @@ export async function getParticipantsForManagerFromNotion(managerId: string): Pr
         startDate: getDate(props["開始日"]),
         role: getSelect(props["役割"]),
         managerId: managerId,
+        fbPolicy: getRichText(props["FB方針"]) || "",
       };
     });
   } catch (error) {

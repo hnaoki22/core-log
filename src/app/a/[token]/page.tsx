@@ -13,6 +13,7 @@ type ParticipantData = {
   streak: number;
   fbCount: number;
   managerId: string;
+  fbPolicy: string;
   todayHasLog: boolean;
   latestLog: {
     date: string;
@@ -70,6 +71,7 @@ export default function AdminDashboard() {
     { date: string; dayOfWeek: string; morningIntent: string; eveningInsight: string | null; energy: string | null; status: string }[]
   >([]);
   const [fbLogsLoading, setFbLogsLoading] = useState(false);
+  const [aiDraftLoading, setAiDraftLoading] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -155,11 +157,42 @@ export default function AdminDashboard() {
     setFbTargetName(participantName);
     setFbContent(""); setFbPeriod(""); setFbWeekNum(1); setFbSuccess(false);
     setFbRecentLogs([]); setFbLogsLoading(true); setShowFeedbackModal(true);
+    setAiDraftLoading(false);
     fetch(`/api/feedback?token=${token}&participant=${encodeURIComponent(participantName)}&includeLogs=true`)
       .then((r) => r.json())
       .then((d) => setFbRecentLogs(d.recentLogs || []))
       .catch(() => setFbRecentLogs([]))
       .finally(() => setFbLogsLoading(false));
+  };
+
+  const handleAiDraft = async () => {
+    if (fbRecentLogs.length === 0) return;
+    setAiDraftLoading(true);
+    try {
+      const targetParticipant = data?.participants.find((p) => p.name === fbTargetName);
+      const res = await fetch("/api/feedback/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token,
+          participantName: fbTargetName,
+          logs: fbRecentLogs,
+          dojoPhase: targetParticipant?.dojoPhase || "",
+          fbPolicy: targetParticipant?.fbPolicy || "",
+        }),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        setFbContent(result.draft || "");
+      } else {
+        const err = await res.json();
+        alert(err.error || "AI下書きの生成に失敗しました");
+      }
+    } catch {
+      alert("AI下書きの生成に失敗しました");
+    } finally {
+      setAiDraftLoading(false);
+    }
   };
 
   const handleSubmitFeedback = async () => {
@@ -396,7 +429,7 @@ export default function AdminDashboard() {
               { label: "デプロイ先", value: "Vercel", status: "" },
               { label: "認証方式", value: "トークン付きURL", status: "" },
               { label: "Notion DB", value: "接続済み", status: "emerald" },
-              { label: "AIフィードバック", value: "Phase 2で実装", status: "amber" },
+              { label: "AIフィードバック", value: "実装済み", status: "green" },
             ].map((item, i) => (
               <div key={i} className="flex justify-between items-center py-2.5 border-b border-[#F9FAFB] last:border-0">
                 <span className="text-xs text-[#9CA3AF]">{item.label}</span>
@@ -509,6 +542,9 @@ export default function AdminDashboard() {
                 </button>
               </div>
               <p className="text-xs text-amber-600 font-medium mt-1">対象: {fbTargetName}</p>
+              {(() => { const p = data?.participants.find((p) => p.name === fbTargetName); return p?.fbPolicy ? (
+                <p className="text-[10px] text-violet-500 mt-1 bg-violet-50 rounded-md px-2 py-1">📋 FB方針: {p.fbPolicy}</p>
+              ) : null; })()}
             </div>
             {fbSuccess ? (
               <div className="p-8 text-center">
@@ -556,9 +592,30 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[#374151] mb-1.5">フィードバック内容 *</label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-medium text-[#374151]">フィードバック内容 *</label>
+                    <button
+                      onClick={handleAiDraft}
+                      disabled={aiDraftLoading || fbLogsLoading || fbRecentLogs.length === 0}
+                      className="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-lg bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:from-violet-600 hover:to-purple-700 disabled:from-gray-300 disabled:to-gray-400 disabled:text-gray-500 transition-all shadow-sm"
+                    >
+                      {aiDraftLoading ? (
+                        <>
+                          <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin"></div>
+                          AI生成中...
+                        </>
+                      ) : (
+                        <>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                          </svg>
+                          AI下書き生成
+                        </>
+                      )}
+                    </button>
+                  </div>
                   <textarea value={fbContent} onChange={(e) => setFbContent(e.target.value)} rows={6}
-                    placeholder="今週のCORE Logを拝見しました。..."
+                    placeholder="今週のCORE Logを拝見しました。...（AI下書き生成ボタンで自動作成できます）"
                     className="input-field text-sm resize-none leading-relaxed" />
                 </div>
                 <div className="flex gap-3 pt-2">

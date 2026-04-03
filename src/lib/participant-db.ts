@@ -47,6 +47,7 @@ export type ParticipantInfo = {
   dojoPhase: string;
   emailEnabled: boolean;
   managerId: string;
+  fbPolicy: string;
   // Mock-only fields (for backward compatibility in mock mode)
   weekNum?: number;
   startDate?: string;
@@ -84,6 +85,7 @@ function notionParticipantToInfo(np: NotionParticipant): ParticipantInfo {
     emailEnabled: np.emailEnabled,
     managerId: np.managerId,
     startDate: np.startDate,
+    fbPolicy: np.fbPolicy || "",
   };
 }
 
@@ -97,6 +99,7 @@ function mockParticipantToInfo(mp: Participant): ParticipantInfo {
     dojoPhase: mp.dojoPhase,
     emailEnabled: mp.emailEnabled,
     managerId: mp.managerId,
+    fbPolicy: "",
     weekNum: mp.weekNum,
     startDate: mp.startDate,
     totalDays: mp.totalDays,

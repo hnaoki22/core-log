@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
           streak: p.streak || 0,
           fbCount: p.fbCount || 0,
           managerId: p.managerId,
+          fbPolicy: p.fbPolicy || "",
           todayHasLog: hasLogToday,
           latestLog: logs[0]
             ? {
@@ -75,6 +76,7 @@ export async function GET(request: NextRequest) {
           streak: stats.streak,
           fbCount: stats.fbCount,
           managerId: p.managerId,
+          fbPolicy: p.fbPolicy || "",
           todayHasLog: hasLogToday,
           latestLog: latestLog
             ? {
@@ -98,6 +100,7 @@ export async function GET(request: NextRequest) {
           streak: 0,
           fbCount: 0,
           managerId: p.managerId,
+          fbPolicy: p.fbPolicy || "",
           todayHasLog: false,
           latestLog: null,
           recentEnergy: [],
