@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminToken } from "@/lib/participant-db";
+import { getAiSystemPrompt } from "@/lib/notion";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
 
@@ -61,8 +62,10 @@ export async function POST(request: NextRequest) {
       return entry;
     }).join("\n\n");
 
-    // Build the system prompt
-    const systemPrompt = `あなたは「Human Mature」という戦略・組織開発コンサルティング会社のシニアコンサルタントです。
+    // Get system prompt from Notion settings (or use default)
+    let systemPrompt = await getAiSystemPrompt();
+    if (!systemPrompt) {
+      systemPrompt = `あなたは「Human Mature」という戦略・組織開発コンサルティング会社のシニアコンサルタントです。
 クライアント企業の参加者に対して、週次のフィードバック（CORE Logフィードバック）を作成します。
 
 # フィードバックの基本方針
@@ -75,6 +78,7 @@ export async function POST(request: NextRequest) {
 - 300〜500文字程度で簡潔にまとめる
 - 「〜さん」で呼びかけて始める
 - 末尾は来週に向けた前向きな一言で締める`;
+    }
 
     // Build user prompt with customization
     let userPrompt = `以下は ${participantName} さんの直近1週間のCORE Logです。\n\n`;

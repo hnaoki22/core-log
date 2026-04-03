@@ -1166,3 +1166,156 @@ export async function markFeedbackAsRead(feedbackId: string): Promise<boolean> {
     return false;
   }
 }
+
+// ===== AI Settings =====
+const AI_SETTINGS_PAGE_ID = process.env.NOTION_AI_SETTINGS_PAGE_ID || "";
+
+/**
+ * Get the AI system prompt from the Notion "AI設定" page
+ * Reads the page body content and extracts text under "## システムプロンプト"
+ */
+export async function getAiSystemPrompt(): Promise<string> {
+  if (!AI_SETTINGS_PAGE_ID) return "";
+  try {
+    const blocks = await notion.blocks.children.list({
+      block_id: AI_SETTINGS_PAGE_ID,
+      page_size: 100,
+    });
+
+    let capturing = false;
+    const lines: string[] = [];
+
+    for (const block of blocks.results) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const b = block as any;
+      const type = b.type;
+
+      // Start capturing after "システムプロンプト" heading
+      if (type === "heading_2") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const text = b.heading_2?.rich_text?.map((t: any) => t.plain_text).join("") || "";
+        if (text.includes("システムプロンプト")) {
+          capturing = true;
+          continue;
+        } else if (capturing) {
+          // Stop at next heading_2
+          break;
+        }
+      }
+
+      if (capturing) {
+        if (type === "paragraph") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const text = b.paragraph?.rich_text?.map((t: any) => t.plain_text).join("") || "";
+          lines.push(text);
+        } else if (type === "bulleted_list_item") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const text = b.bulleted_list_item?.rich_text?.map((t: any) => t.plain_text).join("") || "";
+          lines.push("- " + text);
+        } else if (type === "numbered_list_item") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const text = b.numbered_list_item?.rich_text?.map((t: any) => t.plain_text).join("") || "";
+          lines.push(text);
+        } else if (type === "divider") {
+          // skip dividers
+        }
+      }
+    }
+
+    return lines.join("\n").trim();
+  } catch (error) {
+    console.error("Error fetching AI settings:", error);
+    return "";
+  }
+}
+
+/**
+ * Update the AI system prompt in the Notion "AI設定" page
+ * Replaces all content under "## システムプロンプト" heading
+ */
+export async function updateAiSystemPrompt(newPrompt: string): Promise<boolean> {
+  if (!AI_SETTINGS_PAGE_ID) return false;
+  try {
+    // Get existing blocks
+    const blocks = await notion.blocks.children.list({
+      block_id: AI_SETTINGS_PAGE_ID,
+      page_size: 100,
+    });
+
+    // Find the heading and content blocks to replace
+    let headingFound = false;
+    let headingIdx = -1;
+    const blockIdsToDelete: string[] = [];
+
+    for (let i = 0; i < blocks.results.length; i++) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const b = blocks.results[i] as any;
+      const type = b.type;
+
+      if (type === "heading_2") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const text = b.heading_2?.rich_text?.map((t: any) => t.plain_text).join("") || "";
+        if (text.includes("システムプロンプト")) {
+          headingFound = true;
+          headingIdx = i;
+          continue;
+        } else if (headingFound) {
+          break;
+        }
+      }
+
+      if (headingFound && type !== "divider") {
+        blockIdsToDelete.push(b.id);
+      }
+    }
+
+    // Delete old content blocks
+    for (const blockId of blockIdsToDelete) {
+      await notion.blocks.delete({ block_id: blockId });
+    }
+
+    // Find the heading block to append after
+    const headingBlockId = headingFound && headingIdx >= 0
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? (blocks.results[headingIdx] as any).id
+      : null;
+
+    // Build new content blocks from the prompt text
+    const lines = newPrompt.split("\n");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const newBlocks: any[] = [];
+
+    for (const line of lines) {
+      if (line.startsWith("- ")) {
+        newBlocks.push({
+          object: "block",
+          type: "bulleted_list_item",
+          bulleted_list_item: {
+            rich_text: [{ type: "text", text: { content: line.slice(2) } }],
+          },
+        });
+      } else {
+        newBlocks.push({
+          object: "block",
+          type: "paragraph",
+          paragraph: {
+            rich_text: [{ type: "text", text: { content: line } }],
+          },
+        });
+      }
+    }
+
+    if (headingBlockId && newBlocks.length > 0) {
+      await notion.blocks.children.append({
+        block_id: AI_SETTINGS_PAGE_ID,
+        after: headingBlockId,
+        children: newBlocks,
+      });
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error updating AI settings:", error);
+    return false;
+  }
+}

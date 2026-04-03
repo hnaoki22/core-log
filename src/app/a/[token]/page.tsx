@@ -73,6 +73,12 @@ export default function AdminDashboard() {
   const [fbLogsLoading, setFbLogsLoading] = useState(false);
   const [aiDraftLoading, setAiDraftLoading] = useState(false);
 
+  const [showPromptSettings, setShowPromptSettings] = useState(false);
+  const [promptText, setPromptText] = useState("");
+  const [promptLoading, setPromptLoading] = useState(false);
+  const [promptSaving, setPromptSaving] = useState(false);
+  const [promptSaved, setPromptSaved] = useState(false);
+
   useEffect(() => {
     async function fetchData() {
       try {
@@ -214,6 +220,45 @@ export default function AdminDashboard() {
     } catch { alert("エラーが発生しました"); } finally { setFbSubmitting(false); }
   };
 
+  const openPromptSettings = async () => {
+    setShowPromptSettings(true);
+    setPromptLoading(true);
+    setPromptSaved(false);
+    try {
+      const res = await fetch(`/api/admin/ai-settings?token=${token}`);
+      if (res.ok) {
+        const d = await res.json();
+        setPromptText(d.systemPrompt || "");
+      }
+    } catch {
+      alert("AI設定の取得に失敗しました");
+    } finally {
+      setPromptLoading(false);
+    }
+  };
+
+  const handleSavePrompt = async () => {
+    setPromptSaving(true);
+    try {
+      const res = await fetch("/api/admin/ai-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, systemPrompt: promptText }),
+      });
+      if (res.ok) {
+        setPromptSaved(true);
+        setTimeout(() => setPromptSaved(false), 2000);
+      } else {
+        const err = await res.json();
+        alert(err.error || "保存に失敗しました");
+      }
+    } catch {
+      alert("保存に失敗しました");
+    } finally {
+      setPromptSaving(false);
+    }
+  };
+
   if (unauthorized) {
     return (
       <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
@@ -276,6 +321,12 @@ export default function AdminDashboard() {
           </div>
           <p className="text-gray-400 text-sm font-light ml-7">CORE Log システム全体の状況</p>
         </div>
+        <button onClick={openPromptSettings} className="absolute top-0 right-0 mt-1 flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/10">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+          </svg>
+          AI設定
+        </button>
       </div>
 
       <div className="max-w-4xl mx-auto px-5 pt-5 animate-fade-up relative z-10">
@@ -627,6 +678,65 @@ export default function AdminDashboard() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Prompt Settings Modal */}
+      {showPromptSettings && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+            <div className="p-5 border-b border-[#F3F4F6]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-[#111827]">AIフィードバック設定</h3>
+                    <p className="text-[10px] text-[#9CA3AF]">システムプロンプトを編集して、AI生成の文体や方針を調整できます</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowPromptSettings(false)} className="text-[#9CA3AF] hover:text-[#6B7280]">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+            </div>
+            <div className="p-5 space-y-4 max-h-[65vh] overflow-y-auto">
+              {promptLoading ? (
+                <div className="text-center py-8">
+                  <div className="w-6 h-6 border-2 border-[#4338CA] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                  <p className="text-xs text-[#9CA3AF]">読み込み中...</p>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-[#374151] mb-1.5">システムプロンプト</label>
+                    <p className="text-[10px] text-[#9CA3AF] mb-2">AIがフィードバックを生成する際のベースとなる指示文です。参加者ごとの個別方針はNotion参加者DBの「FB方針」欄で設定できます。</p>
+                    <textarea
+                      value={promptText}
+                      onChange={(e) => setPromptText(e.target.value)}
+                      rows={14}
+                      className="input-field text-sm resize-none leading-relaxed font-mono"
+                      placeholder="AIへの指示文を入力..."
+                    />
+                  </div>
+                  <div className="bg-violet-50 rounded-xl p-3 border border-violet-100">
+                    <p className="text-[10px] font-medium text-violet-600 mb-1">参加者ごとの個別調整</p>
+                    <p className="text-[10px] text-violet-500 leading-relaxed">NotionのParticipant DBの「FB方針」欄に、参加者ごとの方針を記入するとAI生成時に反映されます。例: 「具体的な数値目標を含めて厳しめに」「モチベーション維持を重視して」</p>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="p-5 border-t border-[#F3F4F6] flex items-center gap-3">
+              <button onClick={() => setShowPromptSettings(false)} className="btn-secondary flex-1 py-2.5 text-sm">閉じる</button>
+              <button onClick={handleSavePrompt} disabled={promptSaving || promptLoading}
+                className="flex-1 py-2.5 text-sm font-medium rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:from-violet-600 hover:to-purple-700 disabled:from-gray-300 disabled:to-gray-400 disabled:text-gray-500 transition-all">
+                {promptSaving ? "保存中..." : promptSaved ? "保存しました ✓" : "保存する"}
+              </button>
+            </div>
           </div>
         </div>
       )}
