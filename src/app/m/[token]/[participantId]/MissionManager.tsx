@@ -12,6 +12,7 @@ type Mission = {
   purpose: string | null;
   reviewMemo: string | null;
   finalReview: string | null;
+  createdBy: string | null;
 };
 
 type MissionComment = {
@@ -277,6 +278,13 @@ export default function MissionManager({ token, participantName, initialMissions
                     <span className={`text-xs px-2 py-0.5 rounded-full ${statusStyle.bg} ${statusStyle.text}`}>
                       {statusStyle.label}
                     </span>
+                    {mission.createdBy && (
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                        mission.createdBy === "上司設定" ? "bg-amber-50 text-amber-600" : "bg-blue-50 text-blue-600"
+                      }`}>
+                        {mission.createdBy}
+                      </span>
+                    )}
                     <h3 className="font-medium text-[#1E1B3A] text-sm">{mission.title}</h3>
                   </div>
                   <div className="flex gap-3 text-xs text-gray-400 mt-1">
@@ -419,6 +427,13 @@ export default function MissionManager({ token, participantName, initialMissions
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">完了</span>
+                    {mission.createdBy && (
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                        mission.createdBy === "上司設定" ? "bg-amber-50 text-amber-600" : "bg-blue-50 text-blue-600"
+                      }`}>
+                        {mission.createdBy}
+                      </span>
+                    )}
                     <span className="text-sm text-gray-500 line-through">{mission.title}</span>
                   </div>
                   <span className="text-gray-400 text-xs">{expandedMission === mission.id ? "▲" : "▼"}</span>

@@ -339,6 +339,7 @@ export type MissionEntry = {
   purpose: string | null;
   reviewMemo: string | null;
   finalReview: string | null;
+  createdBy: string | null; // "上司設定" | "自己設定" | null
 };
 
 export type MissionComment = {
@@ -370,6 +371,7 @@ export async function getMissionById(missionId: string): Promise<MissionEntry | 
       purpose: getRichText(props["背景・目的"]) || null,
       reviewMemo: getRichText(props["中間レビューメモ"]) || null,
       finalReview: getRichText(props["最終振り返り"]) || null,
+      createdBy: getSelect(props["設定者"]) || null,
     };
   } catch (error) {
     console.error("Error fetching mission by ID:", error);
@@ -403,6 +405,7 @@ export async function getMissionsByParticipant(participantName: string): Promise
         purpose: getRichText(props["背景・目的"]) || null,
         reviewMemo: getRichText(props["中間レビューメモ"]) || null,
         finalReview: getRichText(props["最終振り返り"]) || null,
+        createdBy: getSelect(props["設定者"]) || null,
       };
     });
   } catch (error) {
@@ -419,7 +422,8 @@ export async function createMission(
   title: string,
   purpose: string,
   deadline: string,
-  setDate: string
+  setDate: string,
+  createdBy?: "上司設定" | "自己設定"
 ): Promise<string | null> {
   if (!MISSION_DB_ID) return null;
 
@@ -434,6 +438,10 @@ export async function createMission(
 
     if (purpose) {
       properties["背景・目的"] = { rich_text: [{ text: { content: purpose } }] };
+    }
+
+    if (createdBy) {
+      properties["設定者"] = { select: { name: createdBy } };
     }
 
     const response = await notion.pages.create({

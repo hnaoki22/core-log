@@ -54,12 +54,14 @@ export async function POST(request: NextRequest) {
     }
 
     const setDate = getTodayJST();
+    const createdBy = manager ? "上司設定" : "自己設定";
     const missionId = await createMission(
       effectiveName,
       title,
       purpose || "",
       deadline || "",
-      setDate
+      setDate,
+      createdBy as "上司設定" | "自己設定"
     );
 
     if (!missionId) {
