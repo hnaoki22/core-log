@@ -51,6 +51,7 @@ export type ParticipantInfo = {
   // Mock-only fields (for backward compatibility in mock mode)
   weekNum?: number;
   startDate?: string;
+  endDate?: string;
   totalDays?: number;
   entryRate?: number;
   streak?: number;
@@ -85,6 +86,7 @@ function notionParticipantToInfo(np: NotionParticipant): ParticipantInfo {
     emailEnabled: np.emailEnabled,
     managerId: np.managerId,
     startDate: np.startDate,
+    endDate: np.endDate,
     fbPolicy: np.fbPolicy || "",
   };
 }

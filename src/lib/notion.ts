@@ -19,6 +19,7 @@ const FEEDBACK_DB_ID = process.env.NOTION_FEEDBACK_DB_ID || "";
 export type NotionLogEntry = {
   id: string;
   date: string;
+  datetime: string;
   dayOfWeek: string;
   dayNum: number;
   participantName: string;
@@ -156,8 +157,9 @@ export async function getLogsByParticipant(participantName: string): Promise<Not
     return response.results.map((page) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const props = (page as any).properties;
-      const dateStr = getDate(props["日付"]);
-      const d = new Date(dateStr);
+      const datetimeStr = getDate(props["日付"]);
+      const dateOnly = datetimeStr.split("T")[0];
+      const d = new Date(datetimeStr);
       const morningIntent = getRichText(props["【朝】今日の意図"]);
       const eveningInsight = getRichText(props["【夕】今日の気づき"]) || null;
       const hmFeedback = getRichText(props["HMフィードバック"]) || null;
@@ -167,7 +169,8 @@ export async function getLogsByParticipant(participantName: string): Promise<Not
 
       return {
         id: page.id,
-        date: dateStr,
+        date: dateOnly,
+        datetime: datetimeStr,
         dayOfWeek: DOW_MAP[d.getDay()] || "",
         dayNum: d.getDate(),
         participantName: getSelect(props["参加者名"]),
@@ -192,6 +195,17 @@ export async function getLogsByParticipant(participantName: string): Promise<Not
 }
 
 /**
+ * Generate JST ISO datetime string (e.g., "2026-04-04T09:30:00+09:00")
+ */
+function toJSTDatetime(date?: Date): string {
+  const d = date || new Date();
+  const offset = 9 * 60; // JST = UTC+9
+  const jst = new Date(d.getTime() + (offset + d.getTimezoneOffset()) * 60000);
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${jst.getFullYear()}-${pad(jst.getMonth() + 1)}-${pad(jst.getDate())}T${pad(jst.getHours())}:${pad(jst.getMinutes())}:${pad(jst.getSeconds())}+09:00`;
+}
+
+/**
  * Create a new CORE Log entry (morning)
  */
 export async function createMorningEntry(
@@ -206,19 +220,16 @@ export async function createMorningEntry(
 
   try {
     const d = new Date(date);
-    const title = `${d.getMonth() + 1}/${d.getDate()}（${DOW_MAP[d.getDay()]}）`;
-
-    // JST timestamp for 記入時刻（朝）
-    const nowJST = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString();
+    const title = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}（${DOW_MAP[d.getDay()]}）`;
+    const jstDatetime = toJSTDatetime(new Date());
 
     const properties: Record<string, unknown> = {
       "タイトル": { title: [{ text: { content: title } }] },
-      "日付": { date: { start: date } },
+      "日付": { date: { start: jstDatetime } },
       "参加者名": { select: { name: participantName } },
       "【朝】今日の意図": { rich_text: [{ text: { content: morningIntent } }] },
       "道場フェーズ": { select: { name: dojoPhase } },
       "週番号": { number: weekNum },
-      "記入時刻（朝）": { date: { start: nowJST } },
     };
 
     if (energy) {
@@ -521,6 +532,7 @@ export type NotionParticipant = {
   dojoPhase: string;
   emailEnabled: boolean;
   startDate: string;
+  endDate: string;
   role: string;        // "参加者" | "HM社内"
   managerId: string;   // Notion page ID of related manager (from relation)
   fbPolicy: string;    // FB方針（参加者ごとのAIフィードバックカスタマイズ）
@@ -562,6 +574,7 @@ export async function getAllParticipantsFromNotion(): Promise<NotionParticipant[
         dojoPhase: getSelect(props["道場フェーズ"]),
         emailEnabled: getCheckbox(props["メール通知"]),
         startDate: getDate(props["開始日"]),
+        endDate: getDate(props["終了日"]),
         role: getSelect(props["役割"]),
         managerId: getRelationIds(props["担当上司"])[0] || "",
         fbPolicy: getRichText(props["FB方針"]) || "",
@@ -602,6 +615,7 @@ export async function getParticipantByTokenFromNotion(token: string): Promise<No
       dojoPhase: getSelect(props["道場フェーズ"]),
       emailEnabled: getCheckbox(props["メール通知"]),
       startDate: getDate(props["開始日"]),
+      endDate: getDate(props["終了日"]),
       role: getSelect(props["役割"]),
       managerId: getRelationIds(props["担当上司"])[0] || "",
       fbPolicy: getRichText(props["FB方針"]) || "",
@@ -646,6 +660,7 @@ export async function getParticipantByNameFromNotion(name: string): Promise<Noti
       dojoPhase: getSelect(props["道場フェーズ"]),
       emailEnabled: getCheckbox(props["メール通知"]),
       startDate: getDate(props["開始日"]),
+      endDate: getDate(props["終了日"]),
       role: getSelect(props["役割"]),
       managerId: getRelationIds(props["担当上司"])[0] || "",
       fbPolicy: getRichText(props["FB方針"]) || "",
@@ -685,6 +700,7 @@ export async function getParticipantByEmailFromNotion(email: string): Promise<No
       dojoPhase: getSelect(props["道場フェーズ"]),
       emailEnabled: getCheckbox(props["メール通知"]),
       startDate: getDate(props["開始日"]),
+      endDate: getDate(props["終了日"]),
       role: getSelect(props["役割"]),
       managerId: getRelationIds(props["担当上司"])[0] || "",
       fbPolicy: getRichText(props["FB方針"]) || "",
@@ -839,6 +855,7 @@ export async function getParticipantsForManagerFromNotion(managerId: string): Pr
         dojoPhase: getSelect(props["道場フェーズ"]),
         emailEnabled: getCheckbox(props["メール通知"]),
         startDate: getDate(props["開始日"]),
+        endDate: getDate(props["終了日"]),
         role: getSelect(props["役割"]),
         managerId: managerId,
         fbPolicy: getRichText(props["FB方針"]) || "",

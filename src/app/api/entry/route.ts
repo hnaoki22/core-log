@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createMorningEntry, updateEveningEntry, hasLoggedToday } from "@/lib/notion";
 import { getParticipantByToken, getManagerById } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
+import { isProgramEnded, isProgramNotStarted } from "@/lib/date-utils";
 
 export async function POST(request: NextRequest) {
   const useMock = !process.env.NOTION_API_TOKEN;
@@ -25,6 +26,23 @@ export async function POST(request: NextRequest) {
         message: type === "morning" ? "朝の記入を保存しました" : "夕方の記入を保存しました",
         mock: true,
       });
+    }
+
+    // Check if participant's program is still active
+    const participant = await getParticipantByToken(token);
+    if (participant) {
+      if (participant.endDate && isProgramEnded(participant.endDate)) {
+        return NextResponse.json({
+          error: "プログラムは終了しています。日報の入力はできません。",
+          programEnded: true,
+        }, { status: 403 });
+      }
+      if (participant.startDate && isProgramNotStarted(participant.startDate)) {
+        return NextResponse.json({
+          error: "プログラムはまだ開始されていません。",
+          notStarted: true,
+        }, { status: 403 });
+      }
     }
 
     // Real Notion API

@@ -9,7 +9,7 @@ import {
   isAdminToken,
 } from "@/lib/participant-db";
 import { computeParticipantStats } from "@/lib/stats";
-import { getTodayJST } from "@/lib/date-utils";
+import { getTodayJST, calculateWeekNum } from "@/lib/date-utils";
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
           fbCount: p.fbCount || 0,
           managerId: p.managerId,
           fbPolicy: p.fbPolicy || "",
+          weekNum: p.weekNum || 0,
           todayHasLog: hasLogToday,
           latestLog: logs[0]
             ? {
@@ -77,6 +78,7 @@ export async function GET(request: NextRequest) {
           fbCount: stats.fbCount,
           managerId: p.managerId,
           fbPolicy: p.fbPolicy || "",
+          weekNum: calculateWeekNum(p.startDate || ""),
           todayHasLog: hasLogToday,
           latestLog: latestLog
             ? {
@@ -101,6 +103,7 @@ export async function GET(request: NextRequest) {
           fbCount: 0,
           managerId: p.managerId,
           fbPolicy: p.fbPolicy || "",
+          weekNum: calculateWeekNum(p.startDate || ""),
           todayHasLog: false,
           latestLog: null,
           recentEnergy: [],
