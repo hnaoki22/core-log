@@ -274,6 +274,66 @@ export default function ParticipantHome() {
           </div>
         </div>
 
+        {/* Streak & Insights Cards */}
+        {logs.length > 0 && (() => {
+          // Energy trend analysis
+          const recentEnergies = logs.slice(0, 5).map(l => l.energy ? energyValue[l.energy] : 0).filter(v => v > 0);
+          const olderEnergies = logs.slice(5, 10).map(l => l.energy ? energyValue[l.energy] : 0).filter(v => v > 0);
+          const recentAvg = recentEnergies.length > 0 ? recentEnergies.reduce((a, b) => a + b, 0) / recentEnergies.length : 0;
+          const olderAvg = olderEnergies.length > 0 ? olderEnergies.reduce((a, b) => a + b, 0) / olderEnergies.length : 0;
+          const energyTrend = olderEnergies.length >= 2 ? (recentAvg - olderAvg) : 0;
+          const energyTrendLabel = energyTrend > 0.3 ? "上昇傾向" : energyTrend < -0.3 ? "低下傾向" : "安定";
+          const energyTrendIcon = energyTrend > 0.3 ? "↑" : energyTrend < -0.3 ? "↓" : "→";
+          const energyTrendColor = energyTrend > 0.3 ? "text-emerald-600" : energyTrend < -0.3 ? "text-red-500" : "text-blue-500";
+          const energyTrendBg = energyTrend > 0.3 ? "from-emerald-50 to-green-50 border-emerald-200" : energyTrend < -0.3 ? "from-red-50 to-orange-50 border-red-200" : "from-blue-50 to-indigo-50 border-blue-200";
+
+          // Completion rate for this week
+          const todayStr = getTodayJST();
+          const todayDate = new Date(todayStr + "T00:00:00");
+          const dayOfWeek = todayDate.getDay();
+          const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+          const monday = new Date(todayDate);
+          monday.setDate(monday.getDate() - mondayOffset);
+          const thisWeekLogs = logs.filter(l => {
+            const ld = new Date(l.date + "T00:00:00");
+            return ld >= monday && ld <= todayDate && l.status !== "empty";
+          });
+          const weekDaysPassed = mondayOffset + 1;
+          const weekCompletionRate = Math.round((thisWeekLogs.length / Math.min(weekDaysPassed, 5)) * 100);
+
+          return (
+            <div className="grid grid-cols-2 gap-3">
+              {/* Streak Card */}
+              <div className={`p-4 rounded-2xl border ${streak >= 7 ? "bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200" : streak >= 3 ? "bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-200" : "card"}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">{streak >= 7 ? "🔥" : streak >= 3 ? "✨" : "📝"}</span>
+                  <span className="text-[10px] font-semibold text-[#6B7280] uppercase tracking-wide">連続記入</span>
+                </div>
+                <div className={`text-2xl font-bold tracking-tight ${streak >= 7 ? "text-amber-600" : streak >= 3 ? "text-[#4338CA]" : "text-[#111827]"}`}>
+                  {streak}日
+                </div>
+                <p className="text-[10px] text-[#9CA3AF] mt-1">
+                  {streak >= 7 ? "素晴らしい継続力!" : streak >= 3 ? "いい調子です!" : streak > 0 ? "続けていきましょう" : "今日から始めましょう"}
+                </p>
+              </div>
+
+              {/* Energy Trend Card */}
+              <div className={`p-4 rounded-2xl border bg-gradient-to-br ${energyTrendBg}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`text-lg font-bold ${energyTrendColor}`}>{energyTrendIcon}</span>
+                  <span className="text-[10px] font-semibold text-[#6B7280] uppercase tracking-wide">エネルギー</span>
+                </div>
+                <div className={`text-lg font-bold tracking-tight ${energyTrendColor}`}>
+                  {energyTrendLabel}
+                </div>
+                <p className="text-[10px] text-[#9CA3AF] mt-1">
+                  今週の記入率 {weekCompletionRate}%
+                </p>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Energy Chart - Line Graph */}
         {logs.length > 0 && (
           <div className="card p-5">
