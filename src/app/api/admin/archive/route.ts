@@ -4,7 +4,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Client } from "@notionhq/client";
 
-const ADMIN_TOKENS = ["munetomo-admin", "UE8m8SSJAgRBwsSZ"];
+// Read from environment variable with fallback defaults
+const ADMIN_TOKENS = (process.env.ADMIN_TOKENS || "munetomo-admin,UE8m8SSJAgRBwsSZ")
+  .split(",")
+  .map((t) => t.trim());
 
 export async function POST(request: NextRequest) {
   try {

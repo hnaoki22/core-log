@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { addManagerComment } from "@/lib/notion";
 import { getManagerByToken, getParticipantById } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
+import { sanitizeInput } from "@/lib/sanitize";
 
 export async function POST(request: NextRequest) {
   const useMock = !process.env.NOTION_API_TOKEN;
@@ -16,6 +17,9 @@ export async function POST(request: NextRequest) {
     if (!token || !comment) {
       return NextResponse.json({ error: "Token and comment required" }, { status: 400 });
     }
+
+    // Sanitize user input
+    const sanitizedComment = sanitizeInput(comment);
 
     // Mock mode
     if (useMock) {
@@ -29,7 +33,7 @@ export async function POST(request: NextRequest) {
     // Real Notion API - in production, we'd find the latest log entry
     // for this participant and add the comment there
     if (participantId) {
-      const success = await addManagerComment(participantId, comment);
+      const success = await addManagerComment(participantId, sanitizedComment);
       if (!success) {
         return NextResponse.json({ error: "Failed to save comment" }, { status: 500 });
       }
@@ -51,7 +55,7 @@ export async function POST(request: NextRequest) {
               senderName: manager.name,
               token: p.token,
               type: "manager_comment",
-              detail: comment.length > 100 ? comment.substring(0, 100) + "..." : comment,
+              detail: sanitizedComment.length > 100 ? sanitizedComment.substring(0, 100) + "..." : sanitizedComment,
             }).catch(console.error);
           }
         }

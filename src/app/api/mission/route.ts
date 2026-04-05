@@ -11,6 +11,7 @@ import {
 import { getManagerByToken, getParticipantByToken, getParticipantByName } from "@/lib/participant-db";
 import { getTodayJST } from "@/lib/date-utils";
 import { sendNotificationEmail } from "@/lib/email";
+import { sanitizeInput } from "@/lib/sanitize";
 
 export async function GET(request: NextRequest) {
   const participantName = request.nextUrl.searchParams.get("participantName");
@@ -40,6 +41,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Sanitize user input
+    const sanitizedTitle = sanitizeInput(title);
+    const sanitizedPurpose = sanitizeInput(purpose || "");
+
     // Verify manager or participant token
     const manager = await getManagerByToken(token);
     const participant = !manager ? await getParticipantByToken(token) : null;
@@ -57,8 +62,8 @@ export async function POST(request: NextRequest) {
     const createdBy = manager ? "上司設定" : "自己設定";
     const missionId = await createMission(
       effectiveName,
-      title,
-      purpose || "",
+      sanitizedTitle,
+      sanitizedPurpose,
       deadline || "",
       setDate,
       createdBy as "上司設定" | "自己設定"
@@ -80,7 +85,7 @@ export async function POST(request: NextRequest) {
             senderName: manager.name,
             token: targetParticipant.token,
             type: "mission_created",
-            detail: title,
+            detail: sanitizedTitle,
           }).catch(console.error);
         }
       }

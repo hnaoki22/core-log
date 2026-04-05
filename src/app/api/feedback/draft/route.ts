@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminToken } from "@/lib/participant-db";
 import { getAiSystemPrompt } from "@/lib/notion";
+import { logger } from "@/lib/logger";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
 
@@ -113,16 +114,17 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error("[AI Draft ERROR]", errText);
+      logger.error("AI draft generation failed", { participantName, statusCode: response.status, error: errText });
       return NextResponse.json({ error: "AI生成に失敗しました" }, { status: 500 });
     }
 
     const result = await response.json();
     const draft = result.content?.[0]?.text || "";
 
+    logger.info("AI draft generated", { participantName, logCount: logs.length });
     return NextResponse.json({ draft });
   } catch (error) {
-    console.error("Feedback draft API error:", error);
+    logger.error("Feedback draft API error", { error: String(error) });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

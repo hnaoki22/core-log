@@ -8,20 +8,27 @@ import { isBusinessDay, getJSTDateString, getJSTDayOfWeek } from "@/lib/calendar
 import { getLogsByParticipant } from "@/lib/notion";
 import { getAllParticipants, getAllManagers } from "@/lib/participant-db";
 import { isProgramEnded } from "@/lib/date-utils";
+import { logger } from "@/lib/logger";
 
-const CRON_SECRET = process.env.CRON_SECRET || "";
+const CRON_SECRET = process.env.CRON_SECRET;
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const FROM_EMAIL = process.env.REMIND_FROM_EMAIL || "CORE Log <noreply@resend.dev>";
 const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://core-log-lilac.vercel.app";
 
 export async function GET(request: NextRequest) {
+  // Verify cron secret is configured and matches (Vercel sends this header)
+  if (!CRON_SECRET) {
+    return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
+  }
+
   const authHeader = request.headers.get("authorization");
-  if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (authHeader !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const todayStr = getJSTDateString();
   if (!isBusinessDay(todayStr)) {
+    logger.info("Manager remind skipped: not a business day", { date: todayStr });
     return NextResponse.json({ message: "Skipped: not a business day", date: todayStr });
   }
 
@@ -128,6 +135,10 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  const nudgeCount = results.filter((r) => r.type === "nudge" && r.sent).length;
+  const summaryCount = results.filter((r) => r.type === "weekly_summary" && r.sent).length;
+  logger.info("Manager reminders processed", { date: todayStr, isFriday, nudgesSent: nudgeCount, summariesSent: summaryCount });
+
   return NextResponse.json({
     message: "Manager reminders processed",
     date: todayStr,
@@ -163,11 +174,7 @@ async function sendManagerNudge(
   participantNames: string[]
 ): Promise<boolean> {
   if (!RESEND_API_KEY) {
-    console.log(
-      `[Manager Nudge SKIP] No API key — would nudge ${managerName} about: ${participantNames.join(
-        ", "
-      )}`
-    );
+    logger.info("Manager nudge skipped: no API key", { managerName, participantCount: participantNames.length });
     return false;
   }
 
@@ -206,8 +213,14 @@ async function sendManagerNudge(
         `,
       }),
     });
+    if (res.ok) {
+      logger.info("Manager nudge sent", { managerName, participantCount: participantNames.length });
+    } else {
+      logger.error("Manager nudge failed", { managerName, statusCode: res.status });
+    }
     return res.ok;
-  } catch {
+  } catch (error) {
+    logger.error("Manager nudge error", { managerName, error: String(error) });
     return false;
   }
 }
@@ -219,7 +232,7 @@ async function sendWeeklySummary(
   stats: { name: string; entryDays: number; lastEntry: string | null; streak: number }[]
 ): Promise<boolean> {
   if (!RESEND_API_KEY) {
-    console.log(`[Weekly Summary SKIP] No API key — would send summary to ${managerName}`);
+    logger.info("Weekly summary skipped: no API key", { managerName });
     return false;
   }
 
@@ -277,8 +290,14 @@ async function sendWeeklySummary(
         `,
       }),
     });
+    if (res.ok) {
+      logger.info("Weekly summary sent", { managerName });
+    } else {
+      logger.error("Weekly summary failed", { managerName, statusCode: res.status });
+    }
     return res.ok;
-  } catch {
+  } catch (error) {
+    logger.error("Weekly summary error", { managerName, error: String(error) });
     return false;
   }
 }

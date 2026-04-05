@@ -8,14 +8,19 @@ import { isBusinessDay, getJSTDateString, getJSTHour } from "@/lib/calendar";
 import { sendReminderEmail, type ReminderType } from "@/lib/email";
 import { hasLoggedToday } from "@/lib/notion";
 import { getAllParticipants } from "@/lib/participant-db";
+import { logger } from "@/lib/logger";
 
 // Vercel Cron secret for authentication
-const CRON_SECRET = process.env.CRON_SECRET || "";
+const CRON_SECRET = process.env.CRON_SECRET;
 
 export async function GET(request: NextRequest) {
-  // Verify cron secret (Vercel sends this header)
+  // Verify cron secret is configured and matches (Vercel sends this header)
+  if (!CRON_SECRET) {
+    return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
+  }
+
   const authHeader = request.headers.get("authorization");
-  if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (authHeader !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -24,6 +29,7 @@ export async function GET(request: NextRequest) {
 
   // Skip weekends and holidays
   if (!isBusinessDay(todayStr)) {
+    logger.info("Reminder skipped: not a business day", { date: todayStr });
     return NextResponse.json({
       message: "Skipped: not a business day",
       date: todayStr,
@@ -75,6 +81,8 @@ export async function GET(request: NextRequest) {
   }
 
   const sentCount = results.filter((r) => r.sent).length;
+
+  logger.info("Reminder emails sent", { type, date: todayStr, totalParticipants: activeParticipants.length, sentCount });
 
   return NextResponse.json({
     message: `${type} reminders processed`,

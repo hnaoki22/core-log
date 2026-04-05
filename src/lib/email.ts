@@ -3,6 +3,7 @@
 // Free tier: 100 emails/day (enough for 9 participants × 2 times/day)
 
 import { getParticipantByEmail } from "./participant-db";
+import { logger } from "./logger";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const FROM_EMAIL = process.env.REMIND_FROM_EMAIL || "CORE Log <noreply@resend.dev>";
@@ -217,12 +218,12 @@ export async function sendNotificationEmail(options: NotificationOptions): Promi
   // emailEnabled チェック（参加者DBのフラグで制御）
   const participant = await getParticipantByEmail(options.to);
   if (participant && !participant.emailEnabled) {
-    console.log(`[Notify SKIP] emailEnabled=false for ${options.to} — skipping ${options.type} notification`);
+    logger.info("Notification skipped: emailEnabled false", { email: options.to, type: options.type });
     return false;
   }
 
   if (!RESEND_API_KEY) {
-    console.log(`[Notify SKIP] No RESEND_API_KEY — would send ${options.type} notification to ${options.to}`);
+    logger.info("Notification skipped: no API key", { email: options.to, type: options.type });
     return false;
   }
 
@@ -245,14 +246,14 @@ export async function sendNotificationEmail(options: NotificationOptions): Promi
 
     if (!res.ok) {
       const err = await res.text();
-      console.error(`[Notify ERROR] Failed to send ${options.type} to ${options.to}:`, err);
+      logger.error("Notification send failed", { type: options.type, email: options.to, error: err });
       return false;
     }
 
-    console.log(`[Notify OK] Sent ${options.type} notification to ${options.to}`);
+    logger.info("Notification sent", { type: options.type, email: options.to, senderName: options.senderName });
     return true;
   } catch (error) {
-    console.error(`[Notify ERROR] ${error}`);
+    logger.error("Notification error", { type: options.type, email: options.to, error: String(error) });
     return false;
   }
 }
@@ -263,12 +264,12 @@ export async function sendReminderEmail(options: SendEmailOptions): Promise<bool
   // emailEnabled チェック（参加者DBのフラグで制御）
   const participant = await getParticipantByEmail(options.to);
   if (participant && !participant.emailEnabled) {
-    console.log(`[Email SKIP] emailEnabled=false for ${options.to} — skipping ${options.type} reminder`);
+    logger.info("Reminder skipped: emailEnabled false", { email: options.to, type: options.type });
     return false;
   }
 
   if (!RESEND_API_KEY) {
-    console.log(`[Email SKIP] No RESEND_API_KEY — would send ${options.type} reminder to ${options.to}`);
+    logger.info("Reminder skipped: no API key", { email: options.to, type: options.type });
     return false;
   }
 
@@ -294,14 +295,14 @@ export async function sendReminderEmail(options: SendEmailOptions): Promise<bool
 
     if (!res.ok) {
       const err = await res.text();
-      console.error(`[Email ERROR] Failed to send to ${to}:`, err);
+      logger.error("Reminder send failed", { type, email: to, error: err });
       return false;
     }
 
-    console.log(`[Email OK] Sent ${type} reminder to ${to}`);
+    logger.info("Reminder sent", { type, email: to, participantName });
     return true;
   } catch (error) {
-    console.error(`[Email ERROR] ${error}`);
+    logger.error("Reminder error", { type, email: to, error: String(error) });
     return false;
   }
 }

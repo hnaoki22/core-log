@@ -7,6 +7,8 @@ import { createMorningEntry, updateEveningEntry, hasLoggedToday } from "@/lib/no
 import { getParticipantByToken, getManagerById } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
 import { isProgramEnded, isProgramNotStarted } from "@/lib/date-utils";
+import { sanitizeInput } from "@/lib/sanitize";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
   const useMock = !process.env.NOTION_API_TOKEN;
@@ -49,6 +51,9 @@ export async function POST(request: NextRequest) {
     if (type === "morning") {
       const { participantName, date, morningIntent, energy, dojoPhase, weekNum } = body;
 
+      // Sanitize user input
+      const sanitizedMorningIntent = sanitizeInput(morningIntent || "");
+
       // Check if entry already exists for today
       const todayStatus = await hasLoggedToday(participantName, date);
       if (todayStatus.hasMorning) {
@@ -58,7 +63,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const pageId = await createMorningEntry(participantName, date, morningIntent, energy, dojoPhase, weekNum);
+      const pageId = await createMorningEntry(participantName, date, sanitizedMorningIntent, energy, dojoPhase, weekNum);
       if (!pageId) {
         return NextResponse.json({ error: "Failed to create entry" }, { status: 500 });
       }
@@ -75,14 +80,15 @@ export async function POST(request: NextRequest) {
               senderName: participantName,
               token: mgr.token,
               type: "daily_log_submitted",
-              detail: `朝の意図：${morningIntent.substring(0, 60)}${morningIntent.length > 60 ? "…" : ""}`,
+              detail: `朝の意図：${sanitizedMorningIntent.substring(0, 60)}${sanitizedMorningIntent.length > 60 ? "…" : ""}`,
             });
           }
         }
       } catch (e) {
-        console.error("Failed to send manager notification:", e);
+        logger.error("Failed to send manager notification", { error: String(e), participantName });
       }
 
+      logger.info("Morning entry created", { participantName, date, pageId });
       return NextResponse.json({ success: true, pageId });
     }
 
@@ -91,7 +97,11 @@ export async function POST(request: NextRequest) {
       if (!pageId) {
         return NextResponse.json({ error: "pageId is required for evening entry" }, { status: 400 });
       }
-      const success = await updateEveningEntry(pageId, eveningInsight, energy);
+
+      // Sanitize user input
+      const sanitizedEveningInsight = sanitizeInput(eveningInsight || "");
+
+      const success = await updateEveningEntry(pageId, sanitizedEveningInsight, energy);
       if (!success) {
         return NextResponse.json({ error: "Failed to update entry" }, { status: 500 });
       }
@@ -108,20 +118,21 @@ export async function POST(request: NextRequest) {
               senderName: participantName || participant.name,
               token: mgr.token,
               type: "daily_log_submitted",
-              detail: `夕の気づき：${eveningInsight.substring(0, 60)}${eveningInsight.length > 60 ? "…" : ""}`,
+              detail: `夕の気づき：${sanitizedEveningInsight.substring(0, 60)}${sanitizedEveningInsight.length > 60 ? "…" : ""}`,
             });
           }
         }
       } catch (e) {
-        console.error("Failed to send manager notification:", e);
+        logger.error("Failed to send manager notification", { error: String(e), participantName });
       }
 
+      logger.info("Evening entry updated", { participantName, pageId });
       return NextResponse.json({ success: true });
     }
 
     return NextResponse.json({ error: "Invalid type" }, { status: 400 });
   } catch (error) {
-    console.error("Entry API error:", error);
+    logger.error("Entry API error", { error: String(error) });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

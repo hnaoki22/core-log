@@ -231,7 +231,9 @@ export async function isAdminToken(token: string): Promise<boolean> {
   if (hasNotionParticipantDB()) {
     return await isAdminTokenFromNotion(token);
   }
-  // Fallback: hardcoded admin tokens for mock mode
-  const ADMIN_TOKENS = ["munetomo-admin", "UE8m8SSJAgRBwsSZ"];
+  // Read from environment variable with fallback defaults
+  const ADMIN_TOKENS = (process.env.ADMIN_TOKENS || "munetomo-admin,UE8m8SSJAgRBwsSZ")
+    .split(",")
+    .map((t) => t.trim());
   return ADMIN_TOKENS.includes(token);
 }
