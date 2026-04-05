@@ -41,6 +41,7 @@ export default function MissionPage() {
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [closingMission, setClosingMission] = useState<string | null>(null);
   const [closeReview, setCloseReview] = useState("");
+  const [missionsWithManagerComments, setMissionsWithManagerComments] = useState<Set<string>>(new Set());
 
   // Create form state
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -55,7 +56,33 @@ export default function MissionPage() {
         const res = await fetch(`/api/logs?token=${token}`);
         if (!res.ok) { setNotFound(true); return; }
         const data = await res.json();
-        if (data.missions) setMissions(data.missions);
+        if (data.missions) {
+          setMissions(data.missions);
+          // Check which missions have manager comments in the last 7 days
+          const withManagerComments = new Set<string>();
+          const sevenDaysAgo = new Date();
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+          for (const mission of data.missions) {
+            try {
+              const commentsRes = await fetch(`/api/mission/comments?missionId=${mission.id}`);
+              if (commentsRes.ok) {
+                const commentsData = await commentsRes.json();
+                const hasManagerComment = commentsData.comments?.some(
+                  (c: { authorRole: string; createdAt: string }) => {
+                    return c.authorRole === "manager" && new Date(c.createdAt) >= sevenDaysAgo;
+                  }
+                );
+                if (hasManagerComment) {
+                  withManagerComments.add(mission.id);
+                }
+              }
+            } catch {
+              // silently fail for individual mission
+            }
+          }
+          setMissionsWithManagerComments(withManagerComments);
+        }
         if (data.badges) setBadges(data.badges);
         if (data.participant?.name) setParticipantName(data.participant.name);
       } catch {
@@ -229,7 +256,7 @@ export default function MissionPage() {
               </div>
             </div>
             <div className="flex flex-col items-end gap-1.5 ml-3">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 relative">
                 {mission.createdBy && (
                   <span className={`text-[10px] font-medium px-2 py-0.5 rounded-md ${
                     mission.createdBy === "上司設定" ? "bg-amber-50 text-amber-600" : "bg-blue-50 text-blue-600"
@@ -240,6 +267,9 @@ export default function MissionPage() {
                 <span className={`text-[10px] font-medium px-2 py-0.5 rounded-md ${statusStyle.bg} ${statusStyle.text}`}>
                   {statusStyle.label}
                 </span>
+                {missionsWithManagerComments.has(mission.id) && (
+                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-[#4338CA] rounded-full"></div>
+                )}
               </div>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
                 className={`transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`}>

@@ -2,7 +2,7 @@
 // Returns all CORE Log entries for a participant
 
 import { NextRequest, NextResponse } from "next/server";
-import { getLogsByParticipant, getMissionsByParticipant } from "@/lib/notion";
+import { getLogsByParticipant, getMissionsByParticipant, getMissionComments } from "@/lib/notion";
 import { getParticipantByToken } from "@/lib/participant-db";
 
 export async function GET(request: NextRequest) {
@@ -73,6 +73,26 @@ export async function GET(request: NextRequest) {
       log.hasFeedback && (log.hmFeedback || log.managerComment)
   );
 
+  // Count missions with manager comments in the last 7 days
+  let missionBadgeCount = 0;
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  for (const mission of missions) {
+    const comments = await getMissionComments(mission.id);
+    const hasManagerComment = comments.some(
+      (comment: { authorRole?: string; createdAt?: string }) => {
+        if (comment.authorRole !== "manager") return false;
+        if (!comment.createdAt) return false;
+        const commentDate = new Date(comment.createdAt);
+        return commentDate >= sevenDaysAgo;
+      }
+    );
+    if (hasManagerComment) {
+      missionBadgeCount++;
+    }
+  }
+
   return NextResponse.json({
     participant: {
       id: participant.id,
@@ -85,7 +105,7 @@ export async function GET(request: NextRequest) {
     missions,
     badges: {
       feedback: logsWithNewFeedback.length,
-      mission: 0,
+      mission: missionBadgeCount,
     },
   });
 }

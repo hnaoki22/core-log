@@ -87,6 +87,19 @@ export default function AdminDashboard() {
     managerActivity: { participantName: string; totalComments: number; lastCommentDate: string | null; daysSinceComment: number; needsAttention: boolean }[];
   } | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      window.open(`/api/admin/export?token=${token}`, "_blank");
+    } catch (error) {
+      console.error("Export error:", error);
+      alert("エクスポートに失敗しました");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     async function fetchData() {
@@ -345,6 +358,12 @@ export default function AdminDashboard() {
           <p className="text-gray-400 text-sm font-light ml-7">CORE Log システム全体の状況</p>
         </div>
         <div className="absolute top-0 right-0 mt-1 flex items-center gap-2">
+          <button onClick={handleExport} disabled={exporting} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/10 disabled:opacity-50">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            エクスポート
+          </button>
           <button onClick={openAnalytics} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/10">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/>

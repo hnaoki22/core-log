@@ -84,7 +84,11 @@ export default function ManagerHome() {
   const avgEntryRate = participants.length > 0
     ? Math.round(participants.reduce((sum, p) => sum + p.entryRate, 0) / participants.length)
     : 0;
-  const todayLogCount = participants.filter((p) => p.todayHasLog).length;
+  // Calculate low energy participants (past 7 days)
+  const lowEnergyParticipants = participants.filter((p) => {
+    const recentEnergy = (p.recentEnergy || []).slice(0, 7);
+    return recentEnergy.some((e) => e === "low");
+  }).length;
 
   const getStatusIndicator = (participant: ParticipantData) => {
     if (participant.streak > 0) return { color: "bg-emerald-500", label: "活動中" };
@@ -135,8 +139,8 @@ export default function ManagerHome() {
             <div className="text-[10px] text-[#6366F1] font-medium tracking-wide mt-0.5">平均記入率</div>
           </div>
           <div className="card p-3.5 text-center">
-            <div className="text-2xl font-bold text-[#111827] tracking-tight">{todayLogCount}<span className="text-sm text-[#9CA3AF] font-normal">/{totalParticipants}</span></div>
-            <div className="text-[10px] text-[#9CA3AF] font-medium tracking-wide mt-0.5">今日の記入</div>
+            <div className="text-2xl font-bold text-[#111827] tracking-tight">{lowEnergyParticipants}</div>
+            <div className="text-[10px] text-[#9CA3AF] font-medium tracking-wide mt-0.5">低エネルギー</div>
           </div>
         </div>
 

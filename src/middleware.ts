@@ -3,10 +3,12 @@
  * - Adds security headers to all responses
  * - Logs API requests with structured JSON
  * - Applies rate limiting to /api/* routes
+ * - OTP session verification for protected routes
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { isSessionValid } from "@/lib/session";
 
 // Security headers to add to all responses
 const securityHeaders = {
@@ -40,6 +42,29 @@ function logApiRequest(
 }
 
 export function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
+  // OTP session verification for protected routes
+  // Check if OTP_ENABLED is set to false (disabled)
+  const OTP_ENABLED = process.env.OTP_ENABLED !== "false";
+
+  if (OTP_ENABLED) {
+    // Match patterns: /p/[token], /m/[token], /a/[token]
+    const tokenMatch = pathname.match(/^\/([pma])\/([a-zA-Z0-9_-]+)(\/.*)?$/);
+
+    if (tokenMatch && !pathname.startsWith("/api/") && !pathname.startsWith("/verify/")) {
+      const [, , token] = tokenMatch;
+      const cookieHeader = request.headers.get("cookie");
+
+      // Check if session is valid
+      if (!isSessionValid(token, cookieHeader)) {
+        // Redirect to verification page
+        const verifyUrl = new URL(`/verify/${token}`, request.url);
+        return NextResponse.redirect(verifyUrl);
+      }
+    }
+  }
+
   const response = NextResponse.next();
 
   // Add security headers to all responses
@@ -48,7 +73,6 @@ export function middleware(request: NextRequest) {
   });
 
   // API request logging and rate limiting
-  const pathname = request.nextUrl.pathname;
   const isApiRoute = pathname.startsWith("/api/");
 
   if (isApiRoute) {
