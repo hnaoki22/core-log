@@ -15,7 +15,7 @@ import { logger } from "@/lib/logger";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const FROM_EMAIL = process.env.REMIND_FROM_EMAIL || "CORE Log <noreply@resend.dev>";
-const OTP_ENABLED = process.env.OTP_ENABLED !== "false"; // Default to true
+const OTP_ENABLED = process.env.OTP_ENABLED === "true"; // Default to false (set OTP_ENABLED=true to activate)
 
 interface OTPRequest {
   token: string;

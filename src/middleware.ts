@@ -46,7 +46,7 @@ export function middleware(request: NextRequest) {
 
   // OTP session verification for protected routes
   // Check if OTP_ENABLED is set to false (disabled)
-  const OTP_ENABLED = process.env.OTP_ENABLED !== "false";
+  const OTP_ENABLED = process.env.OTP_ENABLED === "true";
 
   if (OTP_ENABLED) {
     // Match patterns: /p/[token], /m/[token], /a/[token]
