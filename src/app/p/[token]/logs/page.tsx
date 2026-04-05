@@ -4,9 +4,20 @@ import { useParams } from "next/navigation";
 import { BottomNav } from "@/components/BottomNav";
 import { useState, useEffect } from "react";
 
+/** Format datetime string to "2026/6/10 08:30" */
+function formatDateTime(datetime: string | undefined, date: string): string {
+  if (datetime && datetime.includes("T")) {
+    const d = new Date(datetime);
+    return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+  }
+  const d = new Date(date);
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+}
+
 type LogEntry = {
   id: string;
   date: string;
+  datetime?: string;
   dayOfWeek: string;
   dayNum: number;
   morningIntent: string;
@@ -134,7 +145,7 @@ export default function LogsPage() {
                         {log.morningIntent || "(未記入)"}
                       </p>
                       <div className="flex items-center gap-2 mt-1.5">
-                        <span className="text-[11px] text-[#9CA3AF]">{log.date} ({log.dayOfWeek})</span>
+                        <span className="text-[11px] text-[#9CA3AF]">{formatDateTime(log.datetime, log.date)} ({log.dayOfWeek})</span>
                         <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${config.bg} ${config.text}`}>
                           {config.label}
                         </span>

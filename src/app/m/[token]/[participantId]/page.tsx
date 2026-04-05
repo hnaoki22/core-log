@@ -95,7 +95,7 @@ export default async function ParticipantDetailPage({ params }: Params) {
                 <div key={entry.id} className="p-4">
                   <div className="flex justify-between items-center mb-2.5">
                     <span className="text-sm font-medium text-[#111827]">
-                      {entry.date}（{entry.dayOfWeek}）
+                      {entry.datetime ? (() => { const d = new Date(entry.datetime); return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`; })() : entry.date}（{entry.dayOfWeek}）
                     </span>
                     {entry.energy && (
                       <div className="flex items-center gap-1.5">

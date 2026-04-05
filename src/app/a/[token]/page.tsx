@@ -79,6 +79,15 @@ export default function AdminDashboard() {
   const [promptSaving, setPromptSaving] = useState(false);
   const [promptSaved, setPromptSaved] = useState(false);
 
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [analyticsData, setAnalyticsData] = useState<{
+    weeklyTrend: { weekStart: string; weekLabel: string; entryRate: number; totalEntries: number }[];
+    energyDistribution: { excellent: number; good: number; okay: number; low: number };
+    participantTrends: { name: string; totalEntries: number; last7Days: number; weeklyEnergy: { weekLabel: string; avg: number }[] }[];
+    managerActivity: { participantName: string; totalComments: number; lastCommentDate: string | null; daysSinceComment: number; needsAttention: boolean }[];
+  } | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
   useEffect(() => {
     async function fetchData() {
       try {
@@ -259,6 +268,20 @@ export default function AdminDashboard() {
     }
   };
 
+  const openAnalytics = async () => {
+    setShowAnalytics(true);
+    if (analyticsData) return; // Already loaded
+    setAnalyticsLoading(true);
+    try {
+      const res = await fetch(`/api/admin/analytics?token=${token}`);
+      if (res.ok) setAnalyticsData(await res.json());
+    } catch {
+      // silently fail
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
+
   if (unauthorized) {
     return (
       <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
@@ -321,12 +344,20 @@ export default function AdminDashboard() {
           </div>
           <p className="text-gray-400 text-sm font-light ml-7">CORE Log システム全体の状況</p>
         </div>
-        <button onClick={openPromptSettings} className="absolute top-0 right-0 mt-1 flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/10">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
-          </svg>
-          AI設定
-        </button>
+        <div className="absolute top-0 right-0 mt-1 flex items-center gap-2">
+          <button onClick={openAnalytics} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/10">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/>
+            </svg>
+            分析
+          </button>
+          <button onClick={openPromptSettings} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/10">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+            </svg>
+            AI設定
+          </button>
+        </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-5 pt-5 animate-fade-up relative z-10">
@@ -381,6 +412,110 @@ export default function AdminDashboard() {
             </div>
           ))}
         </div>
+
+        {showAnalytics && (
+          <div className="card overflow-hidden mb-5">
+            <div className="px-5 py-4 border-b border-[#F3F4F6] flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-[#111827]">分析ダッシュボード</h2>
+              <button onClick={() => setShowAnalytics(false)} className="text-[#9CA3AF] hover:text-[#6B7280] text-xs">閉じる</button>
+            </div>
+
+            {analyticsLoading ? (
+              <div className="p-8 text-center">
+                <div className="w-6 h-6 border-2 border-[#4338CA] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                <p className="text-xs text-[#9CA3AF]">分析データを取得中...</p>
+              </div>
+            ) : analyticsData ? (
+              <div className="p-5 space-y-6">
+                {/* Weekly Entry Rate Trend - Bar Chart */}
+                <div>
+                  <h3 className="text-xs font-semibold text-[#6B7280] mb-3">週次記入率トレンド</h3>
+                  <div className="flex items-end gap-1.5 h-32">
+                    {analyticsData.weeklyTrend.map((w, i) => (
+                      <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                        <span className="text-[10px] font-bold text-[#4338CA]">{w.entryRate}%</span>
+                        <div className="w-full bg-[#EEF2FF] rounded-t-lg relative" style={{ height: "100%" }}>
+                          <div
+                            className="absolute bottom-0 w-full bg-[#4338CA] rounded-t-lg transition-all"
+                            style={{ height: `${Math.max(w.entryRate, 2)}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-[9px] text-[#9CA3AF]">{w.weekLabel}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Energy Distribution */}
+                <div>
+                  <h3 className="text-xs font-semibold text-[#6B7280] mb-3">エネルギー分布</h3>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { key: "excellent", emoji: "🔥", label: "絶好調", color: "bg-red-50 border-red-200" },
+                      { key: "good", emoji: "😊", label: "良い", color: "bg-green-50 border-green-200" },
+                      { key: "okay", emoji: "😐", label: "まあまあ", color: "bg-yellow-50 border-yellow-200" },
+                      { key: "low", emoji: "😞", label: "低調", color: "bg-blue-50 border-blue-200" },
+                    ].map(e => {
+                      const count = analyticsData.energyDistribution[e.key as keyof typeof analyticsData.energyDistribution];
+                      const total = Object.values(analyticsData.energyDistribution).reduce((a, b) => a + b, 0);
+                      const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                      return (
+                        <div key={e.key} className={`${e.color} border rounded-xl p-3 text-center`}>
+                          <div className="text-xl mb-1">{e.emoji}</div>
+                          <div className="text-lg font-bold text-[#111827]">{pct}%</div>
+                          <div className="text-[10px] text-[#9CA3AF]">{e.label} ({count})</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Manager Engagement Alert */}
+                {analyticsData.managerActivity.some(m => m.needsAttention) && (
+                  <div>
+                    <h3 className="text-xs font-semibold text-[#6B7280] mb-3">要フォロー（3日以上コメントなし）</h3>
+                    <div className="space-y-1.5">
+                      {analyticsData.managerActivity
+                        .filter(m => m.needsAttention)
+                        .sort((a, b) => b.daysSinceComment - a.daysSinceComment)
+                        .map((m, i) => (
+                          <div key={i} className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                            <span className="text-xs font-medium text-[#111827]">{m.participantName}</span>
+                            <span className="text-[10px] text-amber-600 font-medium">
+                              {m.daysSinceComment > 100 ? "コメントなし" : `${m.daysSinceComment}日間コメントなし`}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Per-Participant 7-Day Activity */}
+                <div>
+                  <h3 className="text-xs font-semibold text-[#6B7280] mb-3">直近7日間の記入状況</h3>
+                  <div className="space-y-1.5">
+                    {analyticsData.participantTrends
+                      .sort((a, b) => b.last7Days - a.last7Days)
+                      .map((p, i) => (
+                        <div key={i} className="flex items-center gap-3 px-3 py-2 bg-[#F9FAFB] rounded-lg">
+                          <span className="text-xs font-medium text-[#111827] w-20 truncate">{p.name}</span>
+                          <div className="flex-1 bg-[#E5E7EB] rounded-full h-2">
+                            <div
+                              className="bg-[#4338CA] h-2 rounded-full transition-all"
+                              style={{ width: `${Math.round((p.last7Days / 5) * 100)}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-[10px] text-[#6B7280] font-medium w-12 text-right">{p.last7Days}/5日</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-8 text-center text-xs text-[#9CA3AF]">データの取得に失敗しました</div>
+            )}
+          </div>
+        )}
 
         {/* Participants Table */}
         <div className="card overflow-hidden mb-5">

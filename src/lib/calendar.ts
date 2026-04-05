@@ -16,6 +16,11 @@ export function getJSTHour(): number {
   return getJSTDate().getUTCHours();
 }
 
+// Get JST day of week (0=Sunday, 1=Monday, ..., 6=Saturday)
+export function getJSTDayOfWeek(): number {
+  return getJSTDate().getUTCDay();
+}
+
 // Check if a date is weekend (Saturday or Sunday)
 export function isWeekend(date: Date): boolean {
   const day = date.getUTCDay();
