@@ -180,7 +180,7 @@ export default function FeatureFlagsAdminPage() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-5 -mt-4 space-y-4">
+      <div className="max-w-5xl mx-auto px-5 mt-6 space-y-4">
         {/* Presets */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
           <h2 className="text-sm font-semibold text-[#111827] mb-1">プリセット(ワンクリック適用)</h2>
