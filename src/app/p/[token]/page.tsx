@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { getTodayJST, getCurrentHourJST } from "@/lib/date-utils";
 import { BottomNav } from "@/components/BottomNav";
+import { useFeatures } from "@/lib/use-features";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 
@@ -61,6 +62,8 @@ export default function ParticipantHome() {
   const [unreadFeedback, setUnreadFeedback] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const { isOn, loaded: featuresLoaded } = useFeatures();
+  const fbFeatureOn = !featuresLoaded || isOn("feature.managerFeedback");
 
   useEffect(() => {
     async function fetchData() {
@@ -199,7 +202,7 @@ export default function ParticipantHome() {
 
       <div className="max-w-md mx-auto px-5 pt-5 space-y-4 animate-fade-up relative z-10">
         {/* Unread Feedback Banner */}
-        {unreadFeedback > 0 && (
+        {fbFeatureOn && unreadFeedback > 0 && (
           <Link href={`/p/${token}/feedback`}>
             <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-4 rounded-2xl flex items-center gap-3 cursor-pointer hover:shadow-md transition-all">
               <div className="bg-amber-500 text-white rounded-xl w-10 h-10 flex items-center justify-center flex-shrink-0 font-semibold text-sm">

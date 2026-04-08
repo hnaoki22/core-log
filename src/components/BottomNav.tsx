@@ -1,5 +1,7 @@
 "use client";
 
+import { useFeatures } from "@/lib/use-features";
+
 interface BadgeCounts {
   feedback?: number;
   mission?: number;
@@ -43,12 +45,19 @@ const MissionIcon = ({ active }: { active: boolean }) => (
 );
 
 export function BottomNav({ active, baseUrl, badges }: BottomNavProps) {
-  const tabs = [
-    { id: "home" as const, label: "ホーム", Icon: HomeIcon, path: "" },
-    { id: "logs" as const, label: "ログ", Icon: LogIcon, path: "logs" },
-    { id: "feedback" as const, label: "FB", Icon: FeedbackIcon, path: "feedback" },
-    { id: "mission" as const, label: "ミッション", Icon: MissionIcon, path: "mission" },
+  const { isOn, loaded } = useFeatures();
+  // While flags are loading, assume all enabled (match historic behavior).
+  // Once loaded, respect flags to conditionally hide tabs.
+  const fbOn = !loaded || isOn("feature.managerFeedback");
+  const missionOn = !loaded || isOn("feature.mission");
+
+  const allTabs = [
+    { id: "home" as const, label: "ホーム", Icon: HomeIcon, path: "", visible: true },
+    { id: "logs" as const, label: "ログ", Icon: LogIcon, path: "logs", visible: true },
+    { id: "feedback" as const, label: "FB", Icon: FeedbackIcon, path: "feedback", visible: fbOn },
+    { id: "mission" as const, label: "ミッション", Icon: MissionIcon, path: "mission", visible: missionOn },
   ];
+  const tabs = allTabs.filter((t) => t.visible);
 
   const getBadge = (tabId: string): number => {
     if (!badges) return 0;

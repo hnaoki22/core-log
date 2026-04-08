@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { BottomNav } from "@/components/BottomNav";
 import { useState, useEffect } from "react";
+import { useFeatures } from "@/lib/use-features";
 
 type FeedbackEntry = {
   id: string;
@@ -24,6 +25,8 @@ export default function FeedbackPage() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [badges, setBadges] = useState<{ feedback: number; mission: number }>({ feedback: 0, mission: 0 });
   const [loading, setLoading] = useState(true);
+  const { isOn, loaded: featuresLoaded } = useFeatures();
+  const fbOn = !featuresLoaded || isOn("feature.managerFeedback");
 
   useEffect(() => {
     async function fetchData() {
@@ -73,6 +76,26 @@ export default function FeedbackPage() {
           <div className="w-8 h-8 border-2 border-[#4338CA] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-[#9CA3AF] text-sm">データを準備しています...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (featuresLoaded && !fbOn) {
+    return (
+      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6 pb-24">
+        <div className="text-center max-w-sm">
+          <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
+          <h2 className="text-base font-semibold text-[#111827] mb-2">フィードバック機能は現在オフです</h2>
+          <p className="text-sm text-[#6B7280] leading-relaxed">
+            まずは自由に記入を続けることで、自分なりの気づきや学びを得る期間です。<br />
+            しばらく継続したあとで、この機能が有効化されます。
+          </p>
+        </div>
+        <BottomNav active="feedback" baseUrl={`/p/${token}`} badges={badges} />
       </div>
     );
   }
