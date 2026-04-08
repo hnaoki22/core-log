@@ -14,13 +14,19 @@ import { logger } from "@/lib/logger";
 const CRON_SECRET = process.env.CRON_SECRET;
 
 export async function GET(request: NextRequest) {
-  // Verify cron secret is configured and matches (Vercel sends this header)
-  if (!CRON_SECRET) {
-    return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
-  }
-
+  // Authenticate cron request:
+  // 1. Vercel Cron automatically includes `x-vercel-cron: 1` header for scheduled runs
+  // 2. Manual invocations must include Bearer CRON_SECRET (if configured)
+  const isVercelCron = request.headers.get("x-vercel-cron") === "1";
   const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${CRON_SECRET}`) {
+  const hasValidSecret = CRON_SECRET && authHeader === `Bearer ${CRON_SECRET}`;
+
+  if (!isVercelCron && !hasValidSecret) {
+    logger.warn("Cron unauthorized", {
+      hasCronHeader: !!request.headers.get("x-vercel-cron"),
+      hasAuth: !!authHeader,
+      secretConfigured: !!CRON_SECRET,
+    });
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

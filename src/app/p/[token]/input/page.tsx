@@ -95,20 +95,13 @@ export default function InputPage() {
     minute: "2-digit",
   });
 
-  if (!participant) {
-    return (
-      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
-        <p className="text-[#9CA3AF] text-sm">ページを読み込めませんでした</p>
-      </div>
-    );
-  }
-
-  if (loadingStatus) {
+  if (loadingStatus || !participant) {
     return (
       <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-[#4338CA] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-[#9CA3AF] text-sm">データを準備しています...</p>
+          <div className="w-10 h-10 border-[3px] border-[#4338CA] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-[#374151] text-sm font-medium">接続中です...</p>
+          <p className="text-[#9CA3AF] text-xs mt-1.5">記入ページを準備しています</p>
         </div>
       </div>
     );

@@ -73,9 +73,11 @@ export function middleware(request: NextRequest) {
   });
 
   // API request logging and rate limiting
+  // Exempt cron endpoints (Vercel Cron invocations should never be rate limited)
   const isApiRoute = pathname.startsWith("/api/");
+  const isCronRoute = pathname.startsWith("/api/cron/");
 
-  if (isApiRoute) {
+  if (isApiRoute && !isCronRoute) {
     const method = request.method;
     const clientIp = getClientIp(request);
 
