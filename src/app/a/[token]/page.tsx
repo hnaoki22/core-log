@@ -297,15 +297,15 @@ export default function AdminDashboard() {
 
   if (unauthorized) {
     return (
-      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
         <div className="text-center">
-          <div className="w-12 h-12 bg-[#F3F4F6] rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div className="w-12 h-12 bg-[#EFE8DD] rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8B8489" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
             </svg>
           </div>
-          <h1 className="text-lg font-semibold text-[#111827]">アクセス権限がありません</h1>
-          <p className="text-sm text-[#6B7280] mt-1">有効な管理者トークンが必要です</p>
+          <h1 className="text-lg font-semibold text-[#1A1A2E]">アクセス権限がありません</h1>
+          <p className="text-sm text-[#5B5560] mt-1">有効な管理者トークンが必要です</p>
         </div>
       </div>
     );
@@ -313,10 +313,10 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-[#4338CA] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-[#9CA3AF] text-sm">データを取得中...</p>
+          <div className="w-8 h-8 border-2 border-[#1A1A2E] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-[#8B8489] text-sm">データを取得中...</p>
         </div>
       </div>
     );
@@ -324,8 +324,8 @@ export default function AdminDashboard() {
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
-        <p className="text-[#6B7280] text-sm">データの取得に失敗しました</p>
+      <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
+        <p className="text-[#5B5560] text-sm">データの取得に失敗しました</p>
       </div>
     );
   }
@@ -345,7 +345,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB]">
+    <div className="min-h-screen bg-[#F5F0EB]">
       {/* Header */}
       <div className="gradient-header-admin text-white px-6 pt-12 pb-6">
         <div className="max-w-4xl mx-auto relative z-10">
@@ -397,24 +397,24 @@ export default function AdminDashboard() {
                     <polyline points="20 6 9 17 4 12"/>
                   </svg>
                 </div>
-                <h3 className="font-medium text-sm text-[#111827]">
+                <h3 className="font-medium text-sm text-[#1A1A2E]">
                   {addResult.name}さんを{addResult.type === "participant" ? "参加者" : "マネージャー"}として追加
                 </h3>
               </div>
-              <button onClick={() => setAddResult(null)} className="text-[#9CA3AF] hover:text-[#6B7280] transition-colors">
+              <button onClick={() => setAddResult(null)} className="text-[#8B8489] hover:text-[#5B5560] transition-colors">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
               </button>
             </div>
-            <div className="bg-[#F9FAFB] rounded-xl p-3.5 space-y-2 text-sm">
+            <div className="bg-[#F5F0EB] rounded-xl p-3.5 space-y-2 text-sm">
               <div className="flex items-center gap-2">
-                <span className="text-[#9CA3AF] w-16 text-xs">トークン</span>
-                <code className="bg-white px-2.5 py-1 rounded-lg border border-[#E5E7EB] font-mono text-[#4338CA] text-xs select-all">{addResult.token}</code>
+                <span className="text-[#8B8489] w-16 text-xs">トークン</span>
+                <code className="bg-white px-2.5 py-1 rounded-lg border border-[#E5DCD0] font-mono text-[#1A1A2E] text-xs select-all">{addResult.token}</code>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[#9CA3AF] w-16 text-xs">URL</span>
-                <a href={addResult.url} className="text-[#4338CA] underline break-all text-xs" target="_blank">
+                <span className="text-[#8B8489] w-16 text-xs">URL</span>
+                <a href={addResult.url} className="text-[#1A1A2E] underline break-all text-xs" target="_blank">
                   {typeof window !== "undefined" ? window.location.origin : ""}{addResult.url}
                 </a>
               </div>
@@ -426,47 +426,47 @@ export default function AdminDashboard() {
         {/* Summary Stats */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 mb-5">
           {[
-            { value: participants.length, label: "参加者", color: "text-[#111827]" },
-            { value: `${avgEntryRate}%`, label: "平均記入率", color: "text-[#4338CA]", highlight: true },
-            { value: todayLogCount, label: "今日の記入", color: "text-[#111827]" },
-            { value: totalLogs, label: "総ログ数", color: "text-[#111827]" },
-            { value: totalFeedbacks, label: "FB配信数", color: "text-[#111827]" },
+            { value: participants.length, label: "参加者", color: "text-[#1A1A2E]" },
+            { value: `${avgEntryRate}%`, label: "平均記入率", color: "text-[#1A1A2E]", highlight: true },
+            { value: todayLogCount, label: "今日の記入", color: "text-[#1A1A2E]" },
+            { value: totalLogs, label: "総ログ数", color: "text-[#1A1A2E]" },
+            { value: totalFeedbacks, label: "FB配信数", color: "text-[#1A1A2E]" },
           ].map((stat, i) => (
-            <div key={i} className={`${stat.highlight ? "bg-[#EEF2FF] border border-indigo-200" : "card"} p-4 rounded-2xl`}>
+            <div key={i} className={`${stat.highlight ? "bg-[#F2F2F7] border border-indigo-200" : "card"} p-4 rounded-2xl`}>
               <div className={`text-2xl font-bold tracking-tight ${stat.color}`}>{stat.value}</div>
-              <div className="text-[10px] text-[#9CA3AF] font-medium tracking-wide mt-0.5">{stat.label}</div>
+              <div className="text-[10px] text-[#8B8489] font-medium tracking-wide mt-0.5">{stat.label}</div>
             </div>
           ))}
         </div>
 
         {showAnalytics && (
           <div className="card overflow-hidden mb-5">
-            <div className="px-5 py-4 border-b border-[#F3F4F6] flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-[#111827]">分析ダッシュボード</h2>
-              <button onClick={() => setShowAnalytics(false)} className="text-[#9CA3AF] hover:text-[#6B7280] text-xs">閉じる</button>
+            <div className="px-5 py-4 border-b border-[#EFE8DD] flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-[#1A1A2E]">分析ダッシュボード</h2>
+              <button onClick={() => setShowAnalytics(false)} className="text-[#8B8489] hover:text-[#5B5560] text-xs">閉じる</button>
             </div>
 
             {analyticsLoading ? (
               <div className="p-8 text-center">
-                <div className="w-6 h-6 border-2 border-[#4338CA] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                <p className="text-xs text-[#9CA3AF]">分析データを取得中...</p>
+                <div className="w-6 h-6 border-2 border-[#1A1A2E] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                <p className="text-xs text-[#8B8489]">分析データを取得中...</p>
               </div>
             ) : analyticsData ? (
               <div className="p-5 space-y-6">
                 {/* Weekly Entry Rate Trend - Bar Chart */}
                 <div>
-                  <h3 className="text-xs font-semibold text-[#6B7280] mb-3">週次記入率トレンド</h3>
+                  <h3 className="text-xs font-semibold text-[#5B5560] mb-3">週次記入率トレンド</h3>
                   <div className="flex items-end gap-1.5 h-32">
                     {analyticsData.weeklyTrend.map((w, i) => (
                       <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                        <span className="text-[10px] font-bold text-[#4338CA]">{w.entryRate}%</span>
-                        <div className="w-full bg-[#EEF2FF] rounded-t-lg relative" style={{ height: "100%" }}>
+                        <span className="text-[10px] font-bold text-[#1A1A2E]">{w.entryRate}%</span>
+                        <div className="w-full bg-[#F2F2F7] rounded-t-lg relative" style={{ height: "100%" }}>
                           <div
-                            className="absolute bottom-0 w-full bg-[#4338CA] rounded-t-lg transition-all"
+                            className="absolute bottom-0 w-full bg-[#1A1A2E] rounded-t-lg transition-all"
                             style={{ height: `${Math.max(w.entryRate, 2)}%` }}
                           ></div>
                         </div>
-                        <span className="text-[9px] text-[#9CA3AF]">{w.weekLabel}</span>
+                        <span className="text-[9px] text-[#8B8489]">{w.weekLabel}</span>
                       </div>
                     ))}
                   </div>
@@ -474,7 +474,7 @@ export default function AdminDashboard() {
 
                 {/* Energy Distribution */}
                 <div>
-                  <h3 className="text-xs font-semibold text-[#6B7280] mb-3">エネルギー分布</h3>
+                  <h3 className="text-xs font-semibold text-[#5B5560] mb-3">エネルギー分布</h3>
                   <div className="grid grid-cols-4 gap-2">
                     {[
                       { key: "excellent", emoji: "🔥", label: "絶好調", color: "bg-red-50 border-red-200" },
@@ -488,8 +488,8 @@ export default function AdminDashboard() {
                       return (
                         <div key={e.key} className={`${e.color} border rounded-xl p-3 text-center`}>
                           <div className="text-xl mb-1">{e.emoji}</div>
-                          <div className="text-lg font-bold text-[#111827]">{pct}%</div>
-                          <div className="text-[10px] text-[#9CA3AF]">{e.label} ({count})</div>
+                          <div className="text-lg font-bold text-[#1A1A2E]">{pct}%</div>
+                          <div className="text-[10px] text-[#8B8489]">{e.label} ({count})</div>
                         </div>
                       );
                     })}
@@ -499,14 +499,14 @@ export default function AdminDashboard() {
                 {/* Manager Engagement Alert */}
                 {analyticsData.managerActivity.some(m => m.needsAttention) && (
                   <div>
-                    <h3 className="text-xs font-semibold text-[#6B7280] mb-3">要フォロー（3日以上コメントなし）</h3>
+                    <h3 className="text-xs font-semibold text-[#5B5560] mb-3">要フォロー（3日以上コメントなし）</h3>
                     <div className="space-y-1.5">
                       {analyticsData.managerActivity
                         .filter(m => m.needsAttention)
                         .sort((a, b) => b.daysSinceComment - a.daysSinceComment)
                         .map((m, i) => (
                           <div key={i} className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                            <span className="text-xs font-medium text-[#111827]">{m.participantName}</span>
+                            <span className="text-xs font-medium text-[#1A1A2E]">{m.participantName}</span>
                             <span className="text-[10px] text-amber-600 font-medium">
                               {m.daysSinceComment > 100 ? "コメントなし" : `${m.daysSinceComment}日間コメントなし`}
                             </span>
@@ -518,64 +518,64 @@ export default function AdminDashboard() {
 
                 {/* Per-Participant 7-Day Activity */}
                 <div>
-                  <h3 className="text-xs font-semibold text-[#6B7280] mb-3">直近7日間の記入状況</h3>
+                  <h3 className="text-xs font-semibold text-[#5B5560] mb-3">直近7日間の記入状況</h3>
                   <div className="space-y-1.5">
                     {analyticsData.participantTrends
                       .sort((a, b) => b.last7Days - a.last7Days)
                       .map((p, i) => (
-                        <div key={i} className="flex items-center gap-3 px-3 py-2 bg-[#F9FAFB] rounded-lg">
-                          <span className="text-xs font-medium text-[#111827] w-20 truncate">{p.name}</span>
-                          <div className="flex-1 bg-[#E5E7EB] rounded-full h-2">
+                        <div key={i} className="flex items-center gap-3 px-3 py-2 bg-[#F5F0EB] rounded-lg">
+                          <span className="text-xs font-medium text-[#1A1A2E] w-20 truncate">{p.name}</span>
+                          <div className="flex-1 bg-[#E5DCD0] rounded-full h-2">
                             <div
-                              className="bg-[#4338CA] h-2 rounded-full transition-all"
+                              className="bg-[#1A1A2E] h-2 rounded-full transition-all"
                               style={{ width: `${Math.round((p.last7Days / 5) * 100)}%` }}
                             ></div>
                           </div>
-                          <span className="text-[10px] text-[#6B7280] font-medium w-12 text-right">{p.last7Days}/5日</span>
+                          <span className="text-[10px] text-[#5B5560] font-medium w-12 text-right">{p.last7Days}/5日</span>
                         </div>
                       ))}
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="p-8 text-center text-xs text-[#9CA3AF]">データの取得に失敗しました</div>
+              <div className="p-8 text-center text-xs text-[#8B8489]">データの取得に失敗しました</div>
             )}
           </div>
         )}
 
         {/* Participants Table */}
         <div className="card overflow-hidden mb-5">
-          <div className="px-5 py-4 border-b border-[#F3F4F6] flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-[#111827]">参加者一覧</h2>
+          <div className="px-5 py-4 border-b border-[#EFE8DD] flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-[#1A1A2E]">参加者一覧</h2>
             <button onClick={() => setShowAddParticipant(true)} className="btn-accent text-xs px-4 py-2">
               + 参加者を追加
             </button>
           </div>
-          <div className="divide-y divide-[#F3F4F6]">
+          <div className="divide-y divide-[#EFE8DD]">
             {participants.map((p) => {
               const status = getStatusBadge(p.entryRate, p.streak, p.entryDays);
               return (
-                <div key={p.id} className="p-4 hover:bg-[#FAFAFA] transition-colors">
+                <div key={p.id} className="p-4 hover:bg-[#FBF8F4] transition-colors">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <div className={`w-2 h-2 rounded-full ${status.color}`}></div>
-                        <span className="font-medium text-sm text-[#111827]">{p.name}</span>
-                        <span className="text-[10px] font-medium bg-indigo-50 text-[#4338CA] px-1.5 py-0.5 rounded-md">{p.dojoPhase}</span>
+                        <span className="font-medium text-sm text-[#1A1A2E]">{p.name}</span>
+                        <span className="text-[10px] font-medium bg-indigo-50 text-[#1A1A2E] px-1.5 py-0.5 rounded-md">{p.dojoPhase}</span>
                         {p.todayHasLog && (
-                          <span className="bg-[#4338CA] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">NEW</span>
+                          <span className="bg-[#1A1A2E] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">NEW</span>
                         )}
                       </div>
-                      <p className="text-[11px] text-[#9CA3AF] mb-1.5 ml-4">{p.department}</p>
-                      <div className="flex gap-4 text-xs text-[#9CA3AF] ml-4">
-                        <span>記入率: <strong className="text-[#111827]">{p.entryRate}%</strong></span>
-                        <span>連続: <strong className="text-[#111827]">{p.streak}日</strong></span>
-                        <span>FB: <strong className="text-[#111827]">{p.fbCount}回</strong></span>
-                        <span>記入: <strong className="text-[#111827]">{p.entryDays}日</strong></span>
+                      <p className="text-[11px] text-[#8B8489] mb-1.5 ml-4">{p.department}</p>
+                      <div className="flex gap-4 text-xs text-[#8B8489] ml-4">
+                        <span>記入率: <strong className="text-[#1A1A2E]">{p.entryRate}%</strong></span>
+                        <span>連続: <strong className="text-[#1A1A2E]">{p.streak}日</strong></span>
+                        <span>FB: <strong className="text-[#1A1A2E]">{p.fbCount}回</strong></span>
+                        <span>記入: <strong className="text-[#1A1A2E]">{p.entryDays}日</strong></span>
                       </div>
                       {p.latestLog && p.latestLog.morningIntent && (
-                        <div className="mt-2 ml-4 text-xs text-[#6B7280] bg-[#F9FAFB] rounded-xl p-2 border border-[#F3F4F6]">
-                          <span className="text-[#9CA3AF]">最新 ({p.latestLog.date}):</span> {p.latestLog.morningIntent}
+                        <div className="mt-2 ml-4 text-xs text-[#5B5560] bg-[#F5F0EB] rounded-xl p-2 border border-[#EFE8DD]">
+                          <span className="text-[#8B8489]">最新 ({p.latestLog.date}):</span> {p.latestLog.morningIntent}
                         </div>
                       )}
                     </div>
@@ -586,7 +586,7 @@ export default function AdminDashboard() {
                       >
                         FB送信
                       </button>
-                      <span className="text-[10px] text-[#9CA3AF]">{status.label}</span>
+                      <span className="text-[10px] text-[#8B8489]">{status.label}</span>
                       {p.recentEnergy.length > 0 && (
                         <div className="flex gap-0.5 mt-0.5">
                           {p.recentEnergy.map((energy, i) => (
@@ -606,23 +606,23 @@ export default function AdminDashboard() {
 
         {/* Managers Table */}
         <div className="card overflow-hidden mb-5">
-          <div className="px-5 py-4 border-b border-[#F3F4F6] flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-[#111827]">マネージャー一覧</h2>
+          <div className="px-5 py-4 border-b border-[#EFE8DD] flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-[#1A1A2E]">マネージャー一覧</h2>
             <button onClick={() => setShowAddManager(true)} className="text-xs font-medium px-4 py-2 rounded-xl bg-amber-500 text-white hover:bg-amber-600 transition-colors">
               + マネージャーを追加
             </button>
           </div>
-          <div className="divide-y divide-[#F3F4F6]">
+          <div className="divide-y divide-[#EFE8DD]">
             {managers.map((m) => (
               <div key={m.id} className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="font-medium text-sm text-[#111827]">{m.name}</div>
-                    <div className="text-[11px] text-[#9CA3AF] mt-0.5">{m.department}</div>
+                    <div className="font-medium text-sm text-[#1A1A2E]">{m.name}</div>
+                    <div className="text-[11px] text-[#8B8489] mt-0.5">{m.department}</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xs text-[#4338CA] font-medium">担当: {m.participantNames.length}名</div>
-                    <div className="text-[11px] text-[#9CA3AF] mt-0.5">{m.participantNames.join("、")}</div>
+                    <div className="text-xs text-[#1A1A2E] font-medium">担当: {m.participantNames.length}名</div>
+                    <div className="text-[11px] text-[#8B8489] mt-0.5">{m.participantNames.join("、")}</div>
                   </div>
                 </div>
               </div>
@@ -632,8 +632,8 @@ export default function AdminDashboard() {
 
         {/* System Info */}
         <div className="card overflow-hidden mb-5">
-          <div className="px-5 py-4 border-b border-[#F3F4F6]">
-            <h2 className="text-sm font-semibold text-[#111827]">システム情報</h2>
+          <div className="px-5 py-4 border-b border-[#EFE8DD]">
+            <h2 className="text-sm font-semibold text-[#1A1A2E]">システム情報</h2>
           </div>
           <div className="p-4 space-y-0">
             {[
@@ -643,10 +643,10 @@ export default function AdminDashboard() {
               { label: "Notion DB", value: "接続済み", status: "emerald" },
               { label: "AIフィードバック", value: "実装済み", status: "green" },
             ].map((item, i) => (
-              <div key={i} className="flex justify-between items-center py-2.5 border-b border-[#F9FAFB] last:border-0">
-                <span className="text-xs text-[#9CA3AF]">{item.label}</span>
+              <div key={i} className="flex justify-between items-center py-2.5 border-b border-[#F5F0EB] last:border-0">
+                <span className="text-xs text-[#8B8489]">{item.label}</span>
                 <span className={`text-xs font-medium ${
-                  item.status === "emerald" ? "text-emerald-500" : item.status === "amber" ? "text-amber-500" : "text-[#111827]"
+                  item.status === "emerald" ? "text-emerald-500" : item.status === "amber" ? "text-amber-500" : "text-[#1A1A2E]"
                 }`}>{item.value}</span>
               </div>
             ))}
@@ -655,22 +655,22 @@ export default function AdminDashboard() {
 
         {/* Quick Links */}
         <div className="card overflow-hidden mb-8">
-          <div className="px-5 py-4 border-b border-[#F3F4F6]">
-            <h2 className="text-sm font-semibold text-[#111827]">クイックリンク</h2>
+          <div className="px-5 py-4 border-b border-[#EFE8DD]">
+            <h2 className="text-sm font-semibold text-[#1A1A2E]">クイックリンク</h2>
           </div>
           <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
             <a href="/p/FAe9diVTAxUR8gRv" className="block p-3.5 bg-indigo-50/50 rounded-xl border border-indigo-100 hover:bg-indigo-50 transition-colors">
-              <div className="font-medium text-[#4338CA] text-xs mb-0.5">参加者画面（土居 由奈）</div>
-              <div className="text-[11px] text-[#9CA3AF]">日報入力・フィードバック確認・ミッション確認</div>
+              <div className="font-medium text-[#1A1A2E] text-xs mb-0.5">参加者画面（土居 由奈）</div>
+              <div className="text-[11px] text-[#8B8489]">日報入力・フィードバック確認・ミッション確認</div>
             </a>
             <a href="/m/pn_Oc1ykCMXUQZpZ" className="block p-3.5 bg-amber-50/50 rounded-xl border border-amber-100 hover:bg-amber-50 transition-colors">
               <div className="font-medium text-amber-600 text-xs mb-0.5">上司画面（本藤 直樹）</div>
-              <div className="text-[11px] text-[#9CA3AF]">参加者一覧・詳細・コメント入力</div>
+              <div className="text-[11px] text-[#8B8489]">参加者一覧・詳細・コメント入力</div>
             </a>
           </div>
         </div>
 
-        <div className="text-center text-[11px] text-[#D1D5DB] pb-8">
+        <div className="text-center text-[11px] text-[#C9BDAE] pb-8">
           CORE Log v1.0 — Powered by Next.js + Notion API
         </div>
       </div>
@@ -679,31 +679,31 @@ export default function AdminDashboard() {
       {showAddParticipant && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="p-5 border-b border-[#F3F4F6]">
+            <div className="p-5 border-b border-[#EFE8DD]">
               <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold text-[#111827]">参加者を追加</h3>
-                <button onClick={() => setShowAddParticipant(false)} className="text-[#9CA3AF] hover:text-[#6B7280]">
+                <h3 className="text-base font-semibold text-[#1A1A2E]">参加者を追加</h3>
+                <button onClick={() => setShowAddParticipant(false)} className="text-[#8B8489] hover:text-[#5B5560]">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
               </div>
-              <p className="text-xs text-[#9CA3AF] mt-1">トークンは自動生成されます</p>
+              <p className="text-xs text-[#8B8489] mt-1">トークンは自動生成されます</p>
             </div>
             <form onSubmit={handleAddParticipant} className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-[#374151] mb-1.5">名前 *</label>
+                <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">名前 *</label>
                 <input name="name" required placeholder="例: 山田 太郎" className="input-field text-sm" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#374151] mb-1.5">メール *</label>
+                <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">メール *</label>
                 <input name="email" type="email" required placeholder="例: taro.yamada@example.com" className="input-field text-sm" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#374151] mb-1.5">部署</label>
+                <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">部署</label>
                 <input name="department" placeholder="例: 製造部" className="input-field text-sm" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-[#374151] mb-1.5">道場フェーズ</label>
+                  <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">道場フェーズ</label>
                   <select name="dojoPhase" className="input-field text-sm">
                     <option value="道場1 覚醒">道場1 覚醒</option>
                     <option value="道場2 武装">道場2 武装</option>
@@ -715,7 +715,7 @@ export default function AdminDashboard() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[#374151] mb-1.5">役割</label>
+                  <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">役割</label>
                   <select name="role" className="input-field text-sm">
                     <option value="参加者">参加者</option>
                     <option value="HM社内">HM社内</option>
@@ -723,15 +723,15 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#374151] mb-1.5">担当上司</label>
+                <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">担当上司</label>
                 <select name="managerId" className="input-field text-sm">
                   <option value="">未設定</option>
                   {managerOptions.map((m) => (<option key={m.id} value={m.id}>{m.name}</option>))}
                 </select>
               </div>
               <div className="flex items-center gap-2">
-                <input type="checkbox" name="emailEnabled" id="emailEnabled" className="rounded border-[#D1D5DB]" />
-                <label htmlFor="emailEnabled" className="text-xs text-[#374151]">メール通知を有効にする</label>
+                <input type="checkbox" name="emailEnabled" id="emailEnabled" className="rounded border-[#C9BDAE]" />
+                <label htmlFor="emailEnabled" className="text-xs text-[#2C2C4A]">メール通知を有効にする</label>
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowAddParticipant(false)} className="btn-secondary flex-1 py-2.5 text-sm">キャンセル</button>
@@ -746,10 +746,10 @@ export default function AdminDashboard() {
       {showFeedbackModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-            <div className="p-5 border-b border-[#F3F4F6]">
+            <div className="p-5 border-b border-[#EFE8DD]">
               <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold text-[#111827]">HMフィードバック送信</h3>
-                <button onClick={() => setShowFeedbackModal(false)} className="text-[#9CA3AF] hover:text-[#6B7280]">
+                <h3 className="text-base font-semibold text-[#1A1A2E]">HMフィードバック送信</h3>
+                <button onClick={() => setShowFeedbackModal(false)} className="text-[#8B8489] hover:text-[#5B5560]">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
               </div>
@@ -766,27 +766,27 @@ export default function AdminDashboard() {
                   </svg>
                 </div>
                 <p className="text-emerald-600 font-medium text-sm">送信完了</p>
-                <p className="text-[11px] text-[#9CA3AF] mt-1">本人にメール通知が送信されます</p>
+                <p className="text-[11px] text-[#8B8489] mt-1">本人にメール通知が送信されます</p>
               </div>
             ) : (
               <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
-                <div className="bg-[#F9FAFB] rounded-xl p-3 border border-[#F3F4F6]">
-                  <p className="text-[10px] font-medium text-[#4338CA] tracking-wide uppercase mb-2">直近1週間のログ</p>
+                <div className="bg-[#F5F0EB] rounded-xl p-3 border border-[#EFE8DD]">
+                  <p className="text-[10px] font-medium text-[#1A1A2E] tracking-wide uppercase mb-2">直近1週間のログ</p>
                   {fbLogsLoading ? (
                     <div className="text-center py-2">
-                      <div className="w-4 h-4 border-2 border-[#4338CA] border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      <div className="w-4 h-4 border-2 border-[#1A1A2E] border-t-transparent rounded-full animate-spin mx-auto"></div>
                     </div>
                   ) : fbRecentLogs.length === 0 ? (
-                    <p className="text-xs text-[#D1D5DB] text-center py-2">直近のログがありません</p>
+                    <p className="text-xs text-[#C9BDAE] text-center py-2">直近のログがありません</p>
                   ) : (
                     <div className="space-y-1.5">
                       {fbRecentLogs.map((log, i) => (
-                        <div key={i} className="bg-white rounded-lg px-3 py-2 text-xs border border-[#F3F4F6]">
+                        <div key={i} className="bg-white rounded-lg px-3 py-2 text-xs border border-[#EFE8DD]">
                           <div className="flex items-center justify-between mb-1">
-                            <span className="font-medium text-[#111827]">{log.date} ({log.dayOfWeek})</span>
+                            <span className="font-medium text-[#1A1A2E]">{log.date} ({log.dayOfWeek})</span>
                             {log.energy && <span className="text-sm leading-none">{energyEmoji[log.energy] || ""}</span>}
                           </div>
-                          <p className="text-[#4338CA]">朝: {log.morningIntent || "—"}</p>
+                          <p className="text-[#1A1A2E]">朝: {log.morningIntent || "—"}</p>
                           {log.eveningInsight && <p className="text-amber-600 mt-0.5">夜: {log.eveningInsight}</p>}
                         </div>
                       ))}
@@ -795,17 +795,17 @@ export default function AdminDashboard() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-[#374151] mb-1.5">対象期間</label>
+                    <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">対象期間</label>
                     <input value={fbPeriod} onChange={(e) => setFbPeriod(e.target.value)} placeholder="例: 2026年3月第4週" className="input-field text-sm" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-[#374151] mb-1.5">週番号</label>
+                    <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">週番号</label>
                     <input type="number" min={1} max={52} value={fbWeekNum} onChange={(e) => setFbWeekNum(Number(e.target.value))} className="input-field text-sm" />
                   </div>
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-medium text-[#374151]">フィードバック内容 *</label>
+                    <label className="block text-xs font-medium text-[#2C2C4A]">フィードバック内容 *</label>
                     <button
                       onClick={handleAiDraft}
                       disabled={aiDraftLoading || fbLogsLoading || fbRecentLogs.length === 0}
@@ -833,7 +833,7 @@ export default function AdminDashboard() {
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={() => setShowFeedbackModal(false)} className="btn-secondary flex-1 py-2.5 text-sm">キャンセル</button>
                   <button onClick={handleSubmitFeedback} disabled={fbSubmitting || !fbContent.trim()}
-                    className="flex-1 py-2.5 text-sm font-medium rounded-xl bg-amber-500 text-white hover:bg-amber-600 disabled:bg-[#D1D5DB] disabled:text-[#9CA3AF] transition-colors">
+                    className="flex-1 py-2.5 text-sm font-medium rounded-xl bg-amber-500 text-white hover:bg-amber-600 disabled:bg-[#C9BDAE] disabled:text-[#8B8489] transition-colors">
                     {fbSubmitting ? "送信中..." : "送信する"}
                   </button>
                 </div>
@@ -847,7 +847,7 @@ export default function AdminDashboard() {
       {showPromptSettings && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
-            <div className="p-5 border-b border-[#F3F4F6]">
+            <div className="p-5 border-b border-[#EFE8DD]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center">
@@ -856,11 +856,11 @@ export default function AdminDashboard() {
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-base font-semibold text-[#111827]">AIフィードバック設定</h3>
-                    <p className="text-[10px] text-[#9CA3AF]">システムプロンプトを編集して、AI生成の文体や方針を調整できます</p>
+                    <h3 className="text-base font-semibold text-[#1A1A2E]">AIフィードバック設定</h3>
+                    <p className="text-[10px] text-[#8B8489]">システムプロンプトを編集して、AI生成の文体や方針を調整できます</p>
                   </div>
                 </div>
-                <button onClick={() => setShowPromptSettings(false)} className="text-[#9CA3AF] hover:text-[#6B7280]">
+                <button onClick={() => setShowPromptSettings(false)} className="text-[#8B8489] hover:text-[#5B5560]">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
               </div>
@@ -868,14 +868,14 @@ export default function AdminDashboard() {
             <div className="p-5 space-y-4 max-h-[65vh] overflow-y-auto">
               {promptLoading ? (
                 <div className="text-center py-8">
-                  <div className="w-6 h-6 border-2 border-[#4338CA] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                  <p className="text-xs text-[#9CA3AF]">読み込み中...</p>
+                  <div className="w-6 h-6 border-2 border-[#1A1A2E] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                  <p className="text-xs text-[#8B8489]">読み込み中...</p>
                 </div>
               ) : (
                 <>
                   <div>
-                    <label className="block text-xs font-medium text-[#374151] mb-1.5">システムプロンプト</label>
-                    <p className="text-[10px] text-[#9CA3AF] mb-2">AIがフィードバックを生成する際のベースとなる指示文です。参加者ごとの個別方針はNotion参加者DBの「FB方針」欄で設定できます。</p>
+                    <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">システムプロンプト</label>
+                    <p className="text-[10px] text-[#8B8489] mb-2">AIがフィードバックを生成する際のベースとなる指示文です。参加者ごとの個別方針はNotion参加者DBの「FB方針」欄で設定できます。</p>
                     <textarea
                       value={promptText}
                       onChange={(e) => setPromptText(e.target.value)}
@@ -891,7 +891,7 @@ export default function AdminDashboard() {
                 </>
               )}
             </div>
-            <div className="p-5 border-t border-[#F3F4F6] flex items-center gap-3">
+            <div className="p-5 border-t border-[#EFE8DD] flex items-center gap-3">
               <button onClick={() => setShowPromptSettings(false)} className="btn-secondary flex-1 py-2.5 text-sm">閉じる</button>
               <button onClick={handleSavePrompt} disabled={promptSaving || promptLoading}
                 className="flex-1 py-2.5 text-sm font-medium rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:from-violet-600 hover:to-purple-700 disabled:from-gray-300 disabled:to-gray-400 disabled:text-gray-500 transition-all">
@@ -906,31 +906,31 @@ export default function AdminDashboard() {
       {showAddManager && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-            <div className="p-5 border-b border-[#F3F4F6]">
+            <div className="p-5 border-b border-[#EFE8DD]">
               <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold text-[#111827]">マネージャーを追加</h3>
-                <button onClick={() => setShowAddManager(false)} className="text-[#9CA3AF] hover:text-[#6B7280]">
+                <h3 className="text-base font-semibold text-[#1A1A2E]">マネージャーを追加</h3>
+                <button onClick={() => setShowAddManager(false)} className="text-[#8B8489] hover:text-[#5B5560]">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
               </div>
-              <p className="text-xs text-[#9CA3AF] mt-1">トークンは自動生成されます</p>
+              <p className="text-xs text-[#8B8489] mt-1">トークンは自動生成されます</p>
             </div>
             <form onSubmit={handleAddManager} className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-[#374151] mb-1.5">名前 *</label>
+                <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">名前 *</label>
                 <input name="name" required placeholder="例: 鈴木 花子" className="input-field text-sm" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#374151] mb-1.5">メール *</label>
+                <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">メール *</label>
                 <input name="email" type="email" required placeholder="例: hanako.suzuki@example.com" className="input-field text-sm" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#374151] mb-1.5">部署</label>
+                <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">部署</label>
                 <input name="department" placeholder="例: 人事部" className="input-field text-sm" />
               </div>
               <div className="flex items-center gap-2">
-                <input type="checkbox" name="isAdmin" id="isAdmin" className="rounded border-[#D1D5DB]" />
-                <label htmlFor="isAdmin" className="text-xs text-[#374151]">管理者権限を付与する</label>
+                <input type="checkbox" name="isAdmin" id="isAdmin" className="rounded border-[#C9BDAE]" />
+                <label htmlFor="isAdmin" className="text-xs text-[#2C2C4A]">管理者権限を付与する</label>
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowAddManager(false)} className="btn-secondary flex-1 py-2.5 text-sm">キャンセル</button>

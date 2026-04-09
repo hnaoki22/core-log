@@ -173,7 +173,7 @@ export default function OTPVerificationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         {/* Header */}
         <div className="text-center mb-8">
@@ -182,8 +182,8 @@ export default function OTPVerificationPage() {
               🔐
             </div>
           </div>
-          <h1 className="text-2xl font-semibold text-[#111827] mb-2">メール認証</h1>
-          <p className="text-sm text-[#6B7280]">
+          <h1 className="text-2xl font-semibold text-[#1A1A2E] mb-2">メール認証</h1>
+          <p className="text-sm text-[#5B5560]">
             {step === "send"
               ? "アカウントにアクセスするために、メール認証が必要です"
               : "認証コードを入力してください"}
@@ -191,10 +191,10 @@ export default function OTPVerificationPage() {
         </div>
 
         {/* Content */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#E5E7EB]">
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#E5DCD0]">
           {step === "send" && (
             <div className="space-y-4">
-              <p className="text-sm text-[#6B7280]">
+              <p className="text-sm text-[#5B5560]">
                 登録されているメールアドレスに認証コードを送信します。
               </p>
 
@@ -220,8 +220,8 @@ export default function OTPVerificationPage() {
           {step === "verify" && (
             <div className="space-y-6">
               <div className="text-center">
-                <p className="text-sm text-[#6B7280] mb-1">送信先</p>
-                <p className="font-medium text-[#111827]">{emailHint}</p>
+                <p className="text-sm text-[#5B5560] mb-1">送信先</p>
+                <p className="font-medium text-[#1A1A2E]">{emailHint}</p>
               </div>
 
               {/* 6-digit input boxes */}
@@ -239,7 +239,7 @@ export default function OTPVerificationPage() {
                     onChange={(e) => handleCodeChange(index, e.target.value)}
                     onKeyDown={(e) => handleKeyDown(index, e)}
                     disabled={loading}
-                    className="w-12 h-12 text-center text-xl font-bold border-2 border-[#D1D5DB] rounded-lg focus:border-indigo-500 focus:outline-none bg-white disabled:bg-[#F9FAFB] disabled:opacity-50"
+                    className="w-12 h-12 text-center text-xl font-bold border-2 border-[#C9BDAE] rounded-lg focus:border-indigo-500 focus:outline-none bg-white disabled:bg-[#F5F0EB] disabled:opacity-50"
                     placeholder="0"
                   />
                 ))}
@@ -268,7 +268,7 @@ export default function OTPVerificationPage() {
               )}
 
               {/* Resend link */}
-              <div className="text-center pt-2 border-t border-[#E5E7EB]">
+              <div className="text-center pt-2 border-t border-[#E5DCD0]">
                 <button
                   onClick={() => {
                     setStep("send");
@@ -285,7 +285,7 @@ export default function OTPVerificationPage() {
               </div>
 
               {/* Info text */}
-              <p className="text-xs text-[#9CA3AF] text-center">
+              <p className="text-xs text-[#8B8489] text-center">
                 認証コードは10分間有効です
               </p>
             </div>
@@ -293,7 +293,7 @@ export default function OTPVerificationPage() {
         </div>
 
         {/* Footer */}
-        <p className="text-xs text-[#9CA3AF] text-center mt-8">
+        <p className="text-xs text-[#8B8489] text-center mt-8">
           Project CORE — Powered by Human Mature
         </p>
       </div>

@@ -191,7 +191,7 @@ export default function MissionManager({ token, participantName, initialMissions
         </h2>
         <button
           onClick={() => setShowCreateForm(!showCreateForm)}
-          className="text-xs bg-[#5B4FD6] text-white px-3 py-1.5 rounded-lg hover:bg-[#4A3FBF] transition-colors"
+          className="text-xs bg-[#1A1A2E] text-white px-3 py-1.5 rounded-lg hover:bg-[#141423] transition-colors"
         >
           + 新規ミッション
         </button>
@@ -199,8 +199,8 @@ export default function MissionManager({ token, participantName, initialMissions
 
       {/* Create Form */}
       {showCreateForm && (
-        <div className="p-4 bg-[#F8F7FF] border-b border-gray-100">
-          <h3 className="text-sm font-semibold text-[#1E1B3A] mb-3">新しいミッションを設定</h3>
+        <div className="p-4 bg-[#F5F0EB] border-b border-gray-100">
+          <h3 className="text-sm font-semibold text-[#1A1A2E] mb-3">新しいミッションを設定</h3>
           <div className="space-y-3">
             <div>
               <label className="text-xs text-gray-500 block mb-1">ミッション名 *</label>
@@ -209,7 +209,7 @@ export default function MissionManager({ token, participantName, initialMissions
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 placeholder="例: Q3営業戦略の提案書を自力で完成させる"
-                className="w-full text-sm border border-gray-200 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-[#5B4FD6] bg-white"
+                className="w-full text-sm border border-gray-200 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-[#1A1A2E] bg-white"
               />
             </div>
             <div>
@@ -218,7 +218,7 @@ export default function MissionManager({ token, participantName, initialMissions
                 value={newPurpose}
                 onChange={(e) => setNewPurpose(e.target.value)}
                 placeholder="このミッションを設定する背景や、達成に向けた期待を記入"
-                className="w-full text-sm border border-gray-200 rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#5B4FD6] bg-white"
+                className="w-full text-sm border border-gray-200 rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#1A1A2E] bg-white"
                 rows={3}
               />
             </div>
@@ -228,7 +228,7 @@ export default function MissionManager({ token, participantName, initialMissions
                 type="date"
                 value={newDeadline}
                 onChange={(e) => setNewDeadline(e.target.value)}
-                className="text-sm border border-gray-200 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-[#5B4FD6] bg-white"
+                className="text-sm border border-gray-200 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-[#1A1A2E] bg-white"
               />
             </div>
             <div className="flex gap-2 justify-end">
@@ -241,7 +241,7 @@ export default function MissionManager({ token, participantName, initialMissions
               <button
                 onClick={handleCreate}
                 disabled={creating || !newTitle.trim()}
-                className="text-xs bg-[#5B4FD6] text-white rounded-lg px-4 py-1.5 hover:bg-[#4A3FBF] disabled:opacity-50"
+                className="text-xs bg-[#1A1A2E] text-white rounded-lg px-4 py-1.5 hover:bg-[#141423] disabled:opacity-50"
               >
                 {creating ? "作成中..." : "ミッションを設定"}
               </button>
@@ -285,7 +285,7 @@ export default function MissionManager({ token, participantName, initialMissions
                         {mission.createdBy}
                       </span>
                     )}
-                    <h3 className="font-medium text-[#1E1B3A] text-sm">{mission.title}</h3>
+                    <h3 className="font-medium text-[#1A1A2E] text-sm">{mission.title}</h3>
                   </div>
                   <div className="flex gap-3 text-xs text-gray-400 mt-1">
                     {mission.setDate && <span>開始: {formatDate(mission.setDate)}</span>}
@@ -300,9 +300,9 @@ export default function MissionManager({ token, participantName, initialMissions
                 <div className="mt-3 space-y-3">
                   {/* Purpose */}
                   {mission.purpose && (
-                    <div className="bg-[#F8F7FF] p-3 rounded-lg">
+                    <div className="bg-[#F5F0EB] p-3 rounded-lg">
                       <p className="text-xs font-semibold text-gray-400 mb-1">背景・目的</p>
-                      <p className="text-sm text-[#1E1B3A]">{mission.purpose}</p>
+                      <p className="text-sm text-[#1A1A2E]">{mission.purpose}</p>
                     </div>
                   )}
 
@@ -373,7 +373,7 @@ export default function MissionManager({ token, participantName, initialMissions
                             }`}
                           >
                             <div className="flex items-center gap-1 mb-1">
-                              <span className={`font-semibold ${c.authorRole === "manager" ? "text-blue-700" : "text-[#5B4FD6]"}`}>
+                              <span className={`font-semibold ${c.authorRole === "manager" ? "text-blue-700" : "text-[#1A1A2E]"}`}>
                                 {c.authorRole === "manager" ? "👔" : "👤"} {c.authorName}
                               </span>
                               <span className="text-gray-300 text-[10px]">{formatCommentTime(c.createdAt)}</span>
@@ -391,7 +391,7 @@ export default function MissionManager({ token, participantName, initialMissions
                         value={commentText[mission.id] || ""}
                         onChange={(e) => setCommentText((prev) => ({ ...prev, [mission.id]: e.target.value }))}
                         placeholder="コメントを入力..."
-                        className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#5B4FD6] bg-white"
+                        className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1A1A2E] bg-white"
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault();
@@ -402,7 +402,7 @@ export default function MissionManager({ token, participantName, initialMissions
                       <button
                         onClick={() => handleSendComment(mission.id)}
                         disabled={sendingComment[mission.id] || !commentText[mission.id]?.trim()}
-                        className="text-xs bg-[#5B4FD6] text-white rounded-lg px-3 py-2 hover:bg-[#4A3FBF] disabled:opacity-50"
+                        className="text-xs bg-[#1A1A2E] text-white rounded-lg px-3 py-2 hover:bg-[#141423] disabled:opacity-50"
                       >
                         {sendingComment[mission.id] ? "..." : "送信"}
                       </button>

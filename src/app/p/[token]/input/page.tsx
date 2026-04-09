@@ -17,10 +17,10 @@ type ParticipantBasic = {
 };
 
 const energyOptions = [
-  { id: "excellent", label: "絶好調", emoji: "🔥", color: "#F59E0B", bg: "bg-amber-50", border: "border-amber-300", ring: "ring-amber-200" },
-  { id: "good", label: "良い", emoji: "😊", color: "#059669", bg: "bg-emerald-50", border: "border-emerald-300", ring: "ring-emerald-200" },
-  { id: "okay", label: "まあまあ", emoji: "😐", color: "#6B7280", bg: "bg-gray-50", border: "border-gray-300", ring: "ring-gray-200" },
-  { id: "low", label: "低調", emoji: "😞", color: "#DC2626", bg: "bg-red-50", border: "border-red-300", ring: "ring-red-200" },
+  { id: "excellent", label: "絶好調", emoji: "🔥", color: "#C17817", bg: "bg-amber-50", border: "border-amber-300", ring: "ring-amber-200" },
+  { id: "good", label: "良い", emoji: "😊", color: "#2D6A4F", bg: "bg-emerald-50", border: "border-emerald-300", ring: "ring-emerald-200" },
+  { id: "okay", label: "まあまあ", emoji: "😐", color: "#5B5560", bg: "bg-gray-50", border: "border-gray-300", ring: "ring-gray-200" },
+  { id: "low", label: "低調", emoji: "😞", color: "#8B1A2B", bg: "bg-red-50", border: "border-red-300", ring: "ring-red-200" },
 ];
 
 export default function InputPage() {
@@ -97,11 +97,11 @@ export default function InputPage() {
 
   if (loadingStatus || !participant) {
     return (
-      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
         <div className="text-center">
-          <div className="w-10 h-10 border-[3px] border-[#4338CA] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-[#374151] text-sm font-medium">接続中です...</p>
-          <p className="text-[#9CA3AF] text-xs mt-1.5">記入ページを準備しています</p>
+          <div className="w-10 h-10 border-[3px] border-[#1A1A2E] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-[#2C2C4A] text-sm font-medium">接続中です...</p>
+          <p className="text-[#8B8489] text-xs mt-1.5">記入ページを準備しています</p>
         </div>
       </div>
     );
@@ -109,15 +109,15 @@ export default function InputPage() {
 
   if (alreadyCompleted) {
     return (
-      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
         <div className="max-w-md mx-auto text-center animate-fade-up">
           <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-[#111827] mb-2">今日の記入は完了済みです</h2>
-          <p className="text-[#6B7280] text-sm mb-8">朝の意図と夕方の振り返りが記入されています</p>
+          <h2 className="text-xl font-semibold text-[#1A1A2E] mb-2">今日の記入は完了済みです</h2>
+          <p className="text-[#5B5560] text-sm mb-8">朝の意図と夕方の振り返りが記入されています</p>
           <button
             onClick={() => router.push(`/p/${token}`)}
             className="btn-primary w-full py-3.5 text-sm"
@@ -184,15 +184,15 @@ export default function InputPage() {
 
   if (completed) {
     return (
-      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
         <div className="max-w-md mx-auto text-center animate-scale-in">
           <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-[#111827] mb-2">記入完了</h2>
-          <p className="text-[#6B7280] text-sm mb-8">いい気づきですね</p>
+          <h2 className="text-xl font-semibold text-[#1A1A2E] mb-2">記入完了</h2>
+          <p className="text-[#5B5560] text-sm mb-8">いい気づきですね</p>
           <button
             onClick={() => router.push(`/p/${token}`)}
             className="btn-primary w-full py-3.5 text-sm"
@@ -205,7 +205,7 @@ export default function InputPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] pb-32">
+    <div className="min-h-screen bg-[#F5F0EB] pb-32">
       {/* Header */}
       <div className="gradient-header text-white px-6 pt-12 pb-6 rounded-b-[2rem]">
         <div className="max-w-md mx-auto relative z-10">
@@ -236,10 +236,10 @@ export default function InputPage() {
         {/* Progress Bar */}
         <div className="flex gap-2 mb-8">
           <div className={`flex-1 h-1 rounded-full transition-colors duration-300 ${
-            step >= 1 ? "bg-[#4338CA]" : "bg-[#E5E7EB]"
+            step >= 1 ? "bg-[#1A1A2E]" : "bg-[#E5DCD0]"
           }`}></div>
           <div className={`flex-1 h-1 rounded-full transition-colors duration-300 ${
-            step >= 2 ? "bg-[#4338CA]" : "bg-[#E5E7EB]"
+            step >= 2 ? "bg-[#1A1A2E]" : "bg-[#E5DCD0]"
           }`}></div>
         </div>
 
@@ -247,9 +247,9 @@ export default function InputPage() {
         {step === 1 && (
           <div className="space-y-4">
             {!isMorning && todayLog && (
-              <div className="bg-[#EEF2FF] border border-indigo-100 p-4 rounded-2xl">
-                <p className="text-[10px] text-[#6366F1] font-medium tracking-wide uppercase mb-1">今朝の意図</p>
-                <p className="text-sm text-[#111827] leading-relaxed">{todayLog.morningIntent}</p>
+              <div className="bg-[#F2F2F7] border border-indigo-100 p-4 rounded-2xl">
+                <p className="text-[10px] text-[#4D4D6D] font-medium tracking-wide uppercase mb-1">今朝の意図</p>
+                <p className="text-sm text-[#1A1A2E] leading-relaxed">{todayLog.morningIntent}</p>
               </div>
             )}
             <textarea
@@ -262,7 +262,7 @@ export default function InputPage() {
               }
               className="input-field min-h-[200px] resize-none leading-relaxed"
             />
-            <p className="text-[11px] text-[#D1D5DB] text-right">
+            <p className="text-[11px] text-[#C9BDAE] text-right">
               {(isMorning ? morning : evening).length} 文字
             </p>
           </div>
@@ -271,7 +271,7 @@ export default function InputPage() {
         {/* Step 2: Energy Selector */}
         {step === 2 && (
           <div className="space-y-4">
-            <p className="text-[#111827] font-medium text-sm mb-2">今日のエネルギーレベルは？</p>
+            <p className="text-[#1A1A2E] font-medium text-sm mb-2">今日のエネルギーレベルは？</p>
             <div className="grid grid-cols-2 gap-3">
               {energyOptions.map((option) => (
                 <button
@@ -280,11 +280,11 @@ export default function InputPage() {
                   className={`p-4 rounded-2xl border-2 transition-all duration-200 ${
                     energy === option.id
                       ? `${option.border} ${option.bg} ring-2 ${option.ring}`
-                      : "border-[#E5E7EB] bg-white hover:border-[#D1D5DB]"
+                      : "border-[#E5DCD0] bg-white hover:border-[#C9BDAE]"
                   }`}
                 >
                   <div className="text-2xl mx-auto mb-2">{option.emoji}</div>
-                  <div className="text-sm font-medium text-[#111827]">{option.label}</div>
+                  <div className="text-sm font-medium text-[#1A1A2E]">{option.label}</div>
                 </button>
               ))}
             </div>

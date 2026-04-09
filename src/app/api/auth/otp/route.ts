@@ -45,17 +45,17 @@ function buildOTPEmail(name: string, code: string): { subject: string; html: str
     subject: "【CORE Log】メール認証コード",
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-        <div style="background: linear-gradient(135deg, #5B4FD6, #7C6FEA); border-radius: 12px; padding: 24px; color: white; text-align: center; margin-bottom: 24px;">
+        <div style="background: linear-gradient(135deg, #1A1A2E, #2C2C4A); border-radius: 12px; padding: 24px; color: white; text-align: center; margin-bottom: 24px;">
           <h1 style="margin: 0; font-size: 24px;">🔐 メール認証</h1>
           <p style="margin: 8px 0 0; opacity: 0.8;">CORE Log</p>
         </div>
         <p>${name}さん</p>
         <p>CORE Logへのアクセスが確認されました。<br>
         以下の認証コードを使用して、メール認証を完了してください。</p>
-        <div style="background: #EEF2FF; border: 2px solid #5B4FD6; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0;">
-          <div style="font-size: 14px; color: #6B7280; font-weight: 500; letter-spacing: 2px; margin-bottom: 8px;">認証コード</div>
-          <div style="font-size: 32px; font-weight: bold; color: #4338CA; letter-spacing: 4px; font-family: monospace;">${code}</div>
-          <div style="font-size: 12px; color: #9CA3AF; margin-top: 8px;">有効期限: 10分</div>
+        <div style="background: #F2F2F7; border: 2px solid #1A1A2E; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0;">
+          <div style="font-size: 14px; color: #5B5560; font-weight: 500; letter-spacing: 2px; margin-bottom: 8px;">認証コード</div>
+          <div style="font-size: 32px; font-weight: bold; color: #1A1A2E; letter-spacing: 4px; font-family: monospace;">${code}</div>
+          <div style="font-size: 12px; color: #8B8489; margin-top: 8px;">有効期限: 10分</div>
         </div>
         <p style="color: #666; font-size: 13px;">このコードは10分間有効です。有効期限を過ぎた場合は、新しいコードをリクエストしてください。</p>
         <p style="color: #666; font-size: 13px;">このメールに心当たりがない場合は、削除してください。</p>

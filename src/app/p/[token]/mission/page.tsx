@@ -208,24 +208,24 @@ export default function MissionPage() {
 
   const getStatusStyle = (status: string) => {
     if (status === "完了" || status === "completed") return { bg: "bg-emerald-50", text: "text-emerald-600", dot: "bg-emerald-500", label: "完了" };
-    if (status === "進行中" || status === "in_progress") return { bg: "bg-indigo-50", text: "text-[#4338CA]", dot: "bg-[#4338CA]", label: "進行中" };
-    return { bg: "bg-gray-50", text: "text-[#9CA3AF]", dot: "bg-[#D1D5DB]", label: "未着手" };
+    if (status === "進行中" || status === "in_progress") return { bg: "bg-indigo-50", text: "text-[#1A1A2E]", dot: "bg-[#1A1A2E]", label: "進行中" };
+    return { bg: "bg-gray-50", text: "text-[#8B8489]", dot: "bg-[#C9BDAE]", label: "未着手" };
   };
 
   if (notFound) {
     return (
-      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
-        <p className="text-[#6B7280] text-sm">ページを読み込めませんでした</p>
+      <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
+        <p className="text-[#5B5560] text-sm">ページを読み込めませんでした</p>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-[#4338CA] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-[#9CA3AF] text-sm">データを準備しています...</p>
+          <div className="w-8 h-8 border-2 border-[#1A1A2E] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-[#8B8489] text-sm">データを準備しています...</p>
         </div>
       </div>
     );
@@ -244,13 +244,13 @@ export default function MissionPage() {
     return (
       <div className="card overflow-hidden">
         <div
-          className="p-4 cursor-pointer hover:bg-[#FAFAFA] transition-colors"
+          className="p-4 cursor-pointer hover:bg-[#FBF8F4] transition-colors"
           onClick={() => setExpandedMission(isExpanded ? null : mission.id)}
         >
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h3 className="font-medium text-sm text-[#111827] mb-2 leading-snug">{mission.title}</h3>
-              <div className="flex gap-3 text-[11px] text-[#9CA3AF]">
+              <h3 className="font-medium text-sm text-[#1A1A2E] mb-2 leading-snug">{mission.title}</h3>
+              <div className="flex gap-3 text-[11px] text-[#8B8489]">
                 {mission.setDate && <span>開始: {formatDate(mission.setDate)}</span>}
                 {mission.deadline && <span>期限: {formatDate(mission.deadline)}</span>}
               </div>
@@ -268,10 +268,10 @@ export default function MissionPage() {
                   {statusStyle.label}
                 </span>
                 {missionsWithManagerComments.has(mission.id) && (
-                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-[#4338CA] rounded-full"></div>
+                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-[#1A1A2E] rounded-full"></div>
                 )}
               </div>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9BDAE" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
                 className={`transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`}>
                 <polyline points="9 18 15 12 9 6"/>
               </svg>
@@ -280,25 +280,25 @@ export default function MissionPage() {
         </div>
 
         {isExpanded && (
-          <div className="px-4 pb-4 space-y-3 border-t border-[#F3F4F6]">
+          <div className="px-4 pb-4 space-y-3 border-t border-[#EFE8DD]">
             {mission.purpose && (
-              <div className="bg-[#F9FAFB] p-3 rounded-xl border border-[#F3F4F6] mt-3">
-                <p className="text-[10px] font-medium text-[#9CA3AF] tracking-wide uppercase mb-1">背景・目的</p>
-                <p className="text-sm text-[#374151] leading-relaxed">{mission.purpose}</p>
+              <div className="bg-[#F5F0EB] p-3 rounded-xl border border-[#EFE8DD] mt-3">
+                <p className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase mb-1">背景・目的</p>
+                <p className="text-sm text-[#2C2C4A] leading-relaxed">{mission.purpose}</p>
               </div>
             )}
 
             {mission.reviewMemo && (
-              <div className="bg-[#F9FAFB] p-3 rounded-xl border border-[#F3F4F6]">
-                <p className="text-[10px] font-medium text-[#9CA3AF] tracking-wide uppercase mb-1">中間レビューメモ</p>
-                <p className="text-sm text-[#374151] leading-relaxed">{mission.reviewMemo}</p>
+              <div className="bg-[#F5F0EB] p-3 rounded-xl border border-[#EFE8DD]">
+                <p className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase mb-1">中間レビューメモ</p>
+                <p className="text-sm text-[#2C2C4A] leading-relaxed">{mission.reviewMemo}</p>
               </div>
             )}
 
             {mission.finalReview && (
               <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100">
                 <p className="text-[10px] font-medium text-emerald-600 tracking-wide uppercase mb-1">最終振り返り</p>
-                <p className="text-sm text-[#374151] leading-relaxed">{mission.finalReview}</p>
+                <p className="text-sm text-[#2C2C4A] leading-relaxed">{mission.finalReview}</p>
               </div>
             )}
 
@@ -310,7 +310,7 @@ export default function MissionPage() {
                     <button
                       onClick={(e) => { e.stopPropagation(); handleStatusChange(mission.id, "進行中"); }}
                       disabled={updatingStatus === mission.id}
-                      className="text-xs bg-[#4338CA] text-white px-3.5 py-2 rounded-xl hover:bg-[#3730A3] disabled:opacity-50 transition-colors"
+                      className="text-xs bg-[#1A1A2E] text-white px-3.5 py-2 rounded-xl hover:bg-[#141423] disabled:opacity-50 transition-colors"
                     >
                       {updatingStatus === mission.id ? "更新中..." : "着手する"}
                     </button>
@@ -328,14 +328,14 @@ export default function MissionPage() {
                         value={closeReview}
                         onChange={(e) => setCloseReview(e.target.value)}
                         placeholder="振り返りコメント（任意）"
-                        className="w-full text-xs border border-[#E5E7EB] rounded-xl p-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400 bg-white transition-all"
+                        className="w-full text-xs border border-[#E5DCD0] rounded-xl p-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400 bg-white transition-all"
                         rows={2}
                         onClick={(e) => e.stopPropagation()}
                       />
                       <div className="flex gap-2 justify-end">
                         <button
                           onClick={(e) => { e.stopPropagation(); setClosingMission(null); setCloseReview(""); }}
-                          className="text-xs text-[#9CA3AF] px-2 py-1"
+                          className="text-xs text-[#8B8489] px-2 py-1"
                         >
                           キャンセル
                         </button>
@@ -354,7 +354,7 @@ export default function MissionPage() {
                 <button
                   onClick={(e) => { e.stopPropagation(); handleStatusChange(mission.id, "進行中"); }}
                   disabled={updatingStatus === mission.id}
-                  className="text-xs bg-[#4338CA] text-white px-3.5 py-2 rounded-xl hover:bg-[#3730A3] disabled:opacity-50 transition-colors"
+                  className="text-xs bg-[#1A1A2E] text-white px-3.5 py-2 rounded-xl hover:bg-[#141423] disabled:opacity-50 transition-colors"
                 >
                   {updatingStatus === mission.id ? "更新中..." : "再開する"}
                 </button>
@@ -362,13 +362,13 @@ export default function MissionPage() {
             </div>
 
             {/* Comments */}
-            <div className="border-t border-[#F3F4F6] pt-3 mt-3">
-              <h4 className="text-[10px] font-medium text-[#9CA3AF] tracking-wide uppercase mb-2">コメント</h4>
+            <div className="border-t border-[#EFE8DD] pt-3 mt-3">
+              <h4 className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase mb-2">コメント</h4>
 
               {isLoadingComments ? (
-                <div className="text-xs text-[#D1D5DB] text-center py-2">読み込み中...</div>
+                <div className="text-xs text-[#C9BDAE] text-center py-2">読み込み中...</div>
               ) : missionComments.length === 0 ? (
-                <div className="text-xs text-[#D1D5DB] text-center py-2">まだコメントはありません</div>
+                <div className="text-xs text-[#C9BDAE] text-center py-2">まだコメントはありません</div>
               ) : (
                 <div className="space-y-2 max-h-60 overflow-y-auto mb-3">
                   {missionComments.map((c) => (
@@ -381,12 +381,12 @@ export default function MissionPage() {
                       }`}
                     >
                       <div className="flex items-center gap-1.5 mb-1">
-                        <span className={`font-medium ${c.authorRole === "manager" ? "text-amber-600" : "text-[#4338CA]"}`}>
+                        <span className={`font-medium ${c.authorRole === "manager" ? "text-amber-600" : "text-[#1A1A2E]"}`}>
                           {c.authorName}
                         </span>
-                        <span className="text-[#D1D5DB] text-[10px]">{formatCommentTime(c.createdAt)}</span>
+                        <span className="text-[#C9BDAE] text-[10px]">{formatCommentTime(c.createdAt)}</span>
                       </div>
-                      <p className="text-[#374151] leading-relaxed">{c.body}</p>
+                      <p className="text-[#2C2C4A] leading-relaxed">{c.body}</p>
                     </div>
                   ))}
                 </div>
@@ -398,7 +398,7 @@ export default function MissionPage() {
                   value={commentText[mission.id] || ""}
                   onChange={(e) => setCommentText((prev) => ({ ...prev, [mission.id]: e.target.value }))}
                   placeholder="コメントを入力..."
-                  className="flex-1 text-xs border border-[#E5E7EB] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#4338CA]/10 focus:border-[#4338CA] bg-white transition-all"
+                  className="flex-1 text-xs border border-[#E5DCD0] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 focus:border-[#1A1A2E] bg-white transition-all"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -409,7 +409,7 @@ export default function MissionPage() {
                 <button
                   onClick={() => handleSendComment(mission.id)}
                   disabled={sendingComment[mission.id] || !commentText[mission.id]?.trim()}
-                  className="text-xs bg-[#111827] text-white rounded-xl px-3.5 py-2.5 hover:bg-[#1F2937] disabled:bg-[#D1D5DB] disabled:text-[#9CA3AF] transition-colors"
+                  className="text-xs bg-[#1A1A2E] text-white rounded-xl px-3.5 py-2.5 hover:bg-[#141423] disabled:bg-[#C9BDAE] disabled:text-[#8B8489] transition-colors"
                 >
                   {sendingComment[mission.id] ? "..." : "送信"}
                 </button>
@@ -422,7 +422,7 @@ export default function MissionPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] pb-24">
+    <div className="min-h-screen bg-[#F5F0EB] pb-24">
       {/* Header */}
       <div className="gradient-header text-white px-6 pt-12 pb-6 rounded-b-[2rem]">
         <div className="max-w-md mx-auto relative z-10">
@@ -436,7 +436,7 @@ export default function MissionPage() {
         {!showCreateForm && (
           <button
             onClick={() => setShowCreateForm(true)}
-            className="w-full mb-5 flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-[#E5E7EB] text-sm text-[#6B7280] hover:border-[#4338CA] hover:text-[#4338CA] transition-colors"
+            className="w-full mb-5 flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-[#E5DCD0] text-sm text-[#5B5560] hover:border-[#1A1A2E] hover:text-[#1A1A2E] transition-colors"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -448,48 +448,48 @@ export default function MissionPage() {
         {/* Create Form */}
         {showCreateForm && (
           <div className="card p-5 mb-5">
-            <h3 className="font-semibold text-sm text-[#111827] mb-4">新しいミッションを設定</h3>
+            <h3 className="font-semibold text-sm text-[#1A1A2E] mb-4">新しいミッションを設定</h3>
             <div className="space-y-3">
               <div>
-                <label className="text-[10px] font-medium text-[#9CA3AF] tracking-wide uppercase block mb-1.5">ミッション名 *</label>
+                <label className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase block mb-1.5">ミッション名 *</label>
                 <input
                   type="text"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="例: Q3営業戦略の提案書を自力で完成させる"
-                  className="w-full text-sm border border-[#E5E7EB] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#4338CA]/10 focus:border-[#4338CA] bg-white transition-all"
+                  className="w-full text-sm border border-[#E5DCD0] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 focus:border-[#1A1A2E] bg-white transition-all"
                 />
               </div>
               <div>
-                <label className="text-[10px] font-medium text-[#9CA3AF] tracking-wide uppercase block mb-1.5">背景・目的</label>
+                <label className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase block mb-1.5">背景・目的</label>
                 <textarea
                   value={newPurpose}
                   onChange={(e) => setNewPurpose(e.target.value)}
                   placeholder="このミッションを設定する背景や、達成に向けた期待を記入"
-                  className="w-full text-sm border border-[#E5E7EB] rounded-xl px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-[#4338CA]/10 focus:border-[#4338CA] bg-white transition-all"
+                  className="w-full text-sm border border-[#E5DCD0] rounded-xl px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 focus:border-[#1A1A2E] bg-white transition-all"
                   rows={3}
                 />
               </div>
               <div>
-                <label className="text-[10px] font-medium text-[#9CA3AF] tracking-wide uppercase block mb-1.5">達成期限</label>
+                <label className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase block mb-1.5">達成期限</label>
                 <input
                   type="date"
                   value={newDeadline}
                   onChange={(e) => setNewDeadline(e.target.value)}
-                  className="text-sm border border-[#E5E7EB] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#4338CA]/10 focus:border-[#4338CA] bg-white transition-all"
+                  className="text-sm border border-[#E5DCD0] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 focus:border-[#1A1A2E] bg-white transition-all"
                 />
               </div>
               <div className="flex gap-2 justify-end pt-1">
                 <button
                   onClick={() => { setShowCreateForm(false); setNewTitle(""); setNewPurpose(""); setNewDeadline(""); }}
-                  className="text-xs text-[#9CA3AF] hover:text-[#6B7280] px-3 py-2 transition-colors"
+                  className="text-xs text-[#8B8489] hover:text-[#5B5560] px-3 py-2 transition-colors"
                 >
                   キャンセル
                 </button>
                 <button
                   onClick={handleCreate}
                   disabled={creating || !newTitle.trim()}
-                  className="text-xs bg-[#111827] text-white rounded-xl px-4 py-2 hover:bg-[#1F2937] disabled:bg-[#D1D5DB] disabled:text-[#9CA3AF] transition-colors"
+                  className="text-xs bg-[#1A1A2E] text-white rounded-xl px-4 py-2 hover:bg-[#141423] disabled:bg-[#C9BDAE] disabled:text-[#8B8489] transition-colors"
                 >
                   {creating ? "作成中..." : "ミッションを設定"}
                 </button>
@@ -500,20 +500,20 @@ export default function MissionPage() {
 
         {missions.length === 0 && !showCreateForm ? (
           <div className="text-center py-12">
-            <div className="w-12 h-12 bg-[#F3F4F6] rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <div className="w-12 h-12 bg-[#EFE8DD] rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8B8489" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
               </svg>
             </div>
-            <p className="text-[#6B7280] text-sm mb-1">ミッションはまだありません</p>
-            <p className="text-xs text-[#D1D5DB]">上のボタンから自分でミッションを設定できます</p>
+            <p className="text-[#5B5560] text-sm mb-1">ミッションはまだありません</p>
+            <p className="text-xs text-[#C9BDAE]">上のボタンから自分でミッションを設定できます</p>
           </div>
         ) : missions.length > 0 ? (
           <div className="space-y-6">
             {inProgress.length > 0 && (
               <section>
-                <h2 className="text-xs font-semibold text-[#6B7280] tracking-wide uppercase mb-3 flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 bg-[#4338CA] rounded-full"></div>
+                <h2 className="text-xs font-semibold text-[#5B5560] tracking-wide uppercase mb-3 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-[#1A1A2E] rounded-full"></div>
                   進行中 ({inProgress.length})
                 </h2>
                 <div className="space-y-2">
@@ -524,8 +524,8 @@ export default function MissionPage() {
 
             {notStarted.length > 0 && (
               <section>
-                <h2 className="text-xs font-semibold text-[#6B7280] tracking-wide uppercase mb-3 flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 bg-[#D1D5DB] rounded-full"></div>
+                <h2 className="text-xs font-semibold text-[#5B5560] tracking-wide uppercase mb-3 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-[#C9BDAE] rounded-full"></div>
                   未着手 ({notStarted.length})
                 </h2>
                 <div className="space-y-2">
@@ -536,7 +536,7 @@ export default function MissionPage() {
 
             {completed.length > 0 && (
               <section>
-                <h2 className="text-xs font-semibold text-[#6B7280] tracking-wide uppercase mb-3 flex items-center gap-2">
+                <h2 className="text-xs font-semibold text-[#5B5560] tracking-wide uppercase mb-3 flex items-center gap-2">
                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
                   完了 ({completed.length})
                 </h2>

@@ -194,16 +194,16 @@ async function sendManagerNudge(
         subject: `【CORE Log】${participantNames.length}名の部下に最近コメントがありません`,
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-            <div style="background: linear-gradient(135deg, #E8833A, #F5A623); border-radius: 12px; padding: 20px; color: white; text-align: center; margin-bottom: 24px;">
+            <div style="background: linear-gradient(135deg, #C17817, #C17817); border-radius: 12px; padding: 20px; color: white; text-align: center; margin-bottom: 24px;">
               <h1 style="margin: 0; font-size: 20px;">💬 コメントリマインド</h1>
             </div>
             <p>${managerName}さん</p>
             <p>以下の部下に3日以上コメントがありません。<br>一言でも声かけがあると、日報の継続率が大きく変わります。</p>
-            <div style="background: #FFF7ED; border-left: 4px solid #E8833A; padding: 12px 16px; margin: 16px 0; border-radius: 4px;">
+            <div style="background: #F5E5BF; border-left: 4px solid #C17817; padding: 12px 16px; margin: 16px 0; border-radius: 4px;">
               <p style="margin: 0; color: #9A3412; font-size: 14px;">${nameList}</p>
             </div>
             <div style="text-align: center; margin: 24px 0;">
-              <a href="${url}" style="display: inline-block; background: #E8833A; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
+              <a href="${url}" style="display: inline-block; background: #C17817; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
                 ダッシュボードを開く →
               </a>
             </div>
@@ -241,9 +241,9 @@ async function sendWeeklySummary(
     .map(
       (s) => `
     <tr>
-      <td style="padding: 8px 12px; border-bottom: 1px solid #f0f0f0; font-size: 14px;">${s.name}</td>
-      <td style="padding: 8px 12px; border-bottom: 1px solid #f0f0f0; text-align: center; font-size: 14px;">${s.entryDays}/5日</td>
-      <td style="padding: 8px 12px; border-bottom: 1px solid #f0f0f0; text-align: center; font-size: 14px;">${s.streak}日連続</td>
+      <td style="padding: 8px 12px; border-bottom: 1px solid #EFE8DD; font-size: 14px;">${s.name}</td>
+      <td style="padding: 8px 12px; border-bottom: 1px solid #EFE8DD; text-align: center; font-size: 14px;">${s.entryDays}/5日</td>
+      <td style="padding: 8px 12px; border-bottom: 1px solid #EFE8DD; text-align: center; font-size: 14px;">${s.streak}日連続</td>
     </tr>
   `
     )
@@ -262,7 +262,7 @@ async function sendWeeklySummary(
         subject: "【CORE Log】今週の週次サマリー",
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-            <div style="background: linear-gradient(135deg, #4338CA, #5B4FD6); border-radius: 12px; padding: 20px; color: white; text-align: center; margin-bottom: 24px;">
+            <div style="background: linear-gradient(135deg, #1A1A2E, #1A1A2E); border-radius: 12px; padding: 20px; color: white; text-align: center; margin-bottom: 24px;">
               <h1 style="margin: 0; font-size: 20px;">📊 週次サマリー</h1>
               <p style="margin: 8px 0 0; opacity: 0.8; font-size: 14px;">今週の振り返り</p>
             </div>
@@ -270,16 +270,16 @@ async function sendWeeklySummary(
             <p>担当する部下の今週の状況をお伝えします。</p>
             <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
               <thead>
-                <tr style="background: #F9FAFB;">
-                  <th style="padding: 8px 12px; text-align: left; font-size: 12px; color: #6B7280;">名前</th>
-                  <th style="padding: 8px 12px; text-align: center; font-size: 12px; color: #6B7280;">今週記入</th>
-                  <th style="padding: 8px 12px; text-align: center; font-size: 12px; color: #6B7280;">連続記入</th>
+                <tr style="background: #F5F0EB;">
+                  <th style="padding: 8px 12px; text-align: left; font-size: 12px; color: #5B5560;">名前</th>
+                  <th style="padding: 8px 12px; text-align: center; font-size: 12px; color: #5B5560;">今週記入</th>
+                  <th style="padding: 8px 12px; text-align: center; font-size: 12px; color: #5B5560;">連続記入</th>
                 </tr>
               </thead>
               <tbody>${statsRows}</tbody>
             </table>
             <div style="text-align: center; margin: 24px 0;">
-              <a href="${url}" style="display: inline-block; background: #4338CA; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
+              <a href="${url}" style="display: inline-block; background: #1A1A2E; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
                 詳細を確認する →
               </a>
             </div>

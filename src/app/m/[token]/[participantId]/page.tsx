@@ -57,7 +57,7 @@ export default async function ParticipantDetailPage({ params }: Params) {
   }
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB]">
+    <div className="min-h-screen bg-[#F5F0EB]">
       {/* Header */}
       <header className="gradient-header-manager text-white px-5 pt-12 pb-6">
         <div className="max-w-2xl mx-auto relative z-10">
@@ -84,35 +84,35 @@ export default async function ParticipantDetailPage({ params }: Params) {
 
         {/* Log Entries */}
         <section className="card overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#F3F4F6]">
-            <h2 className="text-xs font-semibold text-[#6B7280] tracking-wide uppercase">日報一覧</h2>
+          <div className="px-5 py-4 border-b border-[#EFE8DD]">
+            <h2 className="text-xs font-semibold text-[#5B5560] tracking-wide uppercase">日報一覧</h2>
           </div>
           {logs.length === 0 ? (
-            <div className="p-8 text-center text-[#9CA3AF] text-sm">まだ日報がありません</div>
+            <div className="p-8 text-center text-[#8B8489] text-sm">まだ日報がありません</div>
           ) : (
-            <div className="divide-y divide-[#F3F4F6]">
+            <div className="divide-y divide-[#EFE8DD]">
               {logs.map((entry: NotionLogEntry) => (
                 <div key={entry.id} className="p-4">
                   <div className="flex justify-between items-center mb-2.5">
-                    <span className="text-sm font-medium text-[#111827]">
+                    <span className="text-sm font-medium text-[#1A1A2E]">
                       {entry.datetime ? (() => { const d = new Date(entry.datetime); return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`; })() : entry.date}（{entry.dayOfWeek}）
                     </span>
                     {entry.energy && (
                       <div className="flex items-center gap-1.5">
                         <span className="text-base leading-none">{energyEmoji[entry.energy] || ""}</span>
-                        <span className="text-[11px] text-[#9CA3AF]">{energyLabel[entry.energy] || ""}</span>
+                        <span className="text-[11px] text-[#8B8489]">{energyLabel[entry.energy] || ""}</span>
                       </div>
                     )}
                   </div>
                   {entry.morningIntent && (
                     <div className="mb-2">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-[10px] font-medium text-[#4338CA] tracking-wide uppercase">朝の意図</span>
+                        <span className="text-[10px] font-medium text-[#1A1A2E] tracking-wide uppercase">朝の意図</span>
                         {entry.morningTime && (
-                          <span className="text-[10px] text-[#D1D5DB]">{formatTime(entry.morningTime)}</span>
+                          <span className="text-[10px] text-[#C9BDAE]">{formatTime(entry.morningTime)}</span>
                         )}
                       </div>
-                      <p className="text-xs text-[#374151] leading-relaxed">{entry.morningIntent}</p>
+                      <p className="text-xs text-[#2C2C4A] leading-relaxed">{entry.morningIntent}</p>
                     </div>
                   )}
                   {entry.eveningInsight && (
@@ -120,16 +120,16 @@ export default async function ParticipantDetailPage({ params }: Params) {
                       <div className="flex items-center gap-2 mb-0.5">
                         <span className="text-[10px] font-medium text-amber-600 tracking-wide uppercase">夕の気づき</span>
                         {entry.eveningTime && (
-                          <span className="text-[10px] text-[#D1D5DB]">{formatTime(entry.eveningTime)}</span>
+                          <span className="text-[10px] text-[#C9BDAE]">{formatTime(entry.eveningTime)}</span>
                         )}
                       </div>
-                      <p className="text-xs text-[#374151] leading-relaxed">{entry.eveningInsight}</p>
+                      <p className="text-xs text-[#2C2C4A] leading-relaxed">{entry.eveningInsight}</p>
                     </div>
                   )}
                   {entry.hmFeedback && (
                     <div className="bg-amber-50 border border-amber-100 rounded-xl p-2.5 mt-2">
                       <span className="text-[10px] font-medium text-amber-600 tracking-wide">HM FB</span>
-                      <p className="text-xs text-[#374151] mt-0.5 leading-relaxed">{entry.hmFeedback}</p>
+                      <p className="text-xs text-[#2C2C4A] mt-0.5 leading-relaxed">{entry.hmFeedback}</p>
                     </div>
                   )}
                   <CommentForm

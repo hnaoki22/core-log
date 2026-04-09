@@ -127,10 +127,10 @@ export default function FeatureFlagsAdminPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-10 h-10 border-[3px] border-[#4338CA] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-[#9CA3AF] text-sm">読み込み中...</p>
+          <div className="w-10 h-10 border-[3px] border-[#1A1A2E] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-[#8B8489] text-sm">読み込み中...</p>
         </div>
       </div>
     );
@@ -138,10 +138,10 @@ export default function FeatureFlagsAdminPage() {
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
         <div className="text-center max-w-md">
-          <p className="text-[#6B7280] mb-4">{message?.text || "読み込めませんでした"}</p>
-          <Link href={`/a/${token}`} className="text-[#4338CA] font-medium hover:underline text-sm">
+          <p className="text-[#5B5560] mb-4">{message?.text || "読み込めませんでした"}</p>
+          <Link href={`/a/${token}`} className="text-[#1A1A2E] font-medium hover:underline text-sm">
             管理画面に戻る
           </Link>
         </div>
@@ -156,9 +156,9 @@ export default function FeatureFlagsAdminPage() {
   for (const f of data.catalog) grouped[f.category].push(f);
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] pb-32">
+    <div className="min-h-screen bg-[#F5F0EB] pb-32">
       {/* Header */}
-      <div className="bg-gradient-to-br from-[#1E1B4B] via-[#312E81] to-[#4338CA] text-white px-6 pt-10 pb-8">
+      <div className="bg-gradient-to-br from-[#040408] via-[#080810] to-[#1A1A2E] text-white px-6 pt-10 pb-8">
         <div className="max-w-5xl mx-auto">
           <div className="flex items-center justify-between mb-2">
             <Link href={`/a/${token}`} className="text-indigo-200 text-xs hover:text-white transition">
@@ -183,8 +183,8 @@ export default function FeatureFlagsAdminPage() {
       <div className="max-w-5xl mx-auto px-5 mt-6 space-y-4">
         {/* Presets */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-          <h2 className="text-sm font-semibold text-[#111827] mb-1">プリセット(ワンクリック適用)</h2>
-          <p className="text-xs text-[#6B7280] mb-4">
+          <h2 className="text-sm font-semibold text-[#1A1A2E] mb-1">プリセット(ワンクリック適用)</h2>
+          <p className="text-xs text-[#5B5560] mb-4">
             よく使う構成をワンクリックで適用できます。個別調整は下のセクションで。
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -193,10 +193,10 @@ export default function FeatureFlagsAdminPage() {
                 key={p.id}
                 onClick={() => applyPreset(p.id)}
                 disabled={saving}
-                className="text-left p-4 rounded-xl border border-gray-200 hover:border-[#4338CA] hover:bg-indigo-50/40 transition disabled:opacity-50"
+                className="text-left p-4 rounded-xl border border-gray-200 hover:border-[#1A1A2E] hover:bg-indigo-50/40 transition disabled:opacity-50"
               >
-                <div className="font-semibold text-sm text-[#111827] mb-1">{p.label}</div>
-                <div className="text-xs text-[#6B7280] leading-relaxed">{p.description}</div>
+                <div className="font-semibold text-sm text-[#1A1A2E] mb-1">{p.label}</div>
+                <div className="text-xs text-[#5B5560] leading-relaxed">{p.description}</div>
               </button>
             ))}
           </div>
@@ -233,15 +233,15 @@ export default function FeatureFlagsAdminPage() {
                     {meta.label}
                   </span>
                   <div>
-                    <div className="text-xs text-[#6B7280]">{meta.desc}</div>
+                    <div className="text-xs text-[#5B5560]">{meta.desc}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-[#9CA3AF] font-mono">
+                  <span className="text-xs text-[#8B8489] font-mono">
                     {enabledCount}/{items.length} ON
                   </span>
                   <svg
-                    className={`w-4 h-4 text-[#9CA3AF] transition-transform ${isCollapsed ? "" : "rotate-180"}`}
+                    className={`w-4 h-4 text-[#8B8489] transition-transform ${isCollapsed ? "" : "rotate-180"}`}
                     fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
                   >
                     <polyline points="6 9 12 15 18 9" />
@@ -262,7 +262,7 @@ export default function FeatureFlagsAdminPage() {
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="text-sm font-semibold text-[#111827]">{f.label}</h3>
+                            <h3 className="text-sm font-semibold text-[#1A1A2E]">{f.label}</h3>
                             {!f.implemented && (
                               <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
                                 準備中
@@ -274,9 +274,9 @@ export default function FeatureFlagsAdminPage() {
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-[#6B7280] mt-1 leading-relaxed">{f.description}</p>
+                          <p className="text-xs text-[#5B5560] mt-1 leading-relaxed">{f.description}</p>
                           <div className="mt-1.5 flex items-center gap-3">
-                            <code className="text-[10px] text-[#9CA3AF] font-mono">{f.key}</code>
+                            <code className="text-[10px] text-[#8B8489] font-mono">{f.key}</code>
                             {depMissing.length > 0 && enabled && (
                               <span className="text-[10px] text-amber-600">
                                 ⚠ 依存機能がOFF: {depMissing.join(", ")}
@@ -290,7 +290,7 @@ export default function FeatureFlagsAdminPage() {
                           onClick={() => toggleFlag(f.key)}
                           disabled={disabled}
                           className={`flex-shrink-0 relative w-11 h-6 rounded-full transition-colors ${
-                            enabled ? "bg-[#4338CA]" : "bg-gray-300"
+                            enabled ? "bg-[#1A1A2E]" : "bg-gray-300"
                           } ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}
                           aria-pressed={enabled}
                           aria-label={`${f.label}をトグル`}
@@ -315,19 +315,19 @@ export default function FeatureFlagsAdminPage() {
       {dirty && (
         <div className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 shadow-lg px-5 py-4 z-50">
           <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
-            <p className="text-sm text-[#111827] font-medium">未保存の変更があります</p>
+            <p className="text-sm text-[#1A1A2E] font-medium">未保存の変更があります</p>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => { setFlags(data.flags); setDirty(false); setMessage(null); }}
                 disabled={saving}
-                className="px-4 py-2 text-sm text-[#6B7280] hover:bg-gray-50 rounded-lg transition disabled:opacity-50"
+                className="px-4 py-2 text-sm text-[#5B5560] hover:bg-gray-50 rounded-lg transition disabled:opacity-50"
               >
                 破棄
               </button>
               <button
                 onClick={saveFlags}
                 disabled={saving}
-                className="px-5 py-2 text-sm bg-[#4338CA] text-white font-medium rounded-lg hover:bg-[#3730A3] transition disabled:opacity-50"
+                className="px-5 py-2 text-sm bg-[#1A1A2E] text-white font-medium rounded-lg hover:bg-[#141423] transition disabled:opacity-50"
               >
                 {saving ? "保存中..." : "保存する"}
               </button>

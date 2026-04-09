@@ -61,19 +61,23 @@ const config: Config = {
         burgundy,
         navy,
         gold,
-        // Override cool-tone families → HM burgundy
-        indigo: burgundy,
-        violet: burgundy,
-        purple: burgundy,
-        fuchsia: burgundy,
-        pink: burgundy,
-        rose: burgundy,
-        // Blue family → HM navy
+        // Primary = navy (trust, intelligence). Cool-tone & blue families → navy.
+        indigo: navy,
+        violet: navy,
+        purple: navy,
         blue: navy,
         sky: navy,
         cyan: navy,
-        // Amber (accent) → HM gold
+        slate: navy,
+        // Secondary = burgundy (warmth, brand distinction). Warm-red families → burgundy.
+        rose: burgundy,
+        pink: burgundy,
+        fuchsia: burgundy,
+        red: burgundy,
+        // Tertiary = gold (premium accent).
         amber: gold,
+        yellow: gold,
+        orange: gold,
       },
     },
   },

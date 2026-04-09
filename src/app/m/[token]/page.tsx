@@ -59,10 +59,10 @@ export default function ManagerHome() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-[#4338CA] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-[#9CA3AF] text-sm">読み込み中...</p>
+          <div className="w-8 h-8 border-2 border-[#1A1A2E] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-[#8B8489] text-sm">読み込み中...</p>
         </div>
       </div>
     );
@@ -70,10 +70,10 @@ export default function ManagerHome() {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
         <div className="text-center">
-          <p className="text-[#6B7280] mb-4">{error || "上司が見つかりません"}</p>
-          <a href="/" className="text-[#4338CA] font-medium hover:underline">ホームに戻る</a>
+          <p className="text-[#5B5560] mb-4">{error || "上司が見つかりません"}</p>
+          <a href="/" className="text-[#1A1A2E] font-medium hover:underline">ホームに戻る</a>
         </div>
       </div>
     );
@@ -98,7 +98,7 @@ export default function ManagerHome() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] pb-8">
+    <div className="min-h-screen bg-[#F5F0EB] pb-8">
       {/* Header */}
       <div className="gradient-header-manager text-white px-6 pt-12 pb-6">
         <div className="max-w-md mx-auto relative z-10">
@@ -131,22 +131,22 @@ export default function ManagerHome() {
         {/* Summary Stats */}
         <div className="grid grid-cols-3 gap-2.5">
           <div className="card p-3.5 text-center">
-            <div className="text-2xl font-bold text-[#111827] tracking-tight">{totalParticipants}</div>
-            <div className="text-[10px] text-[#9CA3AF] font-medium tracking-wide mt-0.5">参加者</div>
+            <div className="text-2xl font-bold text-[#1A1A2E] tracking-tight">{totalParticipants}</div>
+            <div className="text-[10px] text-[#8B8489] font-medium tracking-wide mt-0.5">参加者</div>
           </div>
-          <div className="bg-[#EEF2FF] border border-indigo-200 p-3.5 rounded-2xl text-center">
-            <div className="text-2xl font-bold text-[#4338CA] tracking-tight">{avgEntryRate}%</div>
-            <div className="text-[10px] text-[#6366F1] font-medium tracking-wide mt-0.5">平均記入率</div>
+          <div className="bg-[#F2F2F7] border border-indigo-200 p-3.5 rounded-2xl text-center">
+            <div className="text-2xl font-bold text-[#1A1A2E] tracking-tight">{avgEntryRate}%</div>
+            <div className="text-[10px] text-[#4D4D6D] font-medium tracking-wide mt-0.5">平均記入率</div>
           </div>
           <div className="card p-3.5 text-center">
-            <div className="text-2xl font-bold text-[#111827] tracking-tight">{lowEnergyParticipants}</div>
-            <div className="text-[10px] text-[#9CA3AF] font-medium tracking-wide mt-0.5">低エネルギー</div>
+            <div className="text-2xl font-bold text-[#1A1A2E] tracking-tight">{lowEnergyParticipants}</div>
+            <div className="text-[10px] text-[#8B8489] font-medium tracking-wide mt-0.5">低エネルギー</div>
           </div>
         </div>
 
         {/* Participant Cards */}
         <div>
-          <h2 className="text-xs font-semibold text-[#6B7280] tracking-wide uppercase mb-3 px-1">
+          <h2 className="text-xs font-semibold text-[#5B5560] tracking-wide uppercase mb-3 px-1">
             直属部下 ({participants.length}名)
           </h2>
           <div className="space-y-2.5">
@@ -160,18 +160,18 @@ export default function ManagerHome() {
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <h3 className="font-medium text-sm text-[#111827]">{participant.name}</h3>
+                          <h3 className="font-medium text-sm text-[#1A1A2E]">{participant.name}</h3>
                           {participant.todayHasLog && (
-                            <span className="bg-[#4338CA] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">
+                            <span className="bg-[#1A1A2E] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">
                               NEW
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] text-[#9CA3AF] mt-0.5">{participant.department}</p>
+                        <p className="text-[11px] text-[#8B8489] mt-0.5">{participant.department}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className={`w-2 h-2 rounded-full ${status.color}`}></div>
-                        <span className="text-[10px] text-[#9CA3AF]">{status.label}</span>
+                        <span className="text-[10px] text-[#8B8489]">{status.label}</span>
                       </div>
                     </div>
 
@@ -180,28 +180,28 @@ export default function ManagerHome() {
                       <div className="flex-shrink-0">
                         <div className="relative w-11 h-11">
                           <svg viewBox="0 0 36 36" className="w-11 h-11 -rotate-90">
-                            <circle cx="18" cy="18" r="15.5" fill="none" stroke="#F3F4F6" strokeWidth="3" />
-                            <circle cx="18" cy="18" r="15.5" fill="none" stroke="#4338CA" strokeWidth="3"
+                            <circle cx="18" cy="18" r="15.5" fill="none" stroke="#EFE8DD" strokeWidth="3" />
+                            <circle cx="18" cy="18" r="15.5" fill="none" stroke="#1A1A2E" strokeWidth="3"
                               strokeDasharray={`${participant.entryRate * 0.9738} 97.38`}
                               strokeLinecap="round" />
                           </svg>
                           <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="text-[10px] font-bold text-[#111827]">{participant.entryRate}%</span>
+                            <span className="text-[10px] font-bold text-[#1A1A2E]">{participant.entryRate}%</span>
                           </div>
                         </div>
                       </div>
-                      <div className="flex-1 text-xs text-[#6B7280]">
+                      <div className="flex-1 text-xs text-[#5B5560]">
                         <span>{participant.entryDays}日記入</span>
-                        <span className="mx-1.5 text-[#E5E7EB]">|</span>
+                        <span className="mx-1.5 text-[#E5DCD0]">|</span>
                         <span>{participant.streak}連続</span>
                       </div>
                     </div>
 
                     {/* Latest Log */}
                     {participant.latestLog && participant.latestLog.morningIntent && (
-                      <div className="mb-3 p-2.5 bg-[#F9FAFB] rounded-xl border border-[#F3F4F6]">
-                        <p className="text-[10px] text-[#9CA3AF] mb-0.5">最新 ({participant.latestLog.date})</p>
-                        <p className="text-xs text-[#374151] line-clamp-2 leading-relaxed">{participant.latestLog.morningIntent}</p>
+                      <div className="mb-3 p-2.5 bg-[#F5F0EB] rounded-xl border border-[#EFE8DD]">
+                        <p className="text-[10px] text-[#8B8489] mb-0.5">最新 ({participant.latestLog.date})</p>
+                        <p className="text-xs text-[#2C2C4A] line-clamp-2 leading-relaxed">{participant.latestLog.morningIntent}</p>
                       </div>
                     )}
 
@@ -214,7 +214,7 @@ export default function ManagerHome() {
                           </span>
                         ))}
                       </div>
-                      <div className="flex items-center gap-1 text-[10px] text-[#4338CA] font-medium">
+                      <div className="flex items-center gap-1 text-[10px] text-[#1A1A2E] font-medium">
                         <span>詳細</span>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="9 18 15 12 9 6"/>
@@ -229,7 +229,7 @@ export default function ManagerHome() {
         </div>
 
         {/* Footer */}
-        <div className="text-center py-6 text-[11px] text-[#D1D5DB]">
+        <div className="text-center py-6 text-[11px] text-[#C9BDAE]">
           CORE Log — マネージャービュー
         </div>
       </div>

@@ -85,24 +85,24 @@ export default function LogsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-[#4338CA] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-[#9CA3AF] text-sm">データを準備しています...</p>
+          <div className="w-8 h-8 border-2 border-[#1A1A2E] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-[#8B8489] text-sm">データを準備しています...</p>
         </div>
       </div>
     );
   }
 
   const statusConfig = {
-    morning_only: { label: "朝のみ", bg: "bg-indigo-50", text: "text-[#4338CA]" },
+    morning_only: { label: "朝のみ", bg: "bg-indigo-50", text: "text-[#1A1A2E]" },
     complete: { label: "完了", bg: "bg-emerald-50", text: "text-emerald-600" },
     fb_done: { label: "FB済", bg: "bg-amber-50", text: "text-amber-600" },
     empty: { label: "未記入", bg: "bg-gray-50", text: "text-gray-400" },
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] pb-24">
+    <div className="min-h-screen bg-[#F5F0EB] pb-24">
       {/* Header */}
       <div className="gradient-header text-white px-6 pt-12 pb-6 rounded-b-[2rem]">
         <div className="max-w-md mx-auto relative z-10">
@@ -114,13 +114,13 @@ export default function LogsPage() {
       <div className="max-w-md mx-auto px-5 pt-5 animate-fade-up relative z-10">
         {logs.length === 0 ? (
           <div className="text-center py-16">
-            <div className="w-12 h-12 bg-[#F3F4F6] rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <div className="w-12 h-12 bg-[#EFE8DD] rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8B8489" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                 <polyline points="14 2 14 8 20 8"/>
               </svg>
             </div>
-            <p className="text-[#6B7280] text-sm">まだログがありません</p>
+            <p className="text-[#5B5560] text-sm">まだログがありません</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -130,10 +130,10 @@ export default function LogsPage() {
                 <div key={log.id} className="card overflow-hidden">
                   <button
                     onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
-                    className="w-full p-4 flex gap-3 hover:bg-[#FAFAFA] transition-colors text-left"
+                    className="w-full p-4 flex gap-3 hover:bg-[#FBF8F4] transition-colors text-left"
                   >
                     <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-semibold ${
-                      log.hasFeedback ? "bg-amber-500" : "bg-[#4338CA]"
+                      log.hasFeedback ? "bg-amber-500" : "bg-[#1A1A2E]"
                     }`}>
                       <div className="text-center leading-tight">
                         <div className="font-bold text-sm">{log.dayNum}</div>
@@ -141,11 +141,11 @@ export default function LogsPage() {
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-[#111827] font-medium truncate leading-tight">
+                      <p className="text-sm text-[#1A1A2E] font-medium truncate leading-tight">
                         {log.morningIntent || "(未記入)"}
                       </p>
                       <div className="flex items-center gap-2 mt-1.5">
-                        <span className="text-[11px] text-[#9CA3AF]">{formatDateTime(log.datetime, log.date)} ({log.dayOfWeek})</span>
+                        <span className="text-[11px] text-[#8B8489]">{formatDateTime(log.datetime, log.date)} ({log.dayOfWeek})</span>
                         <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${config.bg} ${config.text}`}>
                           {config.label}
                         </span>
@@ -156,7 +156,7 @@ export default function LogsPage() {
                       {log.energy && (
                         <span className="text-base leading-none">{energyEmoji[log.energy]}</span>
                       )}
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9BDAE" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
                         className={`transition-transform duration-200 ${expandedId === log.id ? "rotate-90" : ""}`}>
                         <polyline points="9 18 15 12 9 6"/>
                       </svg>
@@ -165,15 +165,15 @@ export default function LogsPage() {
 
                   {/* Expanded View */}
                   {expandedId === log.id && (
-                    <div className="border-t border-[#F3F4F6] p-4 bg-[#FAFAFA] space-y-3">
+                    <div className="border-t border-[#EFE8DD] p-4 bg-[#FBF8F4] space-y-3">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <p className="text-[10px] font-medium text-[#4338CA] tracking-wide uppercase">朝の意図</p>
+                          <p className="text-[10px] font-medium text-[#1A1A2E] tracking-wide uppercase">朝の意図</p>
                           {log.morningTime && (
-                            <span className="text-[10px] text-[#D1D5DB]">{formatTime(log.morningTime)}</span>
+                            <span className="text-[10px] text-[#C9BDAE]">{formatTime(log.morningTime)}</span>
                           )}
                         </div>
-                        <p className="text-sm text-[#374151] leading-relaxed">{log.morningIntent || "(未記入)"}</p>
+                        <p className="text-sm text-[#2C2C4A] leading-relaxed">{log.morningIntent || "(未記入)"}</p>
                       </div>
 
                       {log.eveningInsight && (
@@ -181,36 +181,36 @@ export default function LogsPage() {
                           <div className="flex items-center gap-2 mb-1">
                             <p className="text-[10px] font-medium text-amber-600 tracking-wide uppercase">夜の振り返り</p>
                             {log.eveningTime && (
-                              <span className="text-[10px] text-[#D1D5DB]">{formatTime(log.eveningTime)}</span>
+                              <span className="text-[10px] text-[#C9BDAE]">{formatTime(log.eveningTime)}</span>
                             )}
                           </div>
-                          <p className="text-sm text-[#374151] leading-relaxed">{log.eveningInsight}</p>
+                          <p className="text-sm text-[#2C2C4A] leading-relaxed">{log.eveningInsight}</p>
                         </div>
                       )}
 
                       {log.energy && (
                         <div className="flex items-center gap-2">
                           <span className="text-base leading-none">{energyEmoji[log.energy]}</span>
-                          <span className="text-xs text-[#6B7280]">{energyLabel[log.energy]}</span>
+                          <span className="text-xs text-[#5B5560]">{energyLabel[log.energy]}</span>
                         </div>
                       )}
 
                       {log.managerComment && (
                         <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-xl">
                           <div className="flex items-center gap-2 mb-1">
-                            <p className="text-[10px] font-medium text-[#4338CA] tracking-wide">上司コメント</p>
+                            <p className="text-[10px] font-medium text-[#1A1A2E] tracking-wide">上司コメント</p>
                             {log.managerCommentTime && (
-                              <span className="text-[10px] text-[#D1D5DB]">{formatTime(log.managerCommentTime)}</span>
+                              <span className="text-[10px] text-[#C9BDAE]">{formatTime(log.managerCommentTime)}</span>
                             )}
                           </div>
-                          <p className="text-sm text-[#374151] leading-relaxed">{log.managerComment}</p>
+                          <p className="text-sm text-[#2C2C4A] leading-relaxed">{log.managerComment}</p>
                         </div>
                       )}
 
                       {log.hmFeedback && (
                         <div className="bg-amber-50 border border-amber-100 p-3 rounded-xl">
                           <p className="text-[10px] font-medium text-amber-600 tracking-wide mb-1">HMフィードバック</p>
-                          <p className="text-sm text-[#374151] leading-relaxed">{log.hmFeedback}</p>
+                          <p className="text-sm text-[#2C2C4A] leading-relaxed">{log.hmFeedback}</p>
                         </div>
                       )}
                     </div>

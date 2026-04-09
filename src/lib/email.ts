@@ -24,7 +24,7 @@ function buildMorningEmail(name: string, token: string) {
     subject: "【CORE Log】おはようございます！今日の意図を記入しましょう",
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-        <div style="background: linear-gradient(135deg, #5B4FD6, #7C6FEA); border-radius: 12px; padding: 24px; color: white; text-align: center; margin-bottom: 24px;">
+        <div style="background: linear-gradient(135deg, #1A1A2E, #2C2C4A); border-radius: 12px; padding: 24px; color: white; text-align: center; margin-bottom: 24px;">
           <h1 style="margin: 0; font-size: 24px;">📝 CORE Log</h1>
           <p style="margin: 8px 0 0; opacity: 0.8;">Morning Check-in</p>
         </div>
@@ -32,7 +32,7 @@ function buildMorningEmail(name: string, token: string) {
         <p>今日も1日が始まります。<br>
         <strong>今日意識すること</strong>を3分で記入しましょう。</p>
         <div style="text-align: center; margin: 24px 0;">
-          <a href="${url}" style="display: inline-block; background: #5B4FD6; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: bold; font-size: 16px;">
+          <a href="${url}" style="display: inline-block; background: #1A1A2E; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: bold; font-size: 16px;">
             今日の意図を記入する →
           </a>
         </div>
@@ -50,7 +50,7 @@ function buildEveningEmail(name: string, token: string) {
     subject: "【CORE Log】お疲れさまでした！今日の気づきを振り返りましょう",
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-        <div style="background: linear-gradient(135deg, #E8833A, #F5A623); border-radius: 12px; padding: 24px; color: white; text-align: center; margin-bottom: 24px;">
+        <div style="background: linear-gradient(135deg, #C17817, #C17817); border-radius: 12px; padding: 24px; color: white; text-align: center; margin-bottom: 24px;">
           <h1 style="margin: 0; font-size: 24px;">📝 CORE Log</h1>
           <p style="margin: 8px 0 0; opacity: 0.8;">Evening Reflection</p>
         </div>
@@ -58,7 +58,7 @@ function buildEveningEmail(name: string, token: string) {
         <p>今日1日を振り返って、<br>
         <strong>気づいたこと・学んだこと</strong>を3分で記録しましょう。</p>
         <div style="text-align: center; margin: 24px 0;">
-          <a href="${url}" style="display: inline-block; background: #E8833A; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: bold; font-size: 16px;">
+          <a href="${url}" style="display: inline-block; background: #C17817; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: bold; font-size: 16px;">
             今日の気づきを記入する →
           </a>
         </div>
@@ -99,14 +99,14 @@ function buildNotificationEmail(options: NotificationOptions) {
         subject: `【CORE Log】${senderName}さんからミッションにコメントがありました`,
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-            <div style="background: linear-gradient(135deg, #E8833A, #F5A623); border-radius: 12px; padding: 20px; color: white; text-align: center; margin-bottom: 24px;">
+            <div style="background: linear-gradient(135deg, #C17817, #C17817); border-radius: 12px; padding: 20px; color: white; text-align: center; margin-bottom: 24px;">
               <h1 style="margin: 0; font-size: 20px;">💬 ミッションに新しいコメント</h1>
             </div>
             <p>${recipientName}さん</p>
             <p><strong>${senderName}</strong>さんがミッションにコメントしました。</p>
-            ${detail ? `<div style="background: #FFF7ED; border-left: 4px solid #E8833A; padding: 12px 16px; margin: 16px 0; border-radius: 4px;"><p style="margin: 0; color: #9A3412; font-size: 14px;">${detail}</p></div>` : ""}
+            ${detail ? `<div style="background: #F5E5BF; border-left: 4px solid #C17817; padding: 12px 16px; margin: 16px 0; border-radius: 4px;"><p style="margin: 0; color: #9A3412; font-size: 14px;">${detail}</p></div>` : ""}
             <div style="text-align: center; margin: 24px 0;">
-              <a href="${url}" style="display: inline-block; background: #E8833A; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
+              <a href="${url}" style="display: inline-block; background: #C17817; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
                 ミッションを確認する →
               </a>
             </div>
@@ -122,14 +122,14 @@ function buildNotificationEmail(options: NotificationOptions) {
         subject: `【CORE Log】${senderName}さんから新しいミッションが設定されました`,
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-            <div style="background: linear-gradient(135deg, #5B4FD6, #7C6FEA); border-radius: 12px; padding: 20px; color: white; text-align: center; margin-bottom: 24px;">
+            <div style="background: linear-gradient(135deg, #1A1A2E, #2C2C4A); border-radius: 12px; padding: 20px; color: white; text-align: center; margin-bottom: 24px;">
               <h1 style="margin: 0; font-size: 20px;">🎯 新しいミッション</h1>
             </div>
             <p>${recipientName}さん</p>
             <p><strong>${senderName}</strong>さんが新しいミッションを設定しました。</p>
-            ${detail ? `<div style="background: #EEF2FF; border-left: 4px solid #5B4FD6; padding: 12px 16px; margin: 16px 0; border-radius: 4px;"><p style="margin: 0; color: #3730A3; font-size: 14px; font-weight: bold;">${detail}</p></div>` : ""}
+            ${detail ? `<div style="background: #F2F2F7; border-left: 4px solid #1A1A2E; padding: 12px 16px; margin: 16px 0; border-radius: 4px;"><p style="margin: 0; color: #141423; font-size: 14px; font-weight: bold;">${detail}</p></div>` : ""}
             <div style="text-align: center; margin: 24px 0;">
-              <a href="${url}" style="display: inline-block; background: #5B4FD6; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
+              <a href="${url}" style="display: inline-block; background: #1A1A2E; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
                 ミッションを確認する →
               </a>
             </div>
@@ -145,14 +145,14 @@ function buildNotificationEmail(options: NotificationOptions) {
         subject: `【CORE Log】${senderName}さんから日報にコメントがありました`,
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-            <div style="background: linear-gradient(135deg, #2563EB, #3B82F6); border-radius: 12px; padding: 20px; color: white; text-align: center; margin-bottom: 24px;">
+            <div style="background: linear-gradient(135deg, #1A1A2E, #3B82F6); border-radius: 12px; padding: 20px; color: white; text-align: center; margin-bottom: 24px;">
               <h1 style="margin: 0; font-size: 20px;">💬 日報にコメント</h1>
             </div>
             <p>${recipientName}さん</p>
             <p><strong>${senderName}</strong>さんがあなたの日報にコメントしました。</p>
-            ${detail ? `<div style="background: #EFF6FF; border-left: 4px solid #2563EB; padding: 12px 16px; margin: 16px 0; border-radius: 4px;"><p style="margin: 0; color: #1E40AF; font-size: 14px;">${detail}</p></div>` : ""}
+            ${detail ? `<div style="background: #EFF6FF; border-left: 4px solid #1A1A2E; padding: 12px 16px; margin: 16px 0; border-radius: 4px;"><p style="margin: 0; color: #1E40AF; font-size: 14px;">${detail}</p></div>` : ""}
             <div style="text-align: center; margin: 24px 0;">
-              <a href="${url}" style="display: inline-block; background: #2563EB; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
+              <a href="${url}" style="display: inline-block; background: #1A1A2E; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
                 日報を確認する →
               </a>
             </div>
