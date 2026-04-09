@@ -103,7 +103,7 @@ export default function FeedbackPage() {
   return (
     <div className="min-h-screen bg-[#F5F0EB] pb-24">
       {/* Header */}
-      <div className="gradient-header text-white px-6 pt-12 pb-6 rounded-b-[2rem]">
+      <div className="gradient-header text-white px-6 pt-12 pb-6">
         <div className="max-w-md mx-auto relative z-10">
           <h1 className="text-xl font-semibold tracking-tight">フィードバック</h1>
           {unreadCount > 0 && (

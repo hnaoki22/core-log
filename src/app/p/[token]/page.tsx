@@ -189,7 +189,7 @@ export default function ParticipantHome() {
   return (
     <div className="min-h-screen bg-[#F5F0EB] pb-24">
       {/* Header */}
-      <div className="gradient-header text-white px-6 pt-12 pb-6 rounded-b-[2rem]">
+      <div className="gradient-header text-white px-6 pt-12 pb-6">
         <div className="max-w-md mx-auto relative z-10">
           <p className="text-indigo-200 text-sm font-light tracking-wide mb-1">{getGreeting()}</p>
           <h1 className="text-2xl font-semibold tracking-tight mb-3">{participant.name}</h1>

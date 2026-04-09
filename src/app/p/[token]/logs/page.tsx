@@ -104,7 +104,7 @@ export default function LogsPage() {
   return (
     <div className="min-h-screen bg-[#F5F0EB] pb-24">
       {/* Header */}
-      <div className="gradient-header text-white px-6 pt-12 pb-6 rounded-b-[2rem]">
+      <div className="gradient-header text-white px-6 pt-12 pb-6">
         <div className="max-w-md mx-auto relative z-10">
           <h1 className="text-xl font-semibold tracking-tight">ログ一覧</h1>
           <p className="text-indigo-200 text-sm mt-1 font-light">{logs.length}件の記録</p>

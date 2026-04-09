@@ -424,7 +424,7 @@ export default function MissionPage() {
   return (
     <div className="min-h-screen bg-[#F5F0EB] pb-24">
       {/* Header */}
-      <div className="gradient-header text-white px-6 pt-12 pb-6 rounded-b-[2rem]">
+      <div className="gradient-header text-white px-6 pt-12 pb-6">
         <div className="max-w-md mx-auto relative z-10">
           <h1 className="text-xl font-semibold tracking-tight">ミッション</h1>
           <p className="text-indigo-200 text-sm mt-1 font-light">上司と共有するミッションと進捗</p>
