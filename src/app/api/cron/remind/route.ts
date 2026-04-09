@@ -57,33 +57,38 @@ export async function GET(request: NextRequest) {
   const useNotion = !!process.env.NOTION_API_TOKEN;
 
   for (const p of activeParticipants) {
-    // Check if already logged today (Notion mode only)
-    if (useNotion) {
-      const logged = await hasLoggedToday(p.name, todayStr);
+    try {
+      // Check if already logged today (Notion mode only)
+      if (useNotion) {
+        const logged = await hasLoggedToday(p.name, todayStr);
 
-      if (type === "morning" && logged.hasMorning) {
-        results.push({ name: p.name, email: p.email, sent: false, skipped: "already logged morning" });
-        continue;
+        if (type === "morning" && logged.hasMorning) {
+          results.push({ name: p.name, email: p.email, sent: false, skipped: "already logged morning" });
+          continue;
+        }
+        if (type === "evening" && logged.hasEvening) {
+          results.push({ name: p.name, email: p.email, sent: false, skipped: "already logged evening" });
+          continue;
+        }
+        // Evening reminder only if morning was logged
+        if (type === "evening" && !logged.hasMorning) {
+          results.push({ name: p.name, email: p.email, sent: false, skipped: "no morning entry" });
+          continue;
+        }
       }
-      if (type === "evening" && logged.hasEvening) {
-        results.push({ name: p.name, email: p.email, sent: false, skipped: "already logged evening" });
-        continue;
-      }
-      // Evening reminder only if morning was logged
-      if (type === "evening" && !logged.hasMorning) {
-        results.push({ name: p.name, email: p.email, sent: false, skipped: "no morning entry" });
-        continue;
-      }
+
+      const sent = await sendReminderEmail({
+        to: p.email,
+        participantName: p.name.split(" ")[0], // Use family name only
+        token: p.token,
+        type,
+      });
+
+      results.push({ name: p.name, email: p.email, sent });
+    } catch (error) {
+      logger.error("Participant processing error", { name: p.name, email: p.email, error: String(error) });
+      results.push({ name: p.name, email: p.email, sent: false, skipped: `error: ${String(error).slice(0, 100)}` });
     }
-
-    const sent = await sendReminderEmail({
-      to: p.email,
-      participantName: p.name.split(" ")[0], // Use family name only
-      token: p.token,
-      type,
-    });
-
-    results.push({ name: p.name, email: p.email, sent });
   }
 
   const sentCount = results.filter((r) => r.sent).length;

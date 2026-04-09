@@ -168,13 +168,13 @@ function buildNotificationEmail(options: NotificationOptions) {
         subject: "【CORE Log】Human Matureから週次フィードバックが届きました",
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-            <div style="background: linear-gradient(135deg, #7C3AED, #9333EA); border-radius: 12px; padding: 20px; color: white; text-align: center; margin-bottom: 24px;">
+            <div style="background: linear-gradient(135deg, #1A1A2E, #2C2C4A); border-radius: 12px; padding: 20px; color: white; text-align: center; margin-bottom: 24px;">
               <h1 style="margin: 0; font-size: 20px;">📋 週次フィードバック</h1>
             </div>
             <p>${recipientName}さん</p>
             <p>Human Matureから今週のフィードバックが届いています。<br>振り返りを確認し、来週に活かしましょう。</p>
             <div style="text-align: center; margin: 24px 0;">
-              <a href="${url}" style="display: inline-block; background: #7C3AED; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
+              <a href="${url}" style="display: inline-block; background: #1A1A2E; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
                 フィードバックを確認する →
               </a>
             </div>
