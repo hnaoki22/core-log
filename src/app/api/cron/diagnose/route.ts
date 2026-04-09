@@ -39,13 +39,12 @@ export async function GET(request: NextRequest) {
   };
 
   // Participant check
-  let participants;
-  let participantError = null;
+  let participants: Awaited<ReturnType<typeof getAllParticipants>> = [];
+  let participantError: string | null = null;
   try {
     participants = await getAllParticipants();
   } catch (error) {
     participantError = String(error);
-    participants = [];
   }
 
   const activeParticipants = participants.filter(
