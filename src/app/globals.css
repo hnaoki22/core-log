@@ -6,11 +6,11 @@
 
 :root {
   /* Core palette — sophisticated navy + warm indigo */
-  --color-primary: #4338CA;
-  --color-primary-light: #EEF2FF;
-  --color-primary-hover: #3730A3;
-  --color-accent: #F59E0B;
-  --color-accent-light: #FEF3C7;
+  --color-primary: #8B1A2B;
+  --color-primary-light: #F5E8EB;
+  --color-primary-hover: #6F1221;
+  --color-accent: #C17817;
+  --color-accent-light: #F5E5BF;
   --color-success: #059669;
   --color-success-light: #D1FAE5;
   --color-warning: #D97706;
@@ -64,7 +64,7 @@
 
   /* Premium header gradients */
   .gradient-header {
-    background: linear-gradient(135deg, #312E81 0%, #4338CA 50%, #4F46E5 100%);
+    background: linear-gradient(135deg, #6F1221 0%, #8B1A2B 50%, #A8324A 100%);
     position: relative;
   }
   .gradient-header::after {
@@ -76,7 +76,7 @@
   }
 
   .gradient-header-manager {
-    background: linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #3730A3 100%);
+    background: linear-gradient(135deg, #141423 0%, #6F1221 50%, #6F1221 100%);
     position: relative;
   }
   .gradient-header-manager::after {
@@ -88,7 +88,7 @@
   }
 
   .gradient-header-admin {
-    background: linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #334155 100%);
+    background: linear-gradient(135deg, #080810 0%, #141423 50%, #2C2C4A 100%);
     position: relative;
   }
   .gradient-header-admin::after {
@@ -158,10 +158,10 @@
   }
 
   .btn-accent {
-    @apply bg-[#4338CA] text-white font-medium rounded-xl transition-all duration-200;
+    @apply bg-[#8B1A2B] text-white font-medium rounded-xl transition-all duration-200;
   }
   .btn-accent:hover {
-    @apply bg-[#3730A3];
+    @apply bg-[#6F1221];
   }
 
   /* Tag / Pill styles */
@@ -181,7 +181,7 @@
     font-size: 15px;
   }
   .input-field:focus {
-    @apply outline-none border-[#4338CA] ring-2 ring-[#4338CA]/10;
+    @apply outline-none border-[#8B1A2B] ring-2 ring-[#8B1A2B]/10;
   }
   .input-field::placeholder {
     @apply text-[#9CA3AF];
