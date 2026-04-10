@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
   // Morning cron runs at JST ~8:00, Evening at ~17:00
   const type: ReminderType = jstHour < 12 ? "morning" : "evening";
 
-  // Get all active participants (those with email and startDate or in pilot)
+  // Get all active participants (those with email and within active period)
   const participants = await getAllParticipants();
   const activeParticipants = participants.filter(
     (p) => p.email && p.email !== "" && !p.email.includes("example.com")
@@ -58,6 +58,18 @@ export async function GET(request: NextRequest) {
 
   for (const p of activeParticipants) {
     try {
+      // Check startDate: skip if today is before participant's start date
+      if (p.startDate && todayStr < p.startDate) {
+        results.push({ name: p.name, email: p.email, sent: false, skipped: `before start date (${p.startDate})` });
+        continue;
+      }
+
+      // Check endDate: skip if today is after participant's end date
+      if (p.endDate && todayStr > p.endDate) {
+        results.push({ name: p.name, email: p.email, sent: false, skipped: `after end date (${p.endDate})` });
+        continue;
+      }
+
       // Check if already logged today (Notion mode only)
       if (useNotion) {
         const logged = await hasLoggedToday(p.name, todayStr);

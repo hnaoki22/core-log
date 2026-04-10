@@ -56,6 +56,8 @@ export async function GET(request: NextRequest) {
     }[] = [];
 
     for (const p of myParticipants) {
+      // Skip participants whose program hasn't started yet
+      if (p.startDate && todayStr < p.startDate) continue;
       // Skip ended programs
       if (p.endDate && isProgramEnded(p.endDate)) continue;
 
