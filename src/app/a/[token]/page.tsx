@@ -560,7 +560,10 @@ export default function AdminDashboard() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <div className={`w-2 h-2 rounded-full ${status.color}`}></div>
-                        <span className="font-medium text-sm text-[#1A1A2E]">{p.name}</span>
+                        <a
+                          href={`/a/${token}/participant/${encodeURIComponent(p.name)}`}
+                          className="font-medium text-sm text-[#1A1A2E] hover:text-amber-700 hover:underline underline-offset-2 transition-colors"
+                        >{p.name}</a>
                         <span className="text-[10px] font-medium bg-indigo-50 text-[#1A1A2E] px-1.5 py-0.5 rounded-md">{p.dojoPhase}</span>
                         {p.todayHasLog && (
                           <span className="bg-[#1A1A2E] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">NEW</span>
@@ -580,12 +583,20 @@ export default function AdminDashboard() {
                       )}
                     </div>
                     <div className="flex flex-col items-end gap-1.5 ml-4">
-                      <button
-                        onClick={() => openFeedbackModal(p.name)}
-                        className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors"
-                      >
-                        FB送信
-                      </button>
+                      <div className="flex gap-1.5">
+                        <a
+                          href={`/a/${token}/participant/${encodeURIComponent(p.name)}`}
+                          className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-[#1A1A2E] text-white hover:bg-[#2C2C4A] transition-colors"
+                        >
+                          ログ
+                        </a>
+                        <button
+                          onClick={() => openFeedbackModal(p.name)}
+                          className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+                        >
+                          FB送信
+                        </button>
+                      </div>
                       <span className="text-[10px] text-[#8B8489]">{status.label}</span>
                       {p.recentEnergy.length > 0 && (
                         <div className="flex gap-0.5 mt-0.5">
