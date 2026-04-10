@@ -354,6 +354,22 @@ export async function addManagerComment(
 }
 
 /**
+ * Get the participant name (owner) of a log entry by its Notion page ID
+ */
+export async function getLogEntryOwner(pageId: string): Promise<string | null> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const page = await notion.pages.retrieve({ page_id: pageId }) as any;
+    const props = page.properties;
+    // The log entry has a "参加者名" property (select or title depending on DB schema)
+    return getSelect(props["参加者名"]) || getTitle(props["参加者名"]) || getRichText(props["参加者名"]) || null;
+  } catch (error) {
+    console.error("Error getting log entry owner:", error);
+    return null;
+  }
+}
+
+/**
  * Check if a participant has logged today
  */
 export async function hasLoggedToday(participantName: string, todayStr: string): Promise<{ hasMorning: boolean; hasEvening: boolean }> {

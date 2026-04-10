@@ -2,8 +2,8 @@
 // Add manager comment to a participant's record
 
 import { NextRequest, NextResponse } from "next/server";
-import { addManagerComment } from "@/lib/notion";
-import { getManagerByToken, getParticipantById } from "@/lib/participant-db";
+import { addManagerComment, getLogEntryOwner } from "@/lib/notion";
+import { getManagerByToken, getParticipantByName } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
 import { sanitizeInput } from "@/lib/sanitize";
 
@@ -30,8 +30,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Real Notion API - in production, we'd find the latest log entry
-    // for this participant and add the comment there
+    // Real Notion API - add comment to the specific log entry
     if (participantId) {
       const success = await addManagerComment(participantId, sanitizedComment);
       if (!success) {
@@ -39,21 +38,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Notify participant about manager's comment (non-blocking)
+    // Notify the specific participant whose log was commented on (non-blocking)
     try {
       const manager = await getManagerByToken(token);
-      if (manager) {
-        const allParticipants = manager.participantIds;
-        for (const pid of allParticipants) {
-          const p = await getParticipantById(pid);
-          if (p?.email && !p.email.includes("example.com")) {
-            // For now, notify all participants of this manager (usually just one)
-            // In future, pass participant identifier from frontend
+      if (manager && participantId) {
+        // Look up which participant owns this log entry
+        const ownerName = await getLogEntryOwner(participantId);
+        if (ownerName) {
+          const targetParticipant = await getParticipantByName(ownerName);
+          if (targetParticipant?.email && !targetParticipant.email.includes("example.com")) {
             sendNotificationEmail({
-              to: p.email,
-              recipientName: p.name.split(" ")[0],
+              to: targetParticipant.email,
+              recipientName: targetParticipant.name.split(" ")[0],
               senderName: manager.name,
-              token: p.token,
+              token: targetParticipant.token,
               type: "manager_comment",
               detail: sanitizedComment.length > 100 ? sanitizedComment.substring(0, 100) + "..." : sanitizedComment,
             }).catch(console.error);

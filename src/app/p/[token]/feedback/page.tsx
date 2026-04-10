@@ -26,7 +26,10 @@ export default function FeedbackPage() {
   const [badges, setBadges] = useState<{ feedback: number; mission: number }>({ feedback: 0, mission: 0 });
   const [loading, setLoading] = useState(true);
   const { isOn, loaded: featuresLoaded } = useFeatures();
+  // フィードバック機能フラグがOFFでも、既にフィードバックが存在する場合は表示する
+  // （HMから送信されたフィードバックは常に閲覧可能にする）
   const fbOn = !featuresLoaded || isOn("feature.managerFeedback");
+  const [hasFeedbacks, setHasFeedbacks] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -34,9 +37,11 @@ export default function FeedbackPage() {
         const fbRes = await fetch(`/api/feedback?token=${token}`);
         if (fbRes.ok) {
           const fbData = await fbRes.json();
-          setFeedbacks(fbData.feedback || []);
+          const fbList = fbData.feedback || [];
+          setFeedbacks(fbList);
           setUnreadCount(fbData.unreadCount || 0);
           setBadges((prev) => ({ ...prev, feedback: fbData.unreadCount || 0 }));
+          if (fbList.length > 0) setHasFeedbacks(true);
         }
         const logsRes = await fetch(`/api/logs?token=${token}`);
         if (logsRes.ok) {
@@ -80,7 +85,8 @@ export default function FeedbackPage() {
     );
   }
 
-  if (featuresLoaded && !fbOn) {
+  // フィードバック機能がOFFでも、既にフィードバックが届いている場合は表示する
+  if (featuresLoaded && !fbOn && !hasFeedbacks) {
     return (
       <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6 pb-24">
         <div className="text-center max-w-sm">

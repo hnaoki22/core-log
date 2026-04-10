@@ -62,8 +62,7 @@ export default function ParticipantHome() {
   const [unreadFeedback, setUnreadFeedback] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const { isOn, loaded: featuresLoaded } = useFeatures();
-  const fbFeatureOn = !featuresLoaded || isOn("feature.managerFeedback");
+  useFeatures(); // features hook is still used by BottomNav via context
 
   useEffect(() => {
     async function fetchData() {
@@ -202,7 +201,8 @@ export default function ParticipantHome() {
 
       <div className="max-w-md mx-auto px-5 pt-5 space-y-4 animate-fade-up relative z-10">
         {/* Unread Feedback Banner */}
-        {fbFeatureOn && unreadFeedback > 0 && (
+        {/* フィードバック機能がOFFでも未読があれば表示（HM送信分は常に表示） */}
+        {unreadFeedback > 0 && (
           <Link href={`/p/${token}/feedback`}>
             <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-4 rounded-2xl flex items-center gap-3 cursor-pointer hover:shadow-md transition-all">
               <div className="bg-amber-500 text-white rounded-xl w-10 h-10 flex items-center justify-center flex-shrink-0 font-semibold text-sm">
