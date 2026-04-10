@@ -61,7 +61,7 @@ export default function LogsPage() {
   const token = params.token as string;
 
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [badges, setBadges] = useState<{ feedback: number; mission: number }>({ feedback: 0, mission: 0 });
+  const [badges, setBadges] = useState<{ feedback: number; feedbackTotal: number; mission: number }>({ feedback: 0, feedbackTotal: 0, mission: 0 });
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 

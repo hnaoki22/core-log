@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   if (participant) {
     const feedback = await getFeedbackByParticipant(participant.name);
     const unreadCount = await getUnreadFeedbackCount(participant.name);
-    return NextResponse.json({ feedback, unreadCount });
+    return NextResponse.json({ feedback, unreadCount, totalCount: feedback.length });
   }
 
   // Check if manager/admin token with participant name

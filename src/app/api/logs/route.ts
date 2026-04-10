@@ -2,7 +2,7 @@
 // Returns all CORE Log entries for a participant
 
 import { NextRequest, NextResponse } from "next/server";
-import { getLogsByParticipant, getMissionsByParticipant, getMissionComments } from "@/lib/notion";
+import { getLogsByParticipant, getMissionsByParticipant, getMissionComments, getFeedbackByParticipant } from "@/lib/notion";
 import { getParticipantByToken } from "@/lib/participant-db";
 
 export async function GET(request: NextRequest) {
@@ -62,9 +62,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Participant not found" }, { status: 404 });
   }
 
-  const [logs, missions] = await Promise.all([
+  const [logs, missions, feedbacks] = await Promise.all([
     getLogsByParticipant(participant.name),
     getMissionsByParticipant(participant.name),
+    getFeedbackByParticipant(participant.name),
   ]);
 
   // Notion版: ログのhmFeedback/managerCommentの有無でバッジカウント
@@ -105,6 +106,7 @@ export async function GET(request: NextRequest) {
     missions,
     badges: {
       feedback: logsWithNewFeedback.length,
+      feedbackTotal: feedbacks.length,
       mission: missionBadgeCount,
     },
   });

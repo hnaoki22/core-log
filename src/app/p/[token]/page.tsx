@@ -58,7 +58,7 @@ export default function ParticipantHome() {
 
   const [participant, setParticipant] = useState<ParticipantData | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [badges, setBadges] = useState<{ feedback: number; mission: number }>({ feedback: 0, mission: 0 });
+  const [badges, setBadges] = useState<{ feedback: number; feedbackTotal: number; mission: number }>({ feedback: 0, feedbackTotal: 0, mission: 0 });
   const [unreadFeedback, setUnreadFeedback] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -81,7 +81,11 @@ export default function ParticipantHome() {
         if (fbRes.ok) {
           const fbData = await fbRes.json();
           setUnreadFeedback(fbData.unreadCount || 0);
-          setBadges((prev) => ({ ...prev, feedback: fbData.unreadCount || 0 }));
+          setBadges((prev) => ({
+            ...prev,
+            feedback: fbData.unreadCount || 0,
+            feedbackTotal: fbData.totalCount || 0,
+          }));
         }
       } catch {
         setError("通信エラーが発生しました");

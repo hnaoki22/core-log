@@ -30,7 +30,7 @@ export default function MissionPage() {
 
   const [missions, setMissions] = useState<Mission[]>([]);
   const [participantName, setParticipantName] = useState("");
-  const [badges, setBadges] = useState<{ feedback: number; mission: number }>({ feedback: 0, mission: 0 });
+  const [badges, setBadges] = useState<{ feedback: number; feedbackTotal: number; mission: number }>({ feedback: 0, feedbackTotal: 0, mission: 0 });
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [expandedMission, setExpandedMission] = useState<string | null>(null);

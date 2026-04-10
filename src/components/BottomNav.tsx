@@ -4,6 +4,7 @@ import { useFeatures } from "@/lib/use-features";
 
 interface BadgeCounts {
   feedback?: number;
+  feedbackTotal?: number;
   mission?: number;
 }
 
@@ -50,13 +51,14 @@ export function BottomNav({ active, baseUrl, badges }: BottomNavProps) {
   // Once loaded, respect flags to conditionally hide tabs.
   const fbOn = !loaded || isOn("feature.managerFeedback");
   const missionOn = !loaded || isOn("feature.mission");
-  // フィードバック機能がOFFでも、未読バッジがあればタブを表示する（HM送信分を閲覧可能にする）
-  const hasFbBadge = (badges?.feedback ?? 0) > 0;
+  // フィードバック機能がOFFでも、フィードバックが1件でもあればタブを表示する（HM送信分を閲覧可能にする）
+  // 未読数ではなく総数で判定：既読後もタブが消えないようにする
+  const hasFeedbacks = (badges?.feedbackTotal ?? 0) > 0;
 
   const allTabs = [
     { id: "home" as const, label: "ホーム", Icon: HomeIcon, path: "", visible: true },
     { id: "logs" as const, label: "ログ", Icon: LogIcon, path: "logs", visible: true },
-    { id: "feedback" as const, label: "FB", Icon: FeedbackIcon, path: "feedback", visible: fbOn || hasFbBadge },
+    { id: "feedback" as const, label: "FB", Icon: FeedbackIcon, path: "feedback", visible: fbOn || hasFeedbacks },
     { id: "mission" as const, label: "ミッション", Icon: MissionIcon, path: "mission", visible: missionOn },
   ];
   const tabs = allTabs.filter((t) => t.visible);
