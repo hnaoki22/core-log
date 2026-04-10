@@ -71,6 +71,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Check if already logged today (Notion mode only)
+      let reminderType: ReminderType = type;
       if (useNotion) {
         const logged = await hasLoggedToday(p.name, todayStr);
 
@@ -82,10 +83,9 @@ export async function GET(request: NextRequest) {
           results.push({ name: p.name, email: p.email, sent: false, skipped: "already logged evening" });
           continue;
         }
-        // Evening reminder only if morning was logged
+        // 夕方リマインド: 朝未記入でも送信する（朝未記入の場合は別テンプレート）
         if (type === "evening" && !logged.hasMorning) {
-          results.push({ name: p.name, email: p.email, sent: false, skipped: "no morning entry" });
-          continue;
+          reminderType = "evening_no_morning";
         }
       }
 
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
         to: p.email,
         participantName: p.name.split(" ")[0], // Use family name only
         token: p.token,
-        type,
+        type: reminderType,
       });
 
       results.push({ name: p.name, email: p.email, sent });

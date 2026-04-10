@@ -3,10 +3,10 @@
 // Prevents duplicate entries for the same day
 
 import { NextRequest, NextResponse } from "next/server";
-import { createMorningEntry, updateEveningEntry, hasLoggedToday } from "@/lib/notion";
+import { createMorningEntry, createEveningOnlyEntry, updateEveningEntry, hasLoggedToday } from "@/lib/notion";
 import { getParticipantByToken, getManagerById } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
-import { isProgramEnded, isProgramNotStarted } from "@/lib/date-utils";
+import { isProgramEnded, isProgramNotStarted, getCurrentHourJST } from "@/lib/date-utils";
 import { sanitizeInput } from "@/lib/sanitize";
 import { logger } from "@/lib/logger";
 
@@ -50,6 +50,15 @@ export async function POST(request: NextRequest) {
     // Real Notion API
     if (type === "morning") {
       const { participantName, date, morningIntent, energy, dojoPhase, weekNum } = body;
+
+      // 朝の記入は12:00（正午）まで
+      const hour = getCurrentHourJST();
+      if (hour >= 12) {
+        return NextResponse.json(
+          { error: "朝の意図設定は12:00までです。夕方の振り返りをご記入ください。", morningClosed: true },
+          { status: 403 }
+        );
+      }
 
       // Sanitize user input
       const sanitizedMorningIntent = sanitizeInput(morningIntent || "");
@@ -128,6 +137,50 @@ export async function POST(request: NextRequest) {
 
       logger.info("Evening entry updated", { participantName, pageId });
       return NextResponse.json({ success: true });
+    }
+
+    // 朝未記入で12:00を過ぎた場合の夕方のみエントリー
+    if (type === "evening_only") {
+      const { participantName, date, eveningInsight, energy, dojoPhase, weekNum } = body;
+
+      const sanitizedEveningInsight = sanitizeInput(eveningInsight || "");
+
+      // Check if entry already exists for today
+      const todayStatus = await hasLoggedToday(participantName, date);
+      if (todayStatus.hasEvening) {
+        return NextResponse.json(
+          { error: "今日の夕方の記入は既に完了しています" },
+          { status: 409 }
+        );
+      }
+
+      const pageId = await createEveningOnlyEntry(participantName, date, sanitizedEveningInsight, energy, dojoPhase, weekNum);
+      if (!pageId) {
+        return NextResponse.json({ error: "Failed to create entry" }, { status: 500 });
+      }
+
+      // Notify manager
+      try {
+        const participant = await getParticipantByToken(token);
+        if (participant?.managerId) {
+          const mgr = await getManagerById(participant.managerId);
+          if (mgr?.email && !mgr.email.includes("example.com")) {
+            sendNotificationEmail({
+              to: mgr.email,
+              recipientName: mgr.name.split(" ")[0],
+              senderName: participantName,
+              token: mgr.token,
+              type: "daily_log_submitted",
+              detail: `夕の振り返り：${sanitizedEveningInsight.substring(0, 60)}${sanitizedEveningInsight.length > 60 ? "…" : ""}`,
+            });
+          }
+        }
+      } catch (e) {
+        logger.error("Failed to send manager notification", { error: String(e), participantName });
+      }
+
+      logger.info("Evening-only entry created", { participantName, date, pageId });
+      return NextResponse.json({ success: true, pageId });
     }
 
     return NextResponse.json({ error: "Invalid type" }, { status: 400 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { getTodayJST } from "@/lib/date-utils";
+import { getTodayJST, getCurrentHourJST } from "@/lib/date-utils";
 import { useState, useEffect } from "react";
 
 type TodayLog = {
@@ -39,6 +39,7 @@ export default function InputPage() {
   const [now, setNow] = useState(new Date());
   const [todayLog, setTodayLog] = useState<TodayLog | null>(null);
   const [isMorning, setIsMorning] = useState(true);
+  const [morningClosed, setMorningClosed] = useState(false); // 12:00過ぎで朝未記入
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [alreadyCompleted, setAlreadyCompleted] = useState(false);
 
@@ -64,6 +65,7 @@ export default function InputPage() {
           }
           const logs = data.logs || [];
           const todayEntry = logs.find((log: TodayLog & { date: string }) => log.date === today);
+          const hour = getCurrentHourJST();
           if (todayEntry && todayEntry.morningIntent) {
             setTodayLog(todayEntry);
             if (todayEntry.status === "complete" || todayEntry.status === "fb_done") {
@@ -71,6 +73,10 @@ export default function InputPage() {
             } else {
               setIsMorning(false);
             }
+          } else if (hour >= 12) {
+            // 12:00以降で朝未記入 → 朝はクローズ、夕方の振り返りを表示
+            setIsMorning(false);
+            setMorningClosed(true);
           } else {
             setIsMorning(true);
           }
@@ -134,24 +140,39 @@ export default function InputPage() {
     setSubmitError("");
 
     try {
-      const body = isMorning
-        ? {
-            type: "morning",
-            token,
-            participantName: participant.name,
-            date: today,
-            morningIntent: morning,
-            energy,
-            dojoPhase: participant.dojoPhase || "守",
-            weekNum: participant.weekNum || 1,
-          }
-        : {
-            type: "evening",
-            token,
-            pageId: todayLog?.id || "",
-            eveningInsight: evening,
-            energy,
-          };
+      let body;
+      if (isMorning) {
+        body = {
+          type: "morning",
+          token,
+          participantName: participant.name,
+          date: today,
+          morningIntent: morning,
+          energy,
+          dojoPhase: participant.dojoPhase || "守",
+          weekNum: participant.weekNum || 1,
+        };
+      } else if (morningClosed && !todayLog) {
+        // 朝未記入・12:00過ぎ → 夕方のみの新規エントリー
+        body = {
+          type: "evening_only",
+          token,
+          participantName: participant.name,
+          date: today,
+          eveningInsight: evening,
+          energy,
+          dojoPhase: participant.dojoPhase || "守",
+          weekNum: participant.weekNum || 1,
+        };
+      } else {
+        body = {
+          type: "evening",
+          token,
+          pageId: todayLog?.id || "",
+          eveningInsight: evening,
+          energy,
+        };
+      }
 
       const res = await fetch("/api/entry", {
         method: "POST",
@@ -192,7 +213,9 @@ export default function InputPage() {
             </svg>
           </div>
           <h2 className="text-xl font-semibold text-[#1A1A2E] mb-2">記入完了</h2>
-          <p className="text-[#5B5560] text-sm mb-8">いい気づきですね</p>
+          <p className="text-[#5B5560] text-sm mb-8">
+            {isMorning ? "今日の意図が設定されました" : "今日の振り返りが記録されました"}
+          </p>
           <button
             onClick={() => router.push(`/p/${token}`)}
             className="btn-primary w-full py-3.5 text-sm"

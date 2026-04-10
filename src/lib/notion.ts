@@ -286,6 +286,51 @@ export async function updateEveningEntry(
 }
 
 /**
+ * Create a new entry with evening data only (when morning was missed, after 12:00)
+ */
+export async function createEveningOnlyEntry(
+  participantName: string,
+  date: string,
+  eveningInsight: string,
+  energy: string | null,
+  dojoPhase: string,
+  weekNum: number
+) {
+  if (!CORE_LOG_DB_ID) return null;
+
+  try {
+    const d = new Date(date);
+    const title = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}（${DOW_MAP[d.getDay()]}）`;
+    const jstDatetime = toJSTDatetime(new Date());
+
+    const properties: Record<string, unknown> = {
+      "タイトル": { title: [{ text: { content: title } }] },
+      "日付": { date: { start: jstDatetime } },
+      "参加者名": { select: { name: participantName } },
+      "【夕】今日の気づき": { rich_text: [{ text: { content: eveningInsight } }] },
+      "道場フェーズ": { select: { name: dojoPhase } },
+      "週番号": { number: weekNum },
+      "ステータス": { select: { name: "完了" } },
+      "記入時刻（夕）": { date: { start: jstDatetime } },
+    };
+
+    if (energy) {
+      properties["エネルギーレベル"] = { select: { name: energyToNotion(energy) } };
+    }
+
+    const response = await notion.pages.create({
+      parent: { database_id: CORE_LOG_DB_ID },
+      properties: properties as Parameters<typeof notion.pages.create>[0]["properties"],
+    });
+
+    return response.id;
+  } catch (error) {
+    console.error("Error creating evening-only entry:", error);
+    return null;
+  }
+}
+
+/**
  * Add manager comment to an entry
  */
 export async function addManagerComment(
