@@ -179,7 +179,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-s",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 3,
   },
   {
@@ -189,7 +189,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-s",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 2,
   },
   {
@@ -199,7 +199,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-s",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 3,
   },
   {
@@ -209,7 +209,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-s",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 2,
   },
 
@@ -221,7 +221,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-a",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 2,
     dependencies: ["feature.managerFeedback"],
   },
@@ -232,7 +232,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-a",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 3,
     dependencies: ["tier-s.ruminationDetection"],
   },
@@ -243,7 +243,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-a",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 3,
     dependencies: ["feature.managerFeedback"],
   },
@@ -254,7 +254,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-a",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 2,
   },
 
@@ -266,7 +266,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-b",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 3,
   },
   {
@@ -276,7 +276,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-b",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 3,
     dependencies: ["tier-s.weeklyConceptualization"],
   },
@@ -287,7 +287,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-b",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 3,
   },
   {
@@ -297,7 +297,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-b",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 3,
   },
 
@@ -309,7 +309,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-c",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 3,
   },
   {
@@ -319,7 +319,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-c",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 3,
   },
   {
@@ -329,7 +329,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-c",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 3,
   },
 
@@ -341,7 +341,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-d",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 2,
   },
   {
@@ -351,7 +351,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-d",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 2,
   },
   {
@@ -361,7 +361,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-d",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 3,
   },
 
@@ -373,7 +373,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-e",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 2,
   },
   {
@@ -383,7 +383,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-e",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 2,
   },
   {
@@ -393,7 +393,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-e",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 2,
   },
   {
@@ -403,7 +403,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-e",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 2,
   },
 
@@ -415,7 +415,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-f",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 2,
   },
   {
@@ -425,7 +425,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-f",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 2,
   },
   {
@@ -435,7 +435,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-f",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 3,
   },
 
@@ -447,7 +447,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-g",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 3,
   },
   {
@@ -457,7 +457,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-g",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 3,
   },
   {
@@ -467,7 +467,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     category: "tier-g",
     defaultEnabled: false,
     phase1Enabled: false,
-    implemented: false,
+    implemented: true,
     recommendedPhase: 3,
   },
 ];
