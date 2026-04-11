@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/supabase";
-import { getParticipantByTokenFromSupabase } from "@/lib/supabase";
+import { getParticipantByToken } from "@/lib/participant-db";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 
 const TENANT_ID = "81f91c26-214e-4da2-9893-6ac6c8984062";
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify participant token
-    const participant = await getParticipantByTokenFromSupabase(token);
+    const participant = await getParticipantByToken(token);
     if (!participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -107,7 +107,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Verify participant token
-    const participant = await getParticipantByTokenFromSupabase(token);
+    const participant = await getParticipantByToken(token);
     if (!participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -183,7 +183,7 @@ export async function PUT(req: NextRequest) {
     }
 
     // Verify participant token
-    const participant = await getParticipantByTokenFromSupabase(token);
+    const participant = await getParticipantByToken(token);
     if (!participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
