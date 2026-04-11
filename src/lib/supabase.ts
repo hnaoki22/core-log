@@ -460,6 +460,42 @@ export async function createParticipantInSupabase(
   return { id: data.id, token: data.token };
 }
 
+export async function updateParticipantInSupabase(
+  participantId: string,
+  updates: {
+    name?: string;
+    email?: string;
+    department?: string;
+    dojoPhase?: string;
+    managerId?: string | null;
+    fbPolicy?: string;
+    emailEnabled?: boolean;
+    startDate?: string;
+    endDate?: string;
+  },
+  tenantId: string
+): Promise<boolean> {
+  const updateData: Record<string, unknown> = {};
+  if (updates.name !== undefined) updateData.name = updates.name;
+  if (updates.email !== undefined) updateData.email = updates.email;
+  if (updates.department !== undefined) updateData.department = updates.department;
+  if (updates.dojoPhase !== undefined) updateData.dojo_phase = updates.dojoPhase;
+  if (updates.managerId !== undefined) updateData.manager_id = updates.managerId || null;
+  if (updates.fbPolicy !== undefined) updateData.fb_policy = updates.fbPolicy;
+  if (updates.emailEnabled !== undefined) updateData.email_enabled = updates.emailEnabled;
+  if (updates.startDate !== undefined) updateData.start_date = updates.startDate;
+  if (updates.endDate !== undefined) updateData.end_date = updates.endDate;
+
+  if (Object.keys(updateData).length === 0) return true;
+
+  const { error } = await getClient()
+    .from("participants")
+    .update(updateData)
+    .eq("id", participantId)
+    .eq("tenant_id", tenantId);
+  return !error;
+}
+
 // ---------------------------------------------------------------------------
 // MANAGER QUERIES
 // ---------------------------------------------------------------------------
@@ -573,6 +609,32 @@ export async function createManagerInSupabase(
     .single();
   if (error || !data) return null;
   return { id: data.id, token: data.token };
+}
+
+export async function updateManagerInSupabase(
+  managerId: string,
+  updates: {
+    name?: string;
+    email?: string;
+    department?: string;
+    isAdmin?: boolean;
+  },
+  tenantId: string
+): Promise<boolean> {
+  const updateData: Record<string, unknown> = {};
+  if (updates.name !== undefined) updateData.name = updates.name;
+  if (updates.email !== undefined) updateData.email = updates.email;
+  if (updates.department !== undefined) updateData.department = updates.department;
+  if (updates.isAdmin !== undefined) updateData.is_admin = updates.isAdmin;
+
+  if (Object.keys(updateData).length === 0) return true;
+
+  const { error } = await getClient()
+    .from("managers")
+    .update(updateData)
+    .eq("id", managerId)
+    .eq("tenant_id", tenantId);
+  return !error;
 }
 
 // ---------------------------------------------------------------------------

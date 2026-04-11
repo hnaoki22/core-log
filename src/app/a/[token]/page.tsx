@@ -101,6 +101,24 @@ export default function AdminDashboard() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
 
+  // Participant edit state
+  const [editingParticipant, setEditingParticipant] = useState<ParticipantData | null>(null);
+  const [editForm, setEditForm] = useState<{
+    name: string; email: string; department: string; dojoPhase: string;
+    managerId: string; fbPolicy: string; emailEnabled: boolean;
+    startDate: string; endDate: string;
+  }>({ name: "", email: "", department: "", dojoPhase: "", managerId: "", fbPolicy: "", emailEnabled: true, startDate: "", endDate: "" });
+  const [editSaving, setEditSaving] = useState(false);
+
+  // Manager CSV Import state
+  const [showManagerImport, setShowManagerImport] = useState(false);
+  const [managerCsvText, setManagerCsvText] = useState("");
+  const [managerImportStep, setManagerImportStep] = useState<"input" | "preview" | "result">("input");
+  const [managerImportPreview, setManagerImportPreview] = useState<typeof importPreview>(null);
+  const [managerImportResult, setManagerImportResult] = useState<typeof importResult>(null);
+  const [managerImportLoading, setManagerImportLoading] = useState(false);
+  const [managerImportError, setManagerImportError] = useState<typeof importError>(null);
+
   const handleExport = async () => {
     setExporting(true);
     try {
@@ -111,6 +129,74 @@ export default function AdminDashboard() {
     } finally {
       setExporting(false);
     }
+  };
+
+  const openEditParticipant = async (p: ParticipantData) => {
+    setEditingParticipant(p);
+    // Fetch full participant data including email, startDate, endDate
+    try {
+      const res = await fetch(`/api/admin/members?token=${token}`);
+      const d = await res.json();
+      const managers = d.managers || [];
+      setManagerOptions(managers);
+    } catch { /* use existing managers */ }
+    setEditForm({
+      name: p.name, email: "", department: p.department, dojoPhase: p.dojoPhase,
+      managerId: p.managerId || "", fbPolicy: p.fbPolicy || "",
+      emailEnabled: true, startDate: "", endDate: "",
+    });
+  };
+
+  const handleSaveParticipant = async () => {
+    if (!editingParticipant) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/admin/participants/${editingParticipant.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, ...editForm }),
+      });
+      if (res.ok) {
+        setEditingParticipant(null);
+        const refreshRes = await fetch(`/api/admin?token=${token}`);
+        if (refreshRes.ok) setData(await refreshRes.json());
+      } else {
+        const err = await res.json();
+        alert(err.error || "更新に失敗しました");
+      }
+    } catch { alert("エラーが発生しました"); } finally { setEditSaving(false); }
+  };
+
+  const handleManagerImportDryRun = async () => {
+    if (!managerCsvText.trim()) return;
+    setManagerImportLoading(true);
+    setManagerImportError(null);
+    try {
+      const res = await fetch("/api/admin/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, csv: managerCsvText, dryRun: true }),
+      });
+      const d = await res.json();
+      if (res.ok) { setManagerImportPreview(d); setManagerImportStep("preview"); }
+      else { setManagerImportError({ error: d.error, details: d.details }); }
+    } catch { setManagerImportError({ error: "通信エラーが発生しました" }); }
+    finally { setManagerImportLoading(false); }
+  };
+
+  const handleManagerImportExecute = async () => {
+    setManagerImportLoading(true);
+    try {
+      const res = await fetch("/api/admin/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, csv: managerCsvText, dryRun: false }),
+      });
+      const d = await res.json();
+      if (res.ok) { setManagerImportResult(d); setManagerImportStep("result"); }
+      else { setManagerImportError({ error: d.error, details: d.details }); }
+    } catch { setManagerImportError({ error: "通信エラーが発生しました" }); }
+    finally { setManagerImportLoading(false); }
   };
 
   useEffect(() => {
@@ -623,12 +709,20 @@ export default function AdminDashboard() {
                           ログ
                         </a>
                         {!isObserver && (
-                          <button
-                            onClick={() => openFeedbackModal(p.name)}
-                            className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors"
-                          >
-                            FB送信
-                          </button>
+                          <>
+                            <button
+                              onClick={() => openEditParticipant(p)}
+                              className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-[#EFE8DD] text-[#5B5560] hover:bg-[#E5DDD3] transition-colors"
+                            >
+                              編集
+                            </button>
+                            <button
+                              onClick={() => openFeedbackModal(p.name)}
+                              className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+                            >
+                              FB送信
+                            </button>
+                          </>
                         )}
                       </div>
                       <span className="text-[10px] text-[#8B8489]">{status.label}</span>
@@ -654,9 +748,14 @@ export default function AdminDashboard() {
           <div className="px-5 py-4 border-b border-[#EFE8DD] flex items-center justify-between">
             <h2 className="text-sm font-semibold text-[#1A1A2E]">マネージャー一覧</h2>
             {!isObserver && (
-              <button onClick={() => setShowAddManager(true)} className="text-xs font-medium px-4 py-2 rounded-xl bg-amber-500 text-white hover:bg-amber-600 transition-colors">
-                + マネージャーを追加
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => { setShowManagerImport(true); setManagerImportStep("input"); setManagerCsvText(""); setManagerImportPreview(null); setManagerImportResult(null); setManagerImportError(null); }} className="text-xs px-4 py-2 rounded-xl border border-[#C4A882] text-[#8B7355] hover:bg-[#FBF8F4] transition-colors">
+                  📄 CSVインポート
+                </button>
+                <button onClick={() => setShowAddManager(true)} className="text-xs font-medium px-4 py-2 rounded-xl bg-amber-500 text-white hover:bg-amber-600 transition-colors">
+                  + マネージャーを追加
+                </button>
+              </div>
             )}
           </div>
           <div className="divide-y divide-[#EFE8DD]">
@@ -1271,6 +1370,197 @@ export default function AdminDashboard() {
                     <button type="button" onClick={() => setShowImportModal(false)} className="btn-primary flex-1 py-2.5 text-sm">閉じる</button>
                   </div>
                 </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Participant Edit Modal */}
+      {editingParticipant && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setEditingParticipant(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-[#EFE8DD] flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[#1A1A2E]">参加者を編集: {editingParticipant.name}</h3>
+              <button onClick={() => setEditingParticipant(null)} className="text-[#8B8489] hover:text-[#1A1A2E]">✕</button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-medium text-[#5B5560] block mb-1">名前</label>
+                <input type="text" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="w-full text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[#5B5560] block mb-1">メールアドレス</label>
+                <input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  className="w-full text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none"
+                  placeholder="変更しない場合は空白" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[#5B5560] block mb-1">部署</label>
+                <input type="text" value={editForm.department} onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
+                  className="w-full text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[#5B5560] block mb-1">道場フェーズ</label>
+                <select value={editForm.dojoPhase} onChange={(e) => setEditForm({ ...editForm, dojoPhase: e.target.value })}
+                  className="w-full text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none">
+                  {["道場1 覚醒","道場2 探究","道場3 挑戦","道場4 変容","道場5 統合","道場6 共創","道場7 卒業"].map((ph) => (
+                    <option key={ph} value={ph}>{ph}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[#5B5560] block mb-1">担当マネージャー</label>
+                <select value={editForm.managerId} onChange={(e) => setEditForm({ ...editForm, managerId: e.target.value })}
+                  className="w-full text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none">
+                  <option value="">（未設定）</option>
+                  {managerOptions.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[#5B5560] block mb-1">FB方針</label>
+                <textarea value={editForm.fbPolicy} onChange={(e) => setEditForm({ ...editForm, fbPolicy: e.target.value })}
+                  className="w-full text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none h-20 resize-none"
+                  placeholder="フィードバックの方針を入力" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-[#5B5560] block mb-1">開始日</label>
+                  <input type="date" value={editForm.startDate} onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
+                    className="w-full text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-[#5B5560] block mb-1">終了日</label>
+                  <input type="date" value={editForm.endDate} onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
+                    className="w-full text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none" />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="editEmailEnabled" checked={editForm.emailEnabled}
+                  onChange={(e) => setEditForm({ ...editForm, emailEnabled: e.target.checked })}
+                  className="rounded border-[#EFE8DD]" />
+                <label htmlFor="editEmailEnabled" className="text-xs text-[#5B5560]">メール通知を有効にする</label>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button onClick={() => setEditingParticipant(null)}
+                  className="text-xs px-4 py-2 rounded-xl border border-[#EFE8DD] text-[#5B5560] hover:bg-[#FBF8F4] transition-colors">
+                  キャンセル
+                </button>
+                <button onClick={handleSaveParticipant} disabled={editSaving}
+                  className="btn-accent text-xs px-4 py-2 disabled:opacity-50">
+                  {editSaving ? "保存中..." : "保存"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manager CSV Import Modal */}
+      {showManagerImport && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowManagerImport(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-[#EFE8DD] flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[#1A1A2E]">マネージャー CSV一括インポート</h3>
+              <button onClick={() => setShowManagerImport(false)} className="text-[#8B8489] hover:text-[#1A1A2E]">✕</button>
+            </div>
+            <div className="p-5">
+              {managerImportStep === "input" && (
+                <div className="space-y-4">
+                  <div className="text-xs text-[#5B5560] bg-[#FBF8F4] rounded-xl p-3 border border-[#EFE8DD]">
+                    <p className="font-medium mb-1">CSVフォーマット:</p>
+                    <code className="text-[10px] block bg-white rounded-lg p-2 border border-[#EFE8DD]">
+                      name,email,department,role<br/>
+                      田中太郎,tanaka@example.com,営業部,マネージャー<br/>
+                      佐藤花子,sato@example.com,人事部,管理者
+                    </code>
+                    <p className="mt-2 text-[10px] text-[#8B8489]">role列: 「マネージャー」「管理者」「閲覧者」を指定</p>
+                  </div>
+                  <textarea value={managerCsvText} onChange={(e) => setManagerCsvText(e.target.value)}
+                    className="w-full text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none h-40 resize-none font-mono"
+                    placeholder="CSVデータを貼り付け..." />
+                  {managerImportError && (
+                    <div className="text-xs text-red-600 bg-red-50 rounded-xl p-3 border border-red-100">
+                      <p className="font-medium">{managerImportError.error}</p>
+                      {managerImportError.details?.map((d, i) => <p key={i} className="mt-1">{d}</p>)}
+                    </div>
+                  )}
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => setShowManagerImport(false)}
+                      className="text-xs px-4 py-2 rounded-xl border border-[#EFE8DD] text-[#5B5560] hover:bg-[#FBF8F4] transition-colors">
+                      キャンセル
+                    </button>
+                    <button onClick={handleManagerImportDryRun} disabled={managerImportLoading || !managerCsvText.trim()}
+                      className="btn-accent text-xs px-4 py-2 disabled:opacity-50">
+                      {managerImportLoading ? "検証中..." : "プレビュー"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {managerImportStep === "preview" && managerImportPreview && (
+                <div className="space-y-4">
+                  <div className="text-xs bg-[#FBF8F4] rounded-xl p-3 border border-[#EFE8DD]">
+                    <p>合計: <strong>{managerImportPreview.summary.total}名</strong> / 新規登録: <strong>{managerImportPreview.summary.newRegistrations}名</strong> / 重複: <strong>{managerImportPreview.summary.duplicates}名</strong></p>
+                  </div>
+                  <div className="border border-[#EFE8DD] rounded-xl overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-[#FBF8F4]">
+                        <tr><th className="px-3 py-2 text-left">名前</th><th className="px-3 py-2 text-left">メール</th><th className="px-3 py-2 text-left">部署</th><th className="px-3 py-2 text-left">役割</th><th className="px-3 py-2 text-left">状態</th></tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#EFE8DD]">
+                        {managerImportPreview.rows.map((r, i) => (
+                          <tr key={i} className={r.isDuplicate ? "bg-amber-50" : ""}>
+                            <td className="px-3 py-2">{r.name}</td><td className="px-3 py-2">{r.email}</td>
+                            <td className="px-3 py-2">{r.department}</td><td className="px-3 py-2">{r.role}</td>
+                            <td className="px-3 py-2">{r.isDuplicate ? "⚠️ 重複" : "✅ 新規"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => setManagerImportStep("input")}
+                      className="text-xs px-4 py-2 rounded-xl border border-[#EFE8DD] text-[#5B5560] hover:bg-[#FBF8F4] transition-colors">
+                      戻る
+                    </button>
+                    <button onClick={handleManagerImportExecute} disabled={managerImportLoading}
+                      className="btn-accent text-xs px-4 py-2 disabled:opacity-50">
+                      {managerImportLoading ? "インポート中..." : "インポート実行"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {managerImportStep === "result" && managerImportResult && (
+                <div className="space-y-4">
+                  <div className="text-xs bg-emerald-50 rounded-xl p-3 border border-emerald-100">
+                    <p>成功: <strong>{managerImportResult.summary.success}名</strong> / スキップ: <strong>{managerImportResult.summary.skipped}名</strong> / エラー: <strong>{managerImportResult.summary.errors}名</strong></p>
+                  </div>
+                  <div className="border border-[#EFE8DD] rounded-xl overflow-hidden max-h-60 overflow-y-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-[#FBF8F4] sticky top-0">
+                        <tr><th className="px-3 py-2 text-left">名前</th><th className="px-3 py-2 text-left">メール</th><th className="px-3 py-2 text-left">結果</th><th className="px-3 py-2 text-left">URL</th></tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#EFE8DD]">
+                        {managerImportResult.results.map((r, i) => (
+                          <tr key={i}>
+                            <td className="px-3 py-2">{r.name}</td><td className="px-3 py-2">{r.email}</td>
+                            <td className="px-3 py-2">{r.status === "success" ? "✅" : r.status === "skipped" ? "⏭️" : "❌"} {r.message}</td>
+                            <td className="px-3 py-2">{r.url ? <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-amber-600 hover:underline">開く</a> : ""}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex justify-end">
+                    <button onClick={async () => { setShowManagerImport(false); const refreshRes = await fetch(`/api/admin?token=${token}`); if (refreshRes.ok) setData(await refreshRes.json()); }}
+                      className="btn-accent text-xs px-4 py-2">
+                      閉じる
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>
