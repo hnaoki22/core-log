@@ -63,6 +63,15 @@ export default function AdminDashboard() {
   const [addResult, setAddResult] = useState<AddResult>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // CSV Import state
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [csvText, setCsvText] = useState("");
+  const [importStep, setImportStep] = useState<"input" | "preview" | "result">("input");
+  const [importPreview, setImportPreview] = useState<{ summary: { total: number; managers: number; participants: number; duplicates: number; newRegistrations: number }; duplicates: string[]; rows: { line: number; name: string; email: string; role: string; department: string; dojoPhase: string; managerName: string; isDuplicate: boolean }[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ summary: { total: number; success: number; skipped: number; errors: number }; results: { line: number; name: string; email: string; role: string; status: string; token?: string; url?: string; message: string }[] } | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState<{ error: string; details?: string[] } | null>(null);
+
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [fbTargetName, setFbTargetName] = useState("");
   const [fbContent, setFbContent] = useState("");
@@ -564,9 +573,14 @@ export default function AdminDashboard() {
           <div className="px-5 py-4 border-b border-[#EFE8DD] flex items-center justify-between">
             <h2 className="text-sm font-semibold text-[#1A1A2E]">参加者一覧</h2>
             {!isObserver && (
-              <button onClick={() => setShowAddParticipant(true)} className="btn-accent text-xs px-4 py-2">
-                + 参加者を追加
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => { setShowImportModal(true); setImportStep("input"); setCsvText(""); setImportPreview(null); setImportResult(null); setImportError(null); }} className="text-xs px-4 py-2 rounded-xl border border-[#C4A882] text-[#8B7355] hover:bg-[#FBF8F4] transition-colors">
+                  📄 CSV一括インポート
+                </button>
+                <button onClick={() => setShowAddParticipant(true)} className="btn-accent text-xs px-4 py-2">
+                  + 参加者を追加
+                </button>
+              </div>
             )}
           </div>
           <div className="divide-y divide-[#EFE8DD]">
@@ -1058,6 +1072,207 @@ export default function AdminDashboard() {
                 <button type="submit" disabled={submitting} className="btn-primary flex-1 py-2.5 text-sm">{submitting ? "追加中..." : "追加する"}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* CSV Import Modal */}
+      {!isObserver && showImportModal && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4" onClick={() => setShowImportModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#EFE8DD]">
+              <h3 className="text-base font-semibold text-[#1A1A2E]">CSV一括インポート</h3>
+              <button onClick={() => setShowImportModal(false)} className="text-[#8B8489] hover:text-[#5B5560]">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+
+              {/* Step 1: Input */}
+              {importStep === "input" && (
+                <>
+                  <div className="bg-[#FBF8F4] rounded-xl p-4 text-xs text-[#5B5560] space-y-2">
+                    <p className="font-semibold text-[#2C2C4A]">CSV形式ガイド</p>
+                    <p>1行目はヘッダー行です。以下の列名が使えます:</p>
+                    <p className="font-mono bg-white rounded px-2 py-1">name, email, department, role, dojoPhase, managerName</p>
+                    <p><strong>role</strong>の選択肢: 参加者（デフォルト）/ マネージャー / 管理者 / 閲覧者</p>
+                    <p><strong>dojoPhase</strong>の選択肢: 道場1 覚醒 〜 道場7 卒業（参加者のみ。省略時は「道場1 覚醒」）</p>
+                    <p><strong>managerName</strong>: 上司の名前（参加者のみ）。マネージャー行を参加者行より上に配置してください</p>
+                    <p className="text-[#8B7355]">日本語ヘッダー（名前, メール, 部署, 役割, 道場, 上司）にも対応しています</p>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-medium text-[#2C2C4A]">CSVデータ</label>
+                      <a href={`/api/admin/import?token=${token}`} download className="text-xs text-[#8B7355] hover:text-[#6B5335] underline">テンプレートをダウンロード</a>
+                    </div>
+                    <textarea
+                      value={csvText}
+                      onChange={(e) => setCsvText(e.target.value)}
+                      rows={10}
+                      placeholder={"name,email,department,role,dojoPhase,managerName\n田中太郎,tanaka@example.com,営業部,マネージャー,,\n佐藤花子,sato@example.com,営業部,参加者,道場1 覚醒,田中太郎"}
+                      className="input-field text-sm font-mono w-full"
+                    />
+                    <p className="text-xs text-[#8B8489] mt-1">CSVファイルの内容をペーストするか、直接入力してください</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-[#5B5560] flex items-center gap-2 cursor-pointer rounded-xl border border-dashed border-[#C9BDAE] px-4 py-3 hover:bg-[#FBF8F4] transition-colors w-full justify-center">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                      CSVファイルを選択
+                      <input type="file" accept=".csv,.txt" className="hidden" onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            const text = ev.target?.result as string;
+                            if (text) setCsvText(text);
+                          };
+                          reader.readAsText(file, "UTF-8");
+                        }
+                      }} />
+                    </label>
+                  </div>
+                  {importError && (
+                    <div className="bg-red-50 rounded-xl p-4 text-xs text-red-700 space-y-1">
+                      <p className="font-semibold">{importError.error}</p>
+                      {importError.details?.map((d, i) => <p key={i}>• {d}</p>)}
+                    </div>
+                  )}
+                  <div className="flex gap-3 pt-2">
+                    <button type="button" onClick={() => setShowImportModal(false)} className="btn-secondary flex-1 py-2.5 text-sm">キャンセル</button>
+                    <button
+                      disabled={!csvText.trim() || importLoading}
+                      onClick={async () => {
+                        setImportLoading(true); setImportError(null);
+                        try {
+                          const res = await fetch("/api/admin/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, csv: csvText, dryRun: true }) });
+                          const json = await res.json();
+                          if (!res.ok) {
+                            setImportError({ error: json.error, details: [...(json.details || []), ...(json.duplicates || [])] });
+                          } else {
+                            setImportPreview(json);
+                            setImportStep("preview");
+                          }
+                        } catch { setImportError({ error: "通信エラーが発生しました" }); }
+                        setImportLoading(false);
+                      }}
+                      className="btn-primary flex-1 py-2.5 text-sm"
+                    >{importLoading ? "検証中..." : "プレビュー"}</button>
+                  </div>
+                </>
+              )}
+
+              {/* Step 2: Preview */}
+              {importStep === "preview" && importPreview && (
+                <>
+                  <div className="bg-[#FBF8F4] rounded-xl p-4 text-xs space-y-1">
+                    <p className="font-semibold text-[#2C2C4A]">インポート内容の確認</p>
+                    <p>合計: <strong>{importPreview.summary.total}名</strong>（マネージャー {importPreview.summary.managers}名 + 参加者 {importPreview.summary.participants}名）</p>
+                    {importPreview.summary.duplicates > 0 && (
+                      <p className="text-amber-600">⚠️ {importPreview.summary.duplicates}名は既に登録済みのためスキップされます</p>
+                    )}
+                    <p className="text-green-700">✅ 新規登録: <strong>{importPreview.summary.newRegistrations}名</strong></p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-[#EFE8DD] text-left text-[#8B8489]">
+                          <th className="py-2 pr-3">名前</th>
+                          <th className="py-2 pr-3">メール</th>
+                          <th className="py-2 pr-3">部署</th>
+                          <th className="py-2 pr-3">役割</th>
+                          <th className="py-2 pr-3">道場</th>
+                          <th className="py-2 pr-3">上司</th>
+                          <th className="py-2">状態</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importPreview.rows.map((row, i) => (
+                          <tr key={i} className={`border-b border-[#EFE8DD] ${row.isDuplicate ? "opacity-50" : ""}`}>
+                            <td className="py-2 pr-3 font-medium text-[#1A1A2E]">{row.name}</td>
+                            <td className="py-2 pr-3 text-[#5B5560]">{row.email}</td>
+                            <td className="py-2 pr-3 text-[#5B5560]">{row.department}</td>
+                            <td className="py-2 pr-3"><span className={`px-1.5 py-0.5 rounded text-[10px] ${row.role === "参加者" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>{row.role}</span></td>
+                            <td className="py-2 pr-3 text-[#5B5560]">{row.dojoPhase}</td>
+                            <td className="py-2 pr-3 text-[#5B5560]">{row.managerName || "-"}</td>
+                            <td className="py-2">{row.isDuplicate ? <span className="text-amber-600">重複</span> : <span className="text-green-600">新規</span>}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <button type="button" onClick={() => { setImportStep("input"); setImportPreview(null); }} className="btn-secondary flex-1 py-2.5 text-sm">戻る</button>
+                    <button
+                      disabled={importLoading || importPreview.summary.newRegistrations === 0}
+                      onClick={async () => {
+                        setImportLoading(true);
+                        try {
+                          const res = await fetch("/api/admin/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, csv: csvText, dryRun: false }) });
+                          const json = await res.json();
+                          if (res.ok) {
+                            setImportResult(json);
+                            setImportStep("result");
+                            // refresh participant list
+                            const refreshRes = await fetch(`/api/admin?token=${token}`);
+                            if (refreshRes.ok) { const d = await refreshRes.json(); setData(d); }
+                          } else {
+                            setImportError({ error: json.error, details: json.details });
+                            setImportStep("input");
+                          }
+                        } catch { setImportError({ error: "通信エラーが発生しました" }); setImportStep("input"); }
+                        setImportLoading(false);
+                      }}
+                      className="btn-primary flex-1 py-2.5 text-sm"
+                    >{importLoading ? "登録中..." : `${importPreview.summary.newRegistrations}名を登録する`}</button>
+                  </div>
+                </>
+              )}
+
+              {/* Step 3: Result */}
+              {importStep === "result" && importResult && (
+                <>
+                  <div className="bg-green-50 rounded-xl p-4 text-xs space-y-1">
+                    <p className="font-semibold text-green-800">インポート完了</p>
+                    <p>成功: <strong>{importResult.summary.success}名</strong>　スキップ: {importResult.summary.skipped}名　エラー: {importResult.summary.errors}名</p>
+                  </div>
+                  <div className="overflow-x-auto max-h-80">
+                    <table className="w-full text-xs">
+                      <thead className="sticky top-0 bg-white">
+                        <tr className="border-b border-[#EFE8DD] text-left text-[#8B8489]">
+                          <th className="py-2 pr-3">名前</th>
+                          <th className="py-2 pr-3">役割</th>
+                          <th className="py-2 pr-3">結果</th>
+                          <th className="py-2">トークンURL</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importResult.results.map((r, i) => (
+                          <tr key={i} className="border-b border-[#EFE8DD]">
+                            <td className="py-2 pr-3 font-medium text-[#1A1A2E]">{r.name}</td>
+                            <td className="py-2 pr-3"><span className={`px-1.5 py-0.5 rounded text-[10px] ${r.role === "参加者" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>{r.role || "参加者"}</span></td>
+                            <td className="py-2 pr-3">{r.status === "success" ? <span className="text-green-600">✅ 登録</span> : r.status === "skipped" ? <span className="text-amber-600">⏭️ スキップ</span> : <span className="text-red-600">❌ エラー</span>}</td>
+                            <td className="py-2 font-mono text-[10px] text-[#5B5560] break-all">{r.url || r.message}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <button
+                    onClick={() => {
+                      // Copy all URLs to clipboard
+                      const lines = importResult.results
+                        .filter((r) => r.status === "success" && r.url)
+                        .map((r) => `${r.name}\t${r.email}\t${r.role || "参加者"}\t${r.url}`)
+                        .join("\n");
+                      navigator.clipboard.writeText(lines);
+                    }}
+                    className="text-xs text-[#8B7355] hover:text-[#6B5335] underline"
+                  >📋 全URLをコピー（タブ区切り）</button>
+                  <div className="flex gap-3 pt-2">
+                    <button type="button" onClick={() => setShowImportModal(false)} className="btn-primary flex-1 py-2.5 text-sm">閉じる</button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
