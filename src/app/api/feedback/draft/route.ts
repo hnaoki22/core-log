@@ -3,8 +3,9 @@
 // Analyzes participant's recent logs and generates personalized feedback
 
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminToken } from "@/lib/participant-db";
-import { getAiSystemPrompt } from "@/lib/notion";
+import { getManagerByToken } from "@/lib/participant-db";
+import { getAiSystemPrompt as getAiSystemPromptFromNotion } from "@/lib/notion";
+import { getAiSystemPrompt as getAiSystemPromptFromSupabase } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
@@ -29,9 +30,9 @@ export async function POST(request: NextRequest) {
       fbPolicy?: string;
     };
 
-    // Auth check
-    const authorized = await isAdminToken(token);
-    if (!authorized) {
+    // Auth check — also determines backend for AI settings
+    const manager = await getManagerByToken(token);
+    if (!manager || !manager.isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
@@ -63,8 +64,10 @@ export async function POST(request: NextRequest) {
       return entry;
     }).join("\n\n");
 
-    // Get system prompt from Notion settings (or use default)
-    let systemPrompt = await getAiSystemPrompt();
+    // Get system prompt from appropriate backend
+    let systemPrompt = manager.backend === "supabase" && manager.tenantId
+      ? await getAiSystemPromptFromSupabase(manager.tenantId)
+      : await getAiSystemPromptFromNotion();
     if (!systemPrompt) {
       systemPrompt = `あなたは「Human Mature」という戦略・組織開発コンサルティング会社のシニアコンサルタントです。
 クライアント企業の参加者に対して、週次のフィードバック（CORE Logフィードバック）を作成します。

@@ -2,8 +2,9 @@
 // PUT /api/admin/ai-settings - Update AI system prompt
 
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminToken } from "@/lib/participant-db";
-import { getAiSystemPrompt, updateAiSystemPrompt } from "@/lib/notion";
+import { getManagerByToken } from "@/lib/participant-db";
+import { getAiSystemPrompt as getAiSystemPromptFromNotion, updateAiSystemPrompt as updateAiSystemPromptFromNotion } from "@/lib/notion";
+import { getAiSystemPrompt as getAiSystemPromptFromSupabase, updateAiSystemPrompt as updateAiSystemPromptFromSupabase } from "@/lib/supabase";
 
 const DEFAULT_SYSTEM_PROMPT = `あなたは「Human Mature」という戦略・組織開発コンサルティング会社のシニアコンサルタントです。
 クライアント企業の参加者に対して、週次のフィードバック（CORE Logフィードバック）を作成します。
@@ -25,13 +26,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
-  const authorized = await isAdminToken(token);
-  if (!authorized) {
+  const manager = await getManagerByToken(token);
+  if (!manager || !manager.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
   try {
-    const prompt = await getAiSystemPrompt();
+    const prompt = manager.backend === "supabase" && manager.tenantId
+      ? await getAiSystemPromptFromSupabase(manager.tenantId)
+      : await getAiSystemPromptFromNotion();
     return NextResponse.json({
       systemPrompt: prompt || DEFAULT_SYSTEM_PROMPT,
       isDefault: !prompt,
@@ -53,8 +56,8 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    const authorized = await isAdminToken(token);
-    if (!authorized) {
+    const manager = await getManagerByToken(token);
+    if (!manager || !manager.isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
@@ -62,11 +65,13 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "プロンプトが空です" }, { status: 400 });
     }
 
-    const success = await updateAiSystemPrompt(systemPrompt.trim());
+    const success = manager.backend === "supabase" && manager.tenantId
+      ? await updateAiSystemPromptFromSupabase(manager.tenantId, systemPrompt.trim())
+      : await updateAiSystemPromptFromNotion(systemPrompt.trim());
     if (success) {
       return NextResponse.json({ success: true });
     } else {
-      return NextResponse.json({ error: "Notion設定ページが未設定です（NOTION_AI_SETTINGS_PAGE_ID）" }, { status: 500 });
+      return NextResponse.json({ error: "AI設定の更新に失敗しました" }, { status: 500 });
     }
   } catch (error) {
     console.error("Error updating AI settings:", error);
