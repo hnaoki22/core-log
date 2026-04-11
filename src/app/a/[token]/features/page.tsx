@@ -27,7 +27,7 @@ type ApiData = {
   catalog: FeatureFlag[];
   presets: Preset[];
   flags: Record<string, boolean>;
-  notionConfigured: boolean;
+  storageConfigured: boolean;
 };
 
 const CATEGORY_META: Record<FlagCategory, { label: string; color: string; desc: string }> = {
@@ -172,9 +172,9 @@ export default function FeatureFlagsAdminPage() {
           <p className="text-indigo-200 text-sm mt-1.5 leading-relaxed">
             クライアントの導入フェーズに応じて、機能を段階的にON/OFFできます。
           </p>
-          {!data.notionConfigured && (
+          {!data.storageConfigured && (
             <div className="mt-3 bg-amber-400/20 border border-amber-300/40 text-amber-100 text-xs rounded-lg p-3">
-              ⚠ <code className="bg-black/20 px-1.5 py-0.5 rounded">NOTION_FEATURE_FLAGS_PAGE_ID</code> が未設定です。現在はデフォルト値のみ表示され、保存できません。Notionページを作成し、環境変数を設定してください。
+              ⚠ Supabaseが未設定です。現在はデフォルト値のみ表示され、保存できません。
             </div>
           )}
         </div>

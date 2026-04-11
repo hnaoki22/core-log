@@ -6,8 +6,8 @@ import {
   markFeedbackAsRead,
   getUnreadFeedbackCount,
   getLogsByParticipant,
-} from "@/lib/notion";
-import { getParticipantByToken, getManagerByToken } from "@/lib/participant-db";
+} from "@/lib/supabase";
+import { getParticipantByToken, getManagerByToken, getParticipantByName } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
 
 /**
@@ -25,8 +25,8 @@ export async function GET(req: NextRequest) {
   // Check if participant token
   const participant = await getParticipantByToken(token);
   if (participant) {
-    const feedback = await getFeedbackByParticipant(participant.name);
-    const unreadCount = await getUnreadFeedbackCount(participant.name);
+    const feedback = await getFeedbackByParticipant(participant.name, participant.tenantId || "81f91c26-214e-4da2-9893-6ac6c8984062");
+    const unreadCount = await getUnreadFeedbackCount(participant.name, participant.tenantId || "81f91c26-214e-4da2-9893-6ac6c8984062");
     return NextResponse.json({ feedback, unreadCount, totalCount: feedback.length });
   }
 
@@ -35,9 +35,9 @@ export async function GET(req: NextRequest) {
   const isAdmin = await isAdminToken(token);
   if ((manager || isAdmin) && participantName) {
     const includeLogs = req.nextUrl.searchParams.get("includeLogs") === "true";
-    const feedback = await getFeedbackByParticipant(participantName);
+    const feedback = await getFeedbackByParticipant(participantName, "81f91c26-214e-4da2-9893-6ac6c8984062");
     if (includeLogs) {
-      const allLogs = await getLogsByParticipant(participantName);
+      const allLogs = await getLogsByParticipant(participantName, "81f91c26-214e-4da2-9893-6ac6c8984062");
       // Return only last 7 days of logs
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
         content,
         period: period || "",
         weekNum: weekNum || 1,
-      });
+      }, "81f91c26-214e-4da2-9893-6ac6c8984062", "");
     } catch (fbError: unknown) {
       const msg = fbError instanceof Error ? fbError.message : String(fbError);
       return NextResponse.json({ error: "Failed to create feedback", detail: msg }, { status: 500 });
@@ -101,9 +101,7 @@ export async function POST(req: NextRequest) {
     // Send email notification to participant (non-blocking)
     try {
       // Search all participants to find the one with matching name
-      const { getAllParticipantsFromNotion } = await import("@/lib/notion");
-      const allParticipants = await getAllParticipantsFromNotion();
-      const targetParticipant = allParticipants.find(p => p.name === participantName);
+      const targetParticipant = await getParticipantByName(participantName);
 
       if (targetParticipant?.email && !targetParticipant.email.includes("example.com") && targetParticipant.emailEnabled) {
         sendNotificationEmail({

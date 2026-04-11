@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { isBusinessDay, getJSTDateString, getJSTDayOfWeek } from "@/lib/calendar";
-import { getLogsByParticipant } from "@/lib/notion";
+import { getLogsByParticipant } from "@/lib/supabase";
 import { getAllParticipants, getAllManagers } from "@/lib/participant-db";
 import { isProgramEnded } from "@/lib/date-utils";
 import { logger } from "@/lib/logger";
@@ -34,7 +34,6 @@ export async function GET(request: NextRequest) {
 
   const participants = await getAllParticipants();
   const managers = await getAllManagers();
-  const useNotion = !!process.env.NOTION_API_TOKEN;
   const isFriday = getJSTDayOfWeek() === 5;
 
   const results: { managerName: string; type: string; sent: boolean; reason?: string }[] = [];
@@ -61,51 +60,49 @@ export async function GET(request: NextRequest) {
       // Skip ended programs
       if (p.endDate && isProgramEnded(p.endDate)) continue;
 
-      if (useNotion) {
-        try {
-          const logs = await getLogsByParticipant(p.name);
+      try {
+        const logs = await getLogsByParticipant(p.name, "81f91c26-214e-4da2-9893-6ac6c8984062");
 
-          // Check if manager commented in last 3 days
-          const recentLogs = logs.filter((l) => {
-            const diff = daysBetween(l.date, todayStr);
-            return diff >= 0 && diff <= 3;
-          });
-          const hasRecentComment = recentLogs.some((l) => l.managerComment);
-          if (!hasRecentComment && logs.length > 0) {
-            participantsNeedingAttention.push(p.name);
-          }
-
-          // Weekly stats for Friday summary
-          if (isFriday) {
-            const weekLogs = logs.filter((l) => {
-              const diff = daysBetween(l.date, todayStr);
-              return diff >= 0 && diff < 7;
-            });
-            const entryDays = weekLogs.filter((l) => l.morningIntent).length;
-
-            // Calculate streak
-            let streak = 0;
-            const entryDates = new Set(logs.filter((l) => l.morningIntent).map((l) => l.date));
-            let checkDate = todayStr;
-            for (let i = 0; i < 30; i++) {
-              if (entryDates.has(checkDate)) {
-                streak++;
-              } else if (getDayOfWeek(checkDate) !== 0 && getDayOfWeek(checkDate) !== 6) {
-                break;
-              }
-              checkDate = subtractOneDay(checkDate);
-            }
-
-            participantStats.push({
-              name: p.name,
-              entryDays,
-              lastEntry: logs[0]?.date || null,
-              streak,
-            });
-          }
-        } catch {
-          // skip this participant
+        // Check if manager commented in last 3 days
+        const recentLogs = logs.filter((l) => {
+          const diff = daysBetween(l.date, todayStr);
+          return diff >= 0 && diff <= 3;
+        });
+        const hasRecentComment = recentLogs.some((l) => l.managerComment);
+        if (!hasRecentComment && logs.length > 0) {
+          participantsNeedingAttention.push(p.name);
         }
+
+        // Weekly stats for Friday summary
+        if (isFriday) {
+          const weekLogs = logs.filter((l) => {
+            const diff = daysBetween(l.date, todayStr);
+            return diff >= 0 && diff < 7;
+          });
+          const entryDays = weekLogs.filter((l) => l.morningIntent).length;
+
+          // Calculate streak
+          let streak = 0;
+          const entryDates = new Set(logs.filter((l) => l.morningIntent).map((l) => l.date));
+          let checkDate = todayStr;
+          for (let i = 0; i < 30; i++) {
+            if (entryDates.has(checkDate)) {
+              streak++;
+            } else if (getDayOfWeek(checkDate) !== 0 && getDayOfWeek(checkDate) !== 6) {
+              break;
+            }
+            checkDate = subtractOneDay(checkDate);
+          }
+
+          participantStats.push({
+            name: p.name,
+            entryDays,
+            lastEntry: logs[0]?.date || null,
+            streak,
+          });
+        }
+      } catch {
+        // skip this participant
       }
     }
 

@@ -2,8 +2,7 @@
 // Returns manager info + enriched participant data (Supabase / Notion / Mock)
 
 import { NextRequest, NextResponse } from "next/server";
-import { getLogsByParticipant } from "@/lib/notion";
-import { getLogsByParticipant as getLogsByParticipantFromSupabase } from "@/lib/supabase";
+import { getLogsByParticipant } from "@/lib/supabase";
 import {
   getManagerByToken,
   getParticipantsForManager,
@@ -25,41 +24,13 @@ export async function GET(request: NextRequest) {
 
   const participantMocks = await getParticipantsForManager(manager.id, manager.tenantId);
   const todayJST = getTodayJST();
-  const useMock = !process.env.NOTION_API_TOKEN;
 
-  // Fetch Notion data for each participant in parallel
+  // Fetch Supabase data for each participant in parallel
   const enrichedParticipants = await Promise.all(
     participantMocks.map(async (p) => {
-      if (useMock) {
-        // Mock mode: return mock data stats
-        const logs = p.logs || [];
-        const hasLogToday = logs.some((l) => l.date === todayJST && l.morningIntent);
-        return {
-          name: p.name,
-          department: p.department,
-          dojoPhase: p.dojoPhase,
-          entryDays: (p.entryRate || 0) > 0 ? logs.filter((l) => l.morningIntent).length : 0,
-          entryRate: p.entryRate || 0,
-          streak: p.streak || 0,
-          fbCount: p.fbCount || 0,
-          todayHasLog: hasLogToday,
-          latestLog: logs[0]
-            ? {
-                date: logs[0].date,
-                morningIntent: logs[0].morningIntent,
-                status: logs[0].status,
-                energy: logs[0].energy,
-              }
-            : null,
-          recentEnergy: logs.slice(0, 5).map((l) => l.energy),
-        };
-      }
-
-      // Real data mode: fetch from Supabase or Notion based on backend
+      // Supabase mode: fetch from API
       try {
-        const logs = p.backend === "supabase" && p.tenantId
-          ? await getLogsByParticipantFromSupabase(p.name, p.tenantId)
-          : await getLogsByParticipant(p.name);
+        const logs = await getLogsByParticipant(p.name, p.tenantId || "81f91c26-214e-4da2-9893-6ac6c8984062");
         const stats = computeParticipantStats(logs, todayJST);
         const latestLog = logs[0] || null;
 

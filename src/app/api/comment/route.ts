@@ -2,14 +2,12 @@
 // Add manager comment to a participant's record
 
 import { NextRequest, NextResponse } from "next/server";
-import { addManagerComment, getLogEntryOwner } from "@/lib/notion";
+import { addManagerComment, getLogEntryOwner } from "@/lib/supabase";
 import { getManagerByToken, getParticipantByName } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
 import { sanitizeInput } from "@/lib/sanitize";
 
 export async function POST(request: NextRequest) {
-  const useMock = !process.env.NOTION_API_TOKEN;
-
   try {
     const body = await request.json();
     const { token, participantId, comment } = body;
@@ -21,16 +19,7 @@ export async function POST(request: NextRequest) {
     // Sanitize user input
     const sanitizedComment = sanitizeInput(comment);
 
-    // Mock mode
-    if (useMock) {
-      return NextResponse.json({
-        success: true,
-        message: "コメントを保存しました",
-        mock: true,
-      });
-    }
-
-    // Real Notion API - add comment to the specific log entry
+    // Add comment to the specific log entry
     if (participantId) {
       const success = await addManagerComment(participantId, sanitizedComment);
       if (!success) {

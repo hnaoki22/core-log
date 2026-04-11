@@ -2,7 +2,7 @@
 // Returns all participants + managers with enriched Notion data
 
 import { NextRequest, NextResponse } from "next/server";
-import { getLogsByParticipant } from "@/lib/notion";
+import { getLogsByParticipant } from "@/lib/supabase";
 import {
   getAllParticipants,
   getAllManagers,
@@ -29,42 +29,13 @@ export async function GET(request: NextRequest) {
   const participantMocks = await getAllParticipants();
   const managers = await getAllManagers();
   const todayJST = getTodayJST();
-  const useMock = !process.env.NOTION_API_TOKEN;
 
-  // Fetch Notion data for each participant in parallel
+  // Fetch Supabase data for each participant in parallel
   const enrichedParticipants = await Promise.all(
     participantMocks.map(async (p) => {
-      if (useMock) {
-        const logs = p.logs || [];
-        const hasLogToday = logs.some((l) => l.date === todayJST && l.morningIntent);
-        return {
-          id: p.id,
-          name: p.name,
-          department: p.department,
-          dojoPhase: p.dojoPhase,
-          entryDays: logs.filter((l) => l.morningIntent).length,
-          entryRate: p.entryRate || 0,
-          streak: p.streak || 0,
-          fbCount: p.fbCount || 0,
-          managerId: p.managerId,
-          fbPolicy: p.fbPolicy || "",
-          weekNum: p.weekNum || 0,
-          todayHasLog: hasLogToday,
-          latestLog: logs[0]
-            ? {
-                date: logs[0].date,
-                morningIntent: logs[0].morningIntent,
-                status: logs[0].status,
-                energy: logs[0].energy,
-              }
-            : null,
-          recentEnergy: logs.slice(0, 7).map((l) => l.energy),
-        };
-      }
-
-      // Notion mode
+      // Supabase mode
       try {
-        const logs = await getLogsByParticipant(p.name);
+        const logs = await getLogsByParticipant(p.name, "81f91c26-214e-4da2-9893-6ac6c8984062");
         const stats = computeParticipantStats(logs, todayJST);
         const latestLog = logs[0] || null;
 

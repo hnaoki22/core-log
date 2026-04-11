@@ -1,27 +1,13 @@
 // ===== Participant & Manager DB Access =====
-// Unified async interface supporting three backends:
-//   1. Supabase (multi-tenant, for new clients)
-//   2. Notion (for 大幸薬品 — permanent)
-//   3. Mock data (development fallback)
+// Unified async interface supporting two backends:
+//   1. Supabase (multi-tenant, primary)
+//   2. Mock data (development fallback)
 //
 // Token-based routing: when a token is looked up, Supabase is checked first.
-// If found there, the Supabase backend is used. Otherwise, Notion/mock is used.
+// If found there, the Supabase backend is used. Otherwise, mock is used.
 //
 // ALL API routes should import from this file instead of mock-data.ts or supabase.ts.
 
-import {
-  getAllParticipantsFromNotion,
-  getParticipantByTokenFromNotion,
-  getParticipantByNameFromNotion,
-  getParticipantByEmailFromNotion,
-  getAllManagersFromNotion,
-  getManagerByTokenFromNotion,
-  getManagerByIdFromNotion,
-  isAdminTokenFromNotion,
-  getParticipantsForManagerFromNotion,
-  type NotionParticipant,
-  type NotionManager,
-} from "./notion";
 
 import {
   getParticipantByTokenFromSupabase,
@@ -33,6 +19,8 @@ import {
   getParticipantByEmailFromSupabase,
   getParticipantsForManagerFromSupabase,
   isAdminTokenFromSupabase,
+  type NotionParticipant,
+  type NotionManager,
 } from "./supabase";
 
 import {
@@ -50,16 +38,12 @@ import {
 } from "./mock-data";
 
 // Check backend availability
-function hasNotionParticipantDB(): boolean {
-  return !!process.env.NOTION_PARTICIPANTS_DB_ID;
-}
-
 function hasSupabase(): boolean {
   return !!(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL);
 }
 
 // ===== Unified types that all backends can provide =====
-export type BackendType = "supabase" | "notion" | "mock";
+export type BackendType = "supabase" | "mock";
 
 export type ParticipantInfo = {
   id: string;
@@ -120,7 +104,6 @@ function notionParticipantToInfo(np: NotionParticipant): ParticipantInfo {
     startDate: np.startDate,
     endDate: np.endDate,
     fbPolicy: np.fbPolicy || "",
-    backend: "notion",
   };
 }
 
@@ -160,7 +143,6 @@ function notionManagerToInfo(nm: NotionManager & { role?: string }): ManagerInfo
     isAdmin: nm.isAdmin,
     role: (nm.role as ManagerRole) || (nm.isAdmin ? "admin" : "manager"),
     participantIds: nm.participantIds,
-    backend: "notion",
   };
 }
 
@@ -181,9 +163,13 @@ function mockManagerToInfo(mm: Manager): ManagerInfo {
 // ===== Public API =====
 
 export async function getAllParticipants(): Promise<ParticipantInfo[]> {
-  if (hasNotionParticipantDB()) {
-    const nps = await getAllParticipantsFromNotion();
-    return nps.map(notionParticipantToInfo);
+  if (hasSupabase()) {
+    const sps = await getAllParticipantsFromSupabase("81f91c26-214e-4da2-9893-6ac6c8984062");
+    return sps.map((sp) => ({
+      ...notionParticipantToInfo(sp),
+      backend: "supabase" as BackendType,
+      tenantId: "81f91c26-214e-4da2-9893-6ac6c8984062",
+    }));
   }
   return mockGetAllParticipants().map(mockParticipantToInfo);
 }
@@ -214,15 +200,10 @@ export async function getParticipantByToken(token: string): Promise<ParticipantI
         };
       }
     } catch {
-      // Supabase lookup failed — continue to Notion/mock
+      // Supabase lookup failed — continue to mock
     }
   }
-  // 2. Try Notion (大幸薬品)
-  if (hasNotionParticipantDB()) {
-    const np = await getParticipantByTokenFromNotion(token);
-    return np ? notionParticipantToInfo(np) : null;
-  }
-  // 3. Fallback to mock
+  // 2. Fallback to mock
   const mp = mockGetByToken(token);
   return mp ? mockParticipantToInfo(mp) : null;
 }
@@ -233,10 +214,7 @@ export async function getParticipantByName(name: string, tenantId?: string): Pro
     const sp = await getParticipantByNameFromSupabase(name, tenantId);
     if (sp) return { ...notionParticipantToInfo(sp), backend: "supabase", tenantId };
   }
-  if (hasNotionParticipantDB()) {
-    const np = await getParticipantByNameFromNotion(name);
-    return np ? notionParticipantToInfo(np) : null;
-  }
+  // Fallback to mock
   const mp = mockGetByName(name);
   return mp ? mockParticipantToInfo(mp) : null;
 }
@@ -246,23 +224,26 @@ export async function getParticipantByEmail(email: string, tenantId?: string): P
     const sp = await getParticipantByEmailFromSupabase(email, tenantId);
     if (sp) return { ...notionParticipantToInfo(sp), backend: "supabase", tenantId };
   }
-  if (hasNotionParticipantDB()) {
-    const np = await getParticipantByEmailFromNotion(email);
-    return np ? notionParticipantToInfo(np) : null;
-  }
+  // Fallback to mock
   const mp = mockGetByEmail(email);
   return mp ? mockParticipantToInfo(mp) : null;
 }
 
 export async function getParticipantById(id: string): Promise<ParticipantInfo | null> {
-  if (hasNotionParticipantDB()) {
-    // In Notion mode, ID is a Notion page ID — retrieve directly
+  if (hasSupabase()) {
     try {
-      const all = await getAllParticipantsFromNotion();
+      // Check all participants and find by ID
+      const all = await getAllParticipantsFromSupabase("81f91c26-214e-4da2-9893-6ac6c8984062");
       const found = all.find((p) => p.id === id);
-      return found ? notionParticipantToInfo(found) : null;
+      if (found) {
+        return {
+          ...notionParticipantToInfo(found),
+          backend: "supabase",
+          tenantId: "81f91c26-214e-4da2-9893-6ac6c8984062",
+        };
+      }
     } catch {
-      return null;
+      // Continue to mock
     }
   }
   const mp = mockGetById(id);
@@ -270,9 +251,13 @@ export async function getParticipantById(id: string): Promise<ParticipantInfo | 
 }
 
 export async function getAllManagers(): Promise<ManagerInfo[]> {
-  if (hasNotionParticipantDB()) {
-    const nms = await getAllManagersFromNotion();
-    return nms.map(notionManagerToInfo);
+  if (hasSupabase()) {
+    const sms = await getAllManagersFromSupabase("81f91c26-214e-4da2-9893-6ac6c8984062");
+    return sms.map((sm) => ({
+      ...notionManagerToInfo(sm),
+      backend: "supabase" as BackendType,
+      tenantId: "81f91c26-214e-4da2-9893-6ac6c8984062",
+    }));
   }
   return mockGetAllManagers().map(mockManagerToInfo);
 }
@@ -303,15 +288,10 @@ export async function getManagerByToken(token: string): Promise<ManagerInfo | nu
         };
       }
     } catch {
-      // Continue to Notion/mock
+      // Continue to mock
     }
   }
-  // 2. Try Notion
-  if (hasNotionParticipantDB()) {
-    const nm = await getManagerByTokenFromNotion(token);
-    return nm ? notionManagerToInfo(nm) : null;
-  }
-  // 3. Fallback to mock
+  // 2. Fallback to mock
   const mm = mockGetManagerByToken(token);
   return mm ? mockManagerToInfo(mm) : null;
 }
@@ -323,12 +303,8 @@ export async function getManagerById(id: string): Promise<ManagerInfo | null> {
       const sm = await getManagerByIdFromSupabase(id);
       if (sm) return { ...notionManagerToInfo(sm), backend: "supabase" };
     } catch {
-      // Continue
+      // Continue to mock
     }
-  }
-  if (hasNotionParticipantDB()) {
-    const nm = await getManagerByIdFromNotion(id);
-    return nm ? notionManagerToInfo(nm) : null;
   }
   const mm = mockGetManagerById(id);
   return mm ? mockManagerToInfo(mm) : null;
@@ -343,10 +319,7 @@ export async function getParticipantsForManager(managerId: string, tenantId?: st
       tenantId,
     }));
   }
-  if (hasNotionParticipantDB()) {
-    const nps = await getParticipantsForManagerFromNotion(managerId);
-    return nps.map(notionParticipantToInfo);
-  }
+  // Fallback to mock
   return mockGetParticipantsForManager(managerId).map(mockParticipantToInfo);
 }
 
@@ -357,11 +330,8 @@ export async function isAdminToken(token: string): Promise<boolean> {
       const isAdmin = await isAdminTokenFromSupabase(token);
       if (isAdmin) return true;
     } catch {
-      // Continue
+      // Continue to fallback
     }
-  }
-  if (hasNotionParticipantDB()) {
-    return await isAdminTokenFromNotion(token);
   }
   // Read from environment variable with fallback defaults
   const ADMIN_TOKENS = (process.env.ADMIN_TOKENS || "munetomo-admin,UE8m8SSJAgRBwsSZ")

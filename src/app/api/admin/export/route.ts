@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminOrObserverToken, getAllParticipants } from "@/lib/participant-db";
-import { getLogsByParticipant } from "@/lib/notion";
+import { getLogsByParticipant } from "@/lib/supabase";
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
@@ -23,7 +23,6 @@ export async function GET(request: NextRequest) {
 
     // Collect all logs for all participants
     const csvRows: string[] = [];
-    const useMock = !process.env.NOTION_API_TOKEN;
 
     // CSV Header
     const headers = [
@@ -42,15 +41,8 @@ export async function GET(request: NextRequest) {
 
     // Fetch logs for each participant
     for (const participant of participants) {
-      let logs;
-
-      if (useMock) {
-        // Mock mode: use participant.logs
-        logs = participant.logs || [];
-      } else {
-        // Notion mode: fetch from API
-        logs = await getLogsByParticipant(participant.name);
-      }
+      // Supabase mode: fetch from API
+      const logs = await getLogsByParticipant(participant.name, "81f91c26-214e-4da2-9893-6ac6c8984062");
 
       // Convert logs to CSV rows
       for (const log of logs) {

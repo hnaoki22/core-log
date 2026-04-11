@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminToken } from "@/lib/participant-db";
 
-export const dynamic = "force-dynamic"; // Always fresh reads from Notion
+export const dynamic = "force-dynamic"; // Always fresh reads from Supabase
 import {
   FEATURE_CATALOG,
   PRESETS,
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     catalog: FEATURE_CATALOG,
     presets: PRESETS.map((p) => ({ id: p.id, label: p.label, description: p.description })),
     flags: currentFlags,
-    notionConfigured: !!process.env.NOTION_FEATURE_FLAGS_PAGE_ID,
+    storageConfigured: !!(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL),
   });
 }
 
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
   if (!ok) {
     return NextResponse.json(
       {
-        error: "Failed to save. NOTION_FEATURE_FLAGS_PAGE_ID may not be configured.",
+        error: "Failed to save feature flags to Supabase.",
       },
       { status: 500 }
     );

@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isBusinessDay, getJSTDateString, getJSTHour } from "@/lib/calendar";
 import { sendReminderEmail, type ReminderType } from "@/lib/email";
-import { hasLoggedToday } from "@/lib/notion";
+import { hasLoggedToday } from "@/lib/supabase";
 import { getAllParticipants } from "@/lib/participant-db";
 
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -31,9 +31,6 @@ export async function GET(request: NextRequest) {
   const envCheck = {
     RESEND_API_KEY: !!process.env.RESEND_API_KEY,
     REMIND_FROM_EMAIL: process.env.REMIND_FROM_EMAIL || "(default: noreply@resend.dev)",
-    NOTION_API_TOKEN: !!process.env.NOTION_API_TOKEN,
-    NOTION_PARTICIPANTS_DB_ID: !!process.env.NOTION_PARTICIPANTS_DB_ID,
-    NOTION_CORE_LOG_DB_ID: !!process.env.NOTION_CORE_LOG_DB_ID,
     CRON_SECRET: !!process.env.CRON_SECRET,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || "(default)",
   };
@@ -52,7 +49,6 @@ export async function GET(request: NextRequest) {
   );
 
   // Log check for each participant
-  const useNotion = !!process.env.NOTION_API_TOKEN;
   const participantDetails = [];
 
   for (const p of activeParticipants) {
@@ -60,24 +56,22 @@ export async function GET(request: NextRequest) {
     let wouldSkip = false;
     let skipReason = "";
 
-    if (useNotion) {
-      try {
-        logStatus = await hasLoggedToday(p.name, todayStr);
-        if (type === "morning" && logStatus.hasMorning) {
-          wouldSkip = true;
-          skipReason = "already logged morning";
-        }
-        if (type === "evening" && logStatus.hasEvening) {
-          wouldSkip = true;
-          skipReason = "already logged evening";
-        }
-        if (type === "evening" && !logStatus.hasMorning) {
-          wouldSkip = true;
-          skipReason = "no morning entry → evening skipped";
-        }
-      } catch (error) {
-        logStatus = { error: String(error) };
+    try {
+      logStatus = await hasLoggedToday(p.name, todayStr, "81f91c26-214e-4da2-9893-6ac6c8984062");
+      if (type === "morning" && logStatus.hasMorning) {
+        wouldSkip = true;
+        skipReason = "already logged morning";
       }
+      if (type === "evening" && logStatus.hasEvening) {
+        wouldSkip = true;
+        skipReason = "already logged evening";
+      }
+      if (type === "evening" && !logStatus.hasMorning) {
+        wouldSkip = true;
+        skipReason = "no morning entry → evening skipped";
+      }
+    } catch (error) {
+      logStatus = { error: String(error) };
     }
 
     let sendResult = null;

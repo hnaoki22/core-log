@@ -7,7 +7,7 @@ import {
   createMission,
   updateMissionStatus,
   getMissionsByParticipant,
-} from "@/lib/notion";
+} from "@/lib/supabase";
 import { getManagerByToken, getParticipantByToken, getParticipantByName } from "@/lib/participant-db";
 import { getTodayJST } from "@/lib/date-utils";
 import { sendNotificationEmail } from "@/lib/email";
@@ -21,7 +21,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const missions = await getMissionsByParticipant(participantName);
+    const tenantId = "81f91c26-214e-4da2-9893-6ac6c8984062";
+    const missions = await getMissionsByParticipant(participantName, tenantId);
     return NextResponse.json({ missions });
   } catch (error) {
     console.error("Mission GET error:", error);
@@ -58,6 +59,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "participantName required" }, { status: 400 });
     }
 
+    const tenantId = participant?.tenantId || manager?.tenantId || "81f91c26-214e-4da2-9893-6ac6c8984062";
+    const targetParticipantObj = participant || await getParticipantByName(effectiveName, tenantId);
+    const participantId = targetParticipantObj?.id || "";
+
     const setDate = getTodayJST();
     const createdBy = manager ? "上司設定" : "自己設定";
     const missionId = await createMission(
@@ -66,7 +71,9 @@ export async function POST(request: NextRequest) {
       sanitizedPurpose,
       deadline || "",
       setDate,
-      createdBy as "上司設定" | "自己設定"
+      createdBy as "上司設定" | "自己設定",
+      tenantId,
+      participantId
     );
 
     if (!missionId) {

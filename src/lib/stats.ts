@@ -1,7 +1,7 @@
 // ===== Stats Computation Utility =====
 // Computes participant statistics from Notion log entries
 
-import { NotionLogEntry } from "./notion";
+import { NotionLogEntry } from "./supabase";
 
 export type ParticipantStats = {
   entryDays: number;

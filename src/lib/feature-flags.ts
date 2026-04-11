@@ -1,19 +1,18 @@
 // Feature Flag System for CORE Log
 // - Single source of truth: FEATURE_CATALOG (this file)
-// - Persistence: Notion page (body as JSON code block) — same pattern as AI_SETTINGS_PAGE_ID
+// - Persistence: Supabase ai_settings table (key='feature_flags', value=JSON)
 // - Multi-tenant: JSON shape is { [clientId: string]: { [flagKey: string]: boolean } }
-// - Fallback: if Notion not configured or read fails, uses defaultEnabled from catalog
-// - Cache: 60s in-memory cache to avoid excessive Notion API calls
+// - Fallback: if Supabase not configured or read fails, uses defaultEnabled from catalog
+// - Cache: 5s in-memory cache to avoid excessive DB calls
 //
 // Usage (server):
 //   import { isFeatureEnabled } from "@/lib/feature-flags";
 //   if (await isFeatureEnabled("feature.managerFeedback")) { ... }
 
-import { Client } from "@notionhq/client";
+import { getClient } from "@/lib/supabase";
 
-const notion = new Client({ auth: process.env.NOTION_API_TOKEN });
-const FEATURE_FLAGS_PAGE_ID = process.env.NOTION_FEATURE_FLAGS_PAGE_ID || "";
 const DEFAULT_CLIENT = process.env.FEATURE_FLAGS_CLIENT || "default";
+const DEFAULT_TENANT_ID = "81f91c26-214e-4da2-9893-6ac6c8984062";
 
 // ===== Catalog =====
 // Every feature (existing or new) is declared here. Adding a flag = one entry.
@@ -562,16 +561,11 @@ export const PRESETS: Preset[] = [
   },
 ];
 
-// ===== Storage (Notion page body as JSON code block) =====
+// ===== Storage (Supabase ai_settings table) =====
 
 type FlagStore = Record<string, Record<string, boolean>>; // { clientId: { flagKey: bool } }
 
 let cache: { data: FlagStore; at: number } | null = null;
-// Short TTL to minimize stale reads across serverless instances.
-// Each Vercel function instance has its own in-memory cache; after an admin
-// saves via POST (which invalidates *that* instance's cache), OTHER instances
-// still serve stale data until their TTL expires. 5 seconds is a reasonable
-// trade-off between freshness and Notion API rate limits.
 const CACHE_TTL_MS = 5 * 1000;
 
 function defaultFlagsFor(): Record<string, boolean> {
@@ -582,78 +576,47 @@ function defaultFlagsFor(): Record<string, boolean> {
   return flags;
 }
 
-async function readStoreFromNotion(): Promise<FlagStore> {
-  if (!FEATURE_FLAGS_PAGE_ID) return {};
+async function readStoreFromSupabase(): Promise<FlagStore> {
   try {
-    const blocks = await notion.blocks.children.list({
-      block_id: FEATURE_FLAGS_PAGE_ID,
-      page_size: 50,
-    });
-    for (const block of blocks.results) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const b = block as any;
-      if (b.type === "code" && b.code?.language === "json") {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const text = b.code.rich_text?.map((t: any) => t.plain_text).join("") || "";
-        if (text.trim()) {
-          try {
-            return JSON.parse(text) as FlagStore;
-          } catch {
-            return {};
-          }
-        }
-      }
+    const client = getClient();
+    const { data, error } = await client
+      .from("ai_settings")
+      .select("value")
+      .eq("tenant_id", DEFAULT_TENANT_ID)
+      .eq("key", "feature_flags")
+      .maybeSingle();
+    if (error || !data?.value) return {};
+    try {
+      return JSON.parse(data.value) as FlagStore;
+    } catch {
+      return {};
     }
-    return {};
   } catch (err) {
-    console.error("Error reading feature flags from Notion:", err);
+    console.error("Error reading feature flags from Supabase:", err);
     return {};
   }
 }
 
-async function writeStoreToNotion(store: FlagStore): Promise<boolean> {
-  if (!FEATURE_FLAGS_PAGE_ID) return false;
+async function writeStoreToSupabase(store: FlagStore): Promise<boolean> {
   try {
-    // Delete existing code blocks, then append fresh one
-    const blocks = await notion.blocks.children.list({
-      block_id: FEATURE_FLAGS_PAGE_ID,
-      page_size: 50,
-    });
-    for (const block of blocks.results) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const b = block as any;
-      if (b.type === "code" && b.code?.language === "json") {
-        await notion.blocks.delete({ block_id: b.id });
-      }
-    }
-    await notion.blocks.children.append({
-      block_id: FEATURE_FLAGS_PAGE_ID,
-      children: [
-        {
-          object: "block",
-          type: "code",
-          code: {
-            language: "json",
-            rich_text: [
-              {
-                type: "text",
-                text: { content: JSON.stringify(store, null, 2) },
-              },
-            ],
-          },
-        },
-      ],
-    });
-    return true;
+    const client = getClient();
+    const { error } = await client
+      .from("ai_settings")
+      .upsert({
+        tenant_id: DEFAULT_TENANT_ID,
+        key: "feature_flags",
+        value: JSON.stringify(store),
+      }, { onConflict: "tenant_id,key" });
+    return !error;
   } catch (err) {
-    console.error("Error writing feature flags to Notion:", err);
+    console.error("Error writing feature flags to Supabase:", err);
     return false;
   }
 }
 
 async function getStore(): Promise<FlagStore> {
   if (cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.data;
-  const data = await readStoreFromNotion();
+  const data = await readStoreFromSupabase();
   cache = { data, at: Date.now() };
   return data;
 }
@@ -684,9 +647,9 @@ export async function setFlagsForClient(
   clientId: string,
   flags: Record<string, boolean>
 ): Promise<boolean> {
-  const store = await readStoreFromNotion();
+  const store = await readStoreFromSupabase();
   store[clientId] = flags;
-  const ok = await writeStoreToNotion(store);
+  const ok = await writeStoreToSupabase(store);
   if (ok) invalidateFlagCache();
   return ok;
 }

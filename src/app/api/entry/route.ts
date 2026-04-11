@@ -3,7 +3,7 @@
 // Prevents duplicate entries for the same day
 
 import { NextRequest, NextResponse } from "next/server";
-import { createMorningEntry, createEveningOnlyEntry, updateEveningEntry, hasLoggedToday } from "@/lib/notion";
+import { createMorningEntry, createEveningOnlyEntry, updateEveningEntry, hasLoggedToday } from "@/lib/supabase";
 import { getParticipantByToken, getManagerById } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
 import { isProgramEnded, isProgramNotStarted, getCurrentHourJST } from "@/lib/date-utils";
@@ -11,8 +11,6 @@ import { sanitizeInput } from "@/lib/sanitize";
 import { logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
-  const useMock = !process.env.NOTION_API_TOKEN;
-
   try {
     const body = await request.json();
     const { type, token } = body;
@@ -21,17 +19,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Token and type required" }, { status: 400 });
     }
 
-    // Mock mode: just return success
-    if (useMock) {
-      return NextResponse.json({
-        success: true,
-        message: type === "morning" ? "朝の記入を保存しました" : "夕方の記入を保存しました",
-        mock: true,
-      });
-    }
-
     // Check if participant's program is still active
     const participant = await getParticipantByToken(token);
+    const tenantId = participant?.tenantId || "81f91c26-214e-4da2-9893-6ac6c8984062";
+    const participantId = participant?.id || "";
     if (participant) {
       if (participant.endDate && isProgramEnded(participant.endDate)) {
         return NextResponse.json({
@@ -64,7 +55,7 @@ export async function POST(request: NextRequest) {
       const sanitizedMorningIntent = sanitizeInput(morningIntent || "");
 
       // Check if entry already exists for today
-      const todayStatus = await hasLoggedToday(participantName, date);
+      const todayStatus = await hasLoggedToday(participantName, date, tenantId);
       if (todayStatus.hasMorning) {
         return NextResponse.json(
           { error: "今日の朝の記入は既に完了しています" },
@@ -72,7 +63,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const pageId = await createMorningEntry(participantName, date, sanitizedMorningIntent, energy, dojoPhase, weekNum);
+      const pageId = await createMorningEntry(participantName, date, sanitizedMorningIntent, energy, dojoPhase, weekNum, tenantId, participantId);
       if (!pageId) {
         return NextResponse.json({ error: "Failed to create entry" }, { status: 500 });
       }
@@ -146,7 +137,7 @@ export async function POST(request: NextRequest) {
       const sanitizedEveningInsight = sanitizeInput(eveningInsight || "");
 
       // Check if entry already exists for today
-      const todayStatus = await hasLoggedToday(participantName, date);
+      const todayStatus = await hasLoggedToday(participantName, date, tenantId);
       if (todayStatus.hasEvening) {
         return NextResponse.json(
           { error: "今日の夕方の記入は既に完了しています" },
@@ -154,7 +145,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const pageId = await createEveningOnlyEntry(participantName, date, sanitizedEveningInsight, energy, dojoPhase, weekNum);
+      const pageId = await createEveningOnlyEntry(participantName, date, sanitizedEveningInsight, energy, dojoPhase, weekNum, tenantId, participantId);
       if (!pageId) {
         return NextResponse.json({ error: "Failed to create entry" }, { status: 500 });
       }

@@ -5,10 +5,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminToken } from "@/lib/participant-db";
 import {
-  createParticipantInNotion,
-  createManagerInNotion,
-  getAllManagersFromNotion,
-} from "@/lib/notion";
+  createParticipantInSupabase as createParticipant,
+  createManagerInSupabase as createManager,
+  getAllManagersFromSupabase as getAllManagers,
+} from "@/lib/supabase";
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,20 +25,19 @@ export async function POST(request: NextRequest) {
     }
 
     if (type === "participant") {
-      const { name, email, department, dojoPhase, role, managerId, emailEnabled } = data;
+      const { name, email, department, dojoPhase, managerId } = data;
       if (!name || !email) {
         return NextResponse.json({ error: "名前とメールは必須です" }, { status: 400 });
       }
 
-      const result = await createParticipantInNotion({
+      const result = await createParticipant({
         name,
         email,
         department: department || "",
         dojoPhase: dojoPhase || "道場1 覚醒",
-        role: role || "参加者",
         managerId: managerId || undefined,
-        emailEnabled: emailEnabled ?? false,
-      });
+        fbPolicy: "",
+      }, "81f91c26-214e-4da2-9893-6ac6c8984062");
 
       if (!result) {
         return NextResponse.json({ error: "参加者の作成に失敗しました" }, { status: 500 });
@@ -50,7 +49,6 @@ export async function POST(request: NextRequest) {
         participant: {
           id: result.id,
           token: result.token,
-          url: result.url,
           name,
         },
       });
@@ -62,12 +60,12 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "名前とメールは必須です" }, { status: 400 });
       }
 
-      const result = await createManagerInNotion({
+      const result = await createManager({
         name,
         email,
         department: department || "",
         isAdmin: isAdmin ?? false,
-      });
+      }, "81f91c26-214e-4da2-9893-6ac6c8984062");
 
       if (!result) {
         return NextResponse.json({ error: "マネージャーの作成に失敗しました" }, { status: 500 });
@@ -79,7 +77,6 @@ export async function POST(request: NextRequest) {
         manager: {
           id: result.id,
           token: result.token,
-          url: result.url,
           name,
         },
       });
@@ -105,7 +102,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const managers = await getAllManagersFromNotion();
+    const managers = await getAllManagers("81f91c26-214e-4da2-9893-6ac6c8984062");
     return NextResponse.json({
       managers: managers.map((m) => ({
         id: m.id,

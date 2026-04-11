@@ -3,7 +3,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getManagerByToken } from "@/lib/participant-db";
-import { getAiSystemPrompt as getAiSystemPromptFromNotion, updateAiSystemPrompt as updateAiSystemPromptFromNotion } from "@/lib/notion";
 import { getAiSystemPrompt as getAiSystemPromptFromSupabase, updateAiSystemPrompt as updateAiSystemPromptFromSupabase } from "@/lib/supabase";
 
 const DEFAULT_SYSTEM_PROMPT = `あなたは「Human Mature」という戦略・組織開発コンサルティング会社のシニアコンサルタントです。
@@ -32,9 +31,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const prompt = manager.backend === "supabase" && manager.tenantId
-      ? await getAiSystemPromptFromSupabase(manager.tenantId)
-      : await getAiSystemPromptFromNotion();
+    const prompt = await getAiSystemPromptFromSupabase(manager.tenantId || "81f91c26-214e-4da2-9893-6ac6c8984062");
     return NextResponse.json({
       systemPrompt: prompt || DEFAULT_SYSTEM_PROMPT,
       isDefault: !prompt,
@@ -65,9 +62,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "プロンプトが空です" }, { status: 400 });
     }
 
-    const success = manager.backend === "supabase" && manager.tenantId
-      ? await updateAiSystemPromptFromSupabase(manager.tenantId, systemPrompt.trim())
-      : await updateAiSystemPromptFromNotion(systemPrompt.trim());
+    const success = await updateAiSystemPromptFromSupabase(manager.tenantId || "81f91c26-214e-4da2-9893-6ac6c8984062", systemPrompt.trim());
     if (success) {
       return NextResponse.json({ success: true });
     } else {

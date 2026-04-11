@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isBusinessDay, getJSTDateString, getJSTHour } from "@/lib/calendar";
 import { sendReminderEmail, type ReminderType } from "@/lib/email";
-import { hasLoggedToday } from "@/lib/notion";
+import { hasLoggedToday } from "@/lib/supabase";
 import { getAllParticipants } from "@/lib/participant-db";
 import { logger } from "@/lib/logger";
 
@@ -54,7 +54,6 @@ export async function GET(request: NextRequest) {
   );
 
   const results: { name: string; email: string; sent: boolean; skipped?: string }[] = [];
-  const useNotion = !!process.env.NOTION_API_TOKEN;
 
   for (const p of activeParticipants) {
     try {
@@ -70,23 +69,21 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      // Check if already logged today (Notion mode only)
+      // Check if already logged today
       let reminderType: ReminderType = type;
-      if (useNotion) {
-        const logged = await hasLoggedToday(p.name, todayStr);
+      const logged = await hasLoggedToday(p.name, todayStr, "81f91c26-214e-4da2-9893-6ac6c8984062");
 
-        if (type === "morning" && logged.hasMorning) {
-          results.push({ name: p.name, email: p.email, sent: false, skipped: "already logged morning" });
-          continue;
-        }
-        if (type === "evening" && logged.hasEvening) {
-          results.push({ name: p.name, email: p.email, sent: false, skipped: "already logged evening" });
-          continue;
-        }
-        // 夕方リマインド: 朝未記入でも送信する（朝未記入の場合は別テンプレート）
-        if (type === "evening" && !logged.hasMorning) {
-          reminderType = "evening_no_morning";
-        }
+      if (type === "morning" && logged.hasMorning) {
+        results.push({ name: p.name, email: p.email, sent: false, skipped: "already logged morning" });
+        continue;
+      }
+      if (type === "evening" && logged.hasEvening) {
+        results.push({ name: p.name, email: p.email, sent: false, skipped: "already logged evening" });
+        continue;
+      }
+      // 夕方リマインド: 朝未記入でも送信する（朝未記入の場合は別テンプレート）
+      if (type === "evening" && !logged.hasMorning) {
+        reminderType = "evening_no_morning";
       }
 
       const sent = await sendReminderEmail({

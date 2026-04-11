@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   const checks = {
-    notion: !!process.env.NOTION_API_TOKEN,
+    supabase: !!(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL),
     resend: !!process.env.RESEND_API_KEY,
     anthropic: !!process.env.ANTHROPIC_API_KEY,
   };

@@ -2,7 +2,7 @@
 // Returns analytics data for admin dashboard
 
 import { NextRequest, NextResponse } from "next/server";
-import { getLogsByParticipant } from "@/lib/notion";
+import { getLogsByParticipant } from "@/lib/supabase";
 import { getAllParticipants, isAdminOrObserverToken } from "@/lib/participant-db";
 import { getTodayJST } from "@/lib/date-utils";
 
@@ -17,7 +17,6 @@ export async function GET(request: NextRequest) {
 
   const participants = await getAllParticipants();
   const todayJST = getTodayJST();
-  const useMock = !process.env.NOTION_API_TOKEN;
 
   // Collect all logs
   const allParticipantLogs: {
@@ -32,31 +31,20 @@ export async function GET(request: NextRequest) {
   }[] = [];
 
   for (const p of participants) {
-    if (useMock) {
-      const mockLogs = (p.logs || []).map((l) => ({
-        date: l.date,
-        energy: l.energy,
-        morningIntent: l.morningIntent,
-        managerComment: null,
-        hmFeedback: null,
-      }));
-      allParticipantLogs.push({ name: p.name, logs: mockLogs });
-    } else {
-      try {
-        const logs = await getLogsByParticipant(p.name);
-        allParticipantLogs.push({
-          name: p.name,
-          logs: logs.map((l) => ({
-            date: l.date,
-            energy: l.energy,
-            morningIntent: l.morningIntent,
-            managerComment: l.managerComment,
-            hmFeedback: l.hmFeedback,
-          })),
-        });
-      } catch {
-        allParticipantLogs.push({ name: p.name, logs: [] });
-      }
+    try {
+      const logs = await getLogsByParticipant(p.name, "81f91c26-214e-4da2-9893-6ac6c8984062");
+      allParticipantLogs.push({
+        name: p.name,
+        logs: logs.map((l) => ({
+          date: l.date,
+          energy: l.energy,
+          morningIntent: l.morningIntent,
+          managerComment: l.managerComment,
+          hmFeedback: l.hmFeedback,
+        })),
+      });
+    } catch {
+      allParticipantLogs.push({ name: p.name, logs: [] });
     }
   }
 

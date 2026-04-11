@@ -2,7 +2,7 @@
 // POST /api/mission/comments - Add a comment to a mission
 
 import { NextRequest, NextResponse } from "next/server";
-import { addMissionComment, getMissionComments, getMissionById } from "@/lib/notion";
+import { addMissionComment, getMissionComments, getMissionById } from "@/lib/supabase";
 import { getManagerByToken, getParticipantByToken, getParticipantByName, getManagerById } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
 

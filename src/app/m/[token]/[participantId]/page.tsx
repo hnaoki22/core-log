@@ -2,7 +2,7 @@
 // Shows individual participant's log entries + full mission management
 
 import Link from "next/link";
-import { getLogsByParticipant, getMissionsByParticipant, NotionLogEntry } from "@/lib/notion";
+import { getLogsByParticipant, getMissionsByParticipant, NotionLogEntry } from "@/lib/supabase";
 import CommentForm from "./CommentForm";
 import MissionManager from "./MissionManager";
 
@@ -37,8 +37,8 @@ export default async function ParticipantDetailPage({ params }: Params) {
 
   try {
     const [fetchedLogs, fetchedMissions] = await Promise.all([
-      getLogsByParticipant(participantName),
-      getMissionsByParticipant(participantName),
+      getLogsByParticipant(participantName, "81f91c26-214e-4da2-9893-6ac6c8984062"),
+      getMissionsByParticipant(participantName, "81f91c26-214e-4da2-9893-6ac6c8984062"),
     ]);
     logs = fetchedLogs;
     missions = fetchedMissions;
