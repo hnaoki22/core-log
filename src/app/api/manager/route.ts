@@ -1,8 +1,9 @@
 // GET /api/manager?token=xxx
-// Returns manager info + enriched participant data from Notion
+// Returns manager info + enriched participant data (Supabase / Notion / Mock)
 
 import { NextRequest, NextResponse } from "next/server";
 import { getLogsByParticipant } from "@/lib/notion";
+import { getLogsByParticipant as getLogsByParticipantFromSupabase } from "@/lib/supabase";
 import {
   getManagerByToken,
   getParticipantsForManager,
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Manager not found" }, { status: 404 });
   }
 
-  const participantMocks = await getParticipantsForManager(manager.id);
+  const participantMocks = await getParticipantsForManager(manager.id, manager.tenantId);
   const todayJST = getTodayJST();
   const useMock = !process.env.NOTION_API_TOKEN;
 
@@ -54,9 +55,11 @@ export async function GET(request: NextRequest) {
         };
       }
 
-      // Notion mode: fetch real data
+      // Real data mode: fetch from Supabase or Notion based on backend
       try {
-        const logs = await getLogsByParticipant(p.name);
+        const logs = p.backend === "supabase" && p.tenantId
+          ? await getLogsByParticipantFromSupabase(p.name, p.tenantId)
+          : await getLogsByParticipant(p.name);
         const stats = computeParticipantStats(logs, todayJST);
         const latestLog = logs[0] || null;
 
