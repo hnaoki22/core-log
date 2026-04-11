@@ -1,7 +1,7 @@
 // POST /api/features/peer-reflection
-// Create a peer reflection request (one participant asks another for feedback)
+// Send a peer reflection (one participant sends feedback to another)
 // GET /api/features/peer-reflection?token=xxx
-// Retrieve pending/received reflections for the participant
+// Retrieve team members, pending requests, and received reflections
 // PUT /api/features/peer-reflection
 // Answer a peer reflection request
 
@@ -15,7 +15,7 @@ const TENANT_ID = "81f91c26-214e-4da2-9893-6ac6c8984062";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { token, toParticipantId, question } = body;
+    const { token, toParticipantId, question, reflection } = body;
 
     if (!token || !toParticipantId || !question) {
       return NextResponse.json(
@@ -39,25 +39,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Create peer reflection request
+    // Look up the target participant's name
     const client = getClient();
+    const { data: targetParticipant } = await client
+      .from("participants")
+      .select("id, name")
+      .eq("id", toParticipantId)
+      .single();
+
+    if (!targetParticipant) {
+      return NextResponse.json(
+        { error: "Target participant not found" },
+        { status: 404 }
+      );
+    }
+
+    // Create peer reflection
     const { data, error } = await client
       .from("peer_reflections")
       .insert({
         tenant_id: TENANT_ID,
         from_participant_id: participant.id,
         to_participant_id: toParticipantId,
+        from_name: participant.name,
+        to_name: targetParticipant.name,
         question,
-        answer: null,
-        is_answered: false,
+        answer: reflection || null,
+        status: reflection ? "answered" : "pending",
         created_at: new Date().toISOString(),
+        answered_at: reflection ? new Date().toISOString() : null,
       })
       .select("id")
       .single();
 
     if (error || !data) {
+      console.error("Peer reflection insert error:", error);
       return NextResponse.json(
-        { error: "Failed to create peer reflection request" },
+        { error: "Failed to create peer reflection" },
         { status: 500 }
       );
     }
@@ -66,8 +84,7 @@ export async function POST(req: NextRequest) {
       success: true,
       reflectionId: data.id,
     });
-  } catch (error) {
-    console.error("Peer reflection POST error:", error);
+  } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -97,46 +114,49 @@ export async function GET(req: NextRequest) {
 
     const client = getClient();
 
-    // Fetch pending reflections (sent to this participant)
-    const { data: pending, error: pendingError } = await client
+    // Fetch team members (same tenant, exclude self)
+    const { data: members } = await client
+      .from("participants")
+      .select("id, name, role")
+      .eq("tenant_id", TENANT_ID)
+      .neq("id", participant.id)
+      .order("name");
+
+    // Fetch reflections received (sent TO this participant, pending answer)
+    const { data: pendingForMe } = await client
       .from("peer_reflections")
       .select("*")
       .eq("tenant_id", TENANT_ID)
       .eq("to_participant_id", participant.id)
-      .eq("is_answered", false)
+      .eq("status", "pending")
       .order("created_at", { ascending: false });
 
-    if (pendingError) {
-      return NextResponse.json(
-        { error: "Failed to fetch pending reflections" },
-        { status: 500 }
-      );
-    }
-
-    // Fetch received reflections (sent by this participant)
-    const { data: sent, error: sentError } = await client
+    // Fetch reflections sent BY this participant (to see their status)
+    const { data: sentByMe } = await client
       .from("peer_reflections")
       .select("*")
       .eq("tenant_id", TENANT_ID)
       .eq("from_participant_id", participant.id)
       .order("created_at", { ascending: false });
 
-    if (sentError) {
-      return NextResponse.json(
-        { error: "Failed to fetch sent reflections" },
-        { status: 500 }
-      );
-    }
+    // Fetch reflections received (answered ones sent TO this participant)
+    const { data: receivedAnswers } = await client
+      .from("peer_reflections")
+      .select("*")
+      .eq("tenant_id", TENANT_ID)
+      .eq("to_participant_id", participant.id)
+      .eq("status", "answered")
+      .order("created_at", { ascending: false });
 
     return NextResponse.json({
       success: true,
-      pending: pending || [],
-      sent: sent || [],
-      pendingCount: (pending || []).length,
-      sentCount: (sent || []).length,
+      currentParticipant: { id: participant.id, name: participant.name },
+      members: (members || []).filter((m: { role: string }) => m.role === "参加者"),
+      pendingForMe: pendingForMe || [],
+      sentByMe: sentByMe || [],
+      receivedAnswers: receivedAnswers || [],
     });
-  } catch (error) {
-    console.error("Peer reflection GET error:", error);
+  } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -184,7 +204,7 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    if (reflection.is_answered) {
+    if (reflection.status === "answered") {
       return NextResponse.json(
         { error: "This reflection has already been answered" },
         { status: 409 }
@@ -196,7 +216,7 @@ export async function PUT(req: NextRequest) {
       .from("peer_reflections")
       .update({
         answer,
-        is_answered: true,
+        status: "answered",
         answered_at: new Date().toISOString(),
       })
       .eq("id", reflectionId);
@@ -209,8 +229,7 @@ export async function PUT(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Peer reflection PUT error:", error);
+  } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
