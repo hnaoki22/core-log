@@ -492,7 +492,6 @@ export const PRESETS: Preset[] = [
       }
       // Add essentials
       flags["feature.reminderMail"] = true;
-      flags["feature.logHistory"] = true;
       return flags;
     },
   },
@@ -568,7 +567,12 @@ export const PRESETS: Preset[] = [
 type FlagStore = Record<string, Record<string, boolean>>; // { clientId: { flagKey: bool } }
 
 let cache: { data: FlagStore; at: number } | null = null;
-const CACHE_TTL_MS = 60 * 1000;
+// Short TTL to minimize stale reads across serverless instances.
+// Each Vercel function instance has its own in-memory cache; after an admin
+// saves via POST (which invalidates *that* instance's cache), OTHER instances
+// still serve stale data until their TTL expires. 5 seconds is a reasonable
+// trade-off between freshness and Notion API rate limits.
+const CACHE_TTL_MS = 5 * 1000;
 
 function defaultFlagsFor(): Record<string, boolean> {
   const flags: Record<string, boolean> = {};

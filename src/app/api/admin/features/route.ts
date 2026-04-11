@@ -3,6 +3,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminToken } from "@/lib/participant-db";
+
+export const dynamic = "force-dynamic"; // Always fresh reads from Notion
 import {
   FEATURE_CATALOG,
   PRESETS,
