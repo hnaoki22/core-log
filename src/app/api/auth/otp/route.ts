@@ -11,11 +11,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateOTP, verifyOTP, getRemainingAttempts } from "@/lib/otp";
 import { getSessionCookieName } from "@/lib/session";
 import { getParticipantByToken, getManagerByToken } from "@/lib/participant-db";
+import { isFeatureEnabled } from "@/lib/feature-flags";
 import { logger } from "@/lib/logger";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const FROM_EMAIL = process.env.REMIND_FROM_EMAIL || "CORE Log <noreply@resend.dev>";
-const OTP_ENABLED = process.env.OTP_ENABLED === "true"; // Default to false (set OTP_ENABLED=true to activate)
 
 interface OTPRequest {
   token: string;
@@ -133,9 +133,15 @@ async function handleSendOTP(token: string): Promise<NextResponse> {
     );
   }
 
-  // If OTP is disabled, return success with verified flag (dev mode bypass)
-  if (!OTP_ENABLED) {
-    logger.info("OTP disabled, skipping verification", { email });
+  // If OTP is disabled via feature flag, return success with verified flag (bypass)
+  let otpEnabled = false;
+  try {
+    otpEnabled = await isFeatureEnabled("feature.otpAuth");
+  } catch {
+    otpEnabled = process.env.OTP_ENABLED === "true";
+  }
+  if (!otpEnabled) {
+    logger.info("OTP disabled via feature flag, skipping verification", { email });
     return NextResponse.json(
       { success: true, verified: true, emailHint: maskEmail(email) }
     );

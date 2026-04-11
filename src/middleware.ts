@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { isSessionValid } from "@/lib/session";
+import { isFeatureEnabled } from "@/lib/feature-flags";
 
 // Security headers to add to all responses
 const securityHeaders = {
@@ -41,14 +42,21 @@ function logApiRequest(
   console.log(JSON.stringify(logEntry));
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   // OTP session verification for protected routes
-  // Check if OTP_ENABLED is set to false (disabled)
-  const OTP_ENABLED = process.env.OTP_ENABLED === "true";
+  // Check feature flag from admin dashboard (Supabase ai_settings)
+  // Falls back to OTP_ENABLED env var if feature flag check fails
+  let otpEnabled = false;
+  try {
+    otpEnabled = await isFeatureEnabled("feature.otpAuth");
+  } catch {
+    // Fallback to env var if Supabase is unreachable
+    otpEnabled = process.env.OTP_ENABLED === "true";
+  }
 
-  if (OTP_ENABLED) {
+  if (otpEnabled) {
     // Match patterns: /p/[token], /m/[token], /a/[token]
     const tokenMatch = pathname.match(/^\/([pma])\/([a-zA-Z0-9_-]+)(\/.*)?$/);
 
