@@ -6,7 +6,7 @@ import { getLogsByParticipant } from "@/lib/notion";
 import {
   getAllParticipants,
   getAllManagers,
-  isAdminToken,
+  getManagerByToken,
 } from "@/lib/participant-db";
 import { computeParticipantStats } from "@/lib/stats";
 import { getTodayJST, calculateWeekNum } from "@/lib/date-utils";
@@ -18,11 +18,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
-  // Check admin authorization from Notion DB (管理者権限 checkbox)
-  const authorized = await isAdminToken(token);
-  if (!authorized) {
+  // Check admin or observer authorization
+  const manager = await getManagerByToken(token);
+  const isAdminOrObserver = manager && (manager.role === "admin" || manager.role === "observer" || manager.isAdmin);
+  if (!isAdminOrObserver) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
+  const viewerRole = manager.role;
 
   const participantMocks = await getAllParticipants();
   const managers = await getAllManagers();
@@ -129,5 +131,6 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     participants: enrichedParticipants,
     managers: managerData,
+    viewerRole,
   });
 }

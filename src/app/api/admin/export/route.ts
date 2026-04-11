@@ -2,7 +2,7 @@
 // Exports all participants and their logs as CSV
 
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminToken, getAllParticipants } from "@/lib/participant-db";
+import { isAdminOrObserverToken, getAllParticipants } from "@/lib/participant-db";
 import { getLogsByParticipant } from "@/lib/notion";
 
 export async function GET(request: NextRequest) {
@@ -12,8 +12,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Token required" }, { status: 400 });
   }
 
-  const isAdmin = await isAdminToken(token);
-  if (!isAdmin) {
+  const authorized = await isAdminOrObserverToken(token);
+  if (!authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 

@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getLogsByParticipant } from "@/lib/notion";
-import { getAllParticipants, isAdminToken } from "@/lib/participant-db";
+import { getAllParticipants, isAdminOrObserverToken } from "@/lib/participant-db";
 import { getTodayJST } from "@/lib/date-utils";
 
 export async function GET(request: NextRequest) {
@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   if (!token)
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
-  const authorized = await isAdminToken(token);
+  const authorized = await isAdminOrObserverToken(token);
   if (!authorized)
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 

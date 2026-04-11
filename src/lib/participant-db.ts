@@ -89,6 +89,8 @@ export type ParticipantInfo = {
   missions?: Participant["missions"];
 };
 
+export type ManagerRole = "admin" | "observer" | "manager";
+
 export type ManagerInfo = {
   id: string;
   token: string;
@@ -96,6 +98,7 @@ export type ManagerInfo = {
   email: string;
   department: string;
   isAdmin: boolean;
+  role: ManagerRole;
   participantIds: string[];
   // Backend routing info
   backend?: BackendType;
@@ -147,7 +150,7 @@ function mockParticipantToInfo(mp: Participant): ParticipantInfo {
   };
 }
 
-function notionManagerToInfo(nm: NotionManager): ManagerInfo {
+function notionManagerToInfo(nm: NotionManager & { role?: string }): ManagerInfo {
   return {
     id: nm.id,
     token: nm.token,
@@ -155,6 +158,7 @@ function notionManagerToInfo(nm: NotionManager): ManagerInfo {
     email: nm.email,
     department: nm.department,
     isAdmin: nm.isAdmin,
+    role: (nm.role as ManagerRole) || (nm.isAdmin ? "admin" : "manager"),
     participantIds: nm.participantIds,
     backend: "notion",
   };
@@ -168,6 +172,7 @@ function mockManagerToInfo(mm: Manager): ManagerInfo {
     email: mm.email,
     department: mm.department,
     isAdmin: false, // mock managers don't have this field
+    role: "manager",
     participantIds: mm.participantIds,
     backend: "mock",
   };
@@ -363,4 +368,14 @@ export async function isAdminToken(token: string): Promise<boolean> {
     .split(",")
     .map((t) => t.trim());
   return ADMIN_TOKENS.includes(token);
+}
+
+/**
+ * Check if token belongs to an admin OR observer (read-only admin).
+ * Used for endpoints that allow both roles.
+ */
+export async function isAdminOrObserverToken(token: string): Promise<boolean> {
+  const manager = await getManagerByToken(token);
+  if (!manager) return false;
+  return manager.role === "admin" || manager.role === "observer" || manager.isAdmin;
 }

@@ -162,7 +162,7 @@ function rowToParticipant(r: any): NotionParticipant {
   };
 }
 
-function rowToManager(r: any): NotionManager {
+function rowToManager(r: any): NotionManager & { role?: string } {
   return {
     id: r.id,
     token: r.token,
@@ -170,6 +170,7 @@ function rowToManager(r: any): NotionManager {
     email: r.email || "",
     department: r.department || "",
     isAdmin: r.is_admin || false,
+    role: r.role || (r.is_admin ? "admin" : "manager"),
     participantIds: [], // populated separately
   };
 }

@@ -35,6 +35,7 @@ type ManagerData = {
 type AdminData = {
   participants: ParticipantData[];
   managers: ManagerData[];
+  viewerRole?: "admin" | "observer" | "manager";
 };
 
 type ManagerOption = { id: string; name: string };
@@ -331,6 +332,7 @@ export default function AdminDashboard() {
   }
 
   const { participants, managers } = data;
+  const isObserver = data.viewerRole === "observer";
   const totalLogs = participants.reduce((sum, p) => sum + p.entryDays, 0);
   const avgEntryRate = participants.length > 0
     ? Math.round(participants.reduce((sum, p) => sum + p.entryRate, 0) / participants.length) : 0;
@@ -356,6 +358,14 @@ export default function AdminDashboard() {
             <h1 className="text-xl font-semibold tracking-tight">管理者ダッシュボード</h1>
           </div>
           <p className="text-gray-400 text-sm font-light ml-7">CORE Log システム全体の状況</p>
+          {isObserver && (
+            <div className="ml-7 mt-1.5 inline-flex items-center gap-1.5 bg-white/15 text-white/90 text-[10px] font-medium px-2.5 py-1 rounded-lg">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+              閲覧専用モード
+            </div>
+          )}
         </div>
         <div className="absolute top-0 right-0 mt-1 flex items-center gap-2">
           <button onClick={handleExport} disabled={exporting} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/10 disabled:opacity-50">
@@ -370,19 +380,23 @@ export default function AdminDashboard() {
             </svg>
             分析
           </button>
-          <button onClick={openPromptSettings} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/10">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
-            </svg>
-            AI設定
-          </button>
-          <a href={`/a/${token}/features`} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/10">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-            </svg>
-            機能設定
-          </a>
+          {!isObserver && (
+            <button onClick={openPromptSettings} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/10">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+              </svg>
+              AI設定
+            </button>
+          )}
+          {!isObserver && (
+            <a href={`/a/${token}/features`} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/10">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+              機能設定
+            </a>
+          )}
         </div>
       </div>
 
@@ -547,9 +561,11 @@ export default function AdminDashboard() {
         <div className="card overflow-hidden mb-5">
           <div className="px-5 py-4 border-b border-[#EFE8DD] flex items-center justify-between">
             <h2 className="text-sm font-semibold text-[#1A1A2E]">参加者一覧</h2>
-            <button onClick={() => setShowAddParticipant(true)} className="btn-accent text-xs px-4 py-2">
-              + 参加者を追加
-            </button>
+            {!isObserver && (
+              <button onClick={() => setShowAddParticipant(true)} className="btn-accent text-xs px-4 py-2">
+                + 参加者を追加
+              </button>
+            )}
           </div>
           <div className="divide-y divide-[#EFE8DD]">
             {participants.map((p) => {
@@ -590,12 +606,14 @@ export default function AdminDashboard() {
                         >
                           ログ
                         </a>
-                        <button
-                          onClick={() => openFeedbackModal(p.name)}
-                          className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors"
-                        >
-                          FB送信
-                        </button>
+                        {!isObserver && (
+                          <button
+                            onClick={() => openFeedbackModal(p.name)}
+                            className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+                          >
+                            FB送信
+                          </button>
+                        )}
                       </div>
                       <span className="text-[10px] text-[#8B8489]">{status.label}</span>
                       {p.recentEnergy.length > 0 && (
@@ -619,9 +637,11 @@ export default function AdminDashboard() {
         <div className="card overflow-hidden mb-5">
           <div className="px-5 py-4 border-b border-[#EFE8DD] flex items-center justify-between">
             <h2 className="text-sm font-semibold text-[#1A1A2E]">マネージャー一覧</h2>
-            <button onClick={() => setShowAddManager(true)} className="text-xs font-medium px-4 py-2 rounded-xl bg-amber-500 text-white hover:bg-amber-600 transition-colors">
-              + マネージャーを追加
-            </button>
+            {!isObserver && (
+              <button onClick={() => setShowAddManager(true)} className="text-xs font-medium px-4 py-2 rounded-xl bg-amber-500 text-white hover:bg-amber-600 transition-colors">
+                + マネージャーを追加
+              </button>
+            )}
           </div>
           <div className="divide-y divide-[#EFE8DD]">
             {managers.map((m) => (
@@ -687,7 +707,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Add Participant Modal */}
-      {showAddParticipant && (
+      {!isObserver && showAddParticipant && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="p-5 border-b border-[#EFE8DD]">
@@ -754,7 +774,7 @@ export default function AdminDashboard() {
       )}
 
       {/* Feedback Modal */}
-      {showFeedbackModal && (
+      {!isObserver && showFeedbackModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
             <div className="p-5 border-b border-[#EFE8DD]">
@@ -855,7 +875,7 @@ export default function AdminDashboard() {
       )}
 
       {/* Prompt Settings Modal */}
-      {showPromptSettings && (
+      {!isObserver && showPromptSettings && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
             <div className="p-5 border-b border-[#EFE8DD]">
@@ -914,7 +934,7 @@ export default function AdminDashboard() {
       )}
 
       {/* Add Manager Modal */}
-      {showAddManager && (
+      {!isObserver && showAddManager && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
             <div className="p-5 border-b border-[#EFE8DD]">
