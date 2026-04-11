@@ -2,7 +2,12 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { getTodayJST, getCurrentHourJST } from "@/lib/date-utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useFeatures } from "@/lib/use-features";
+import { StructuredInput } from "@/components/features/StructuredInput";
+import { DoubleLoopPrompt } from "@/components/features/DoubleLoopPrompt";
+import { useRuminationDetector, BreathingPrompt } from "@/components/features/RuminationTimerIntegration";
+import { VoiceInputButton } from "@/components/features/VoiceInput";
 
 type TodayLog = {
   id: string;
@@ -16,6 +21,12 @@ type ParticipantBasic = {
   weekNum?: number;
 };
 
+type StructuredInputState = {
+  fact: string;
+  observation: string;
+  lesson: string;
+};
+
 const energyOptions = [
   { id: "excellent", label: "絶好調", emoji: "🔥", color: "#C17817", bg: "bg-amber-50", border: "border-amber-300", ring: "ring-amber-200" },
   { id: "good", label: "良い", emoji: "😊", color: "#2D6A4F", bg: "bg-emerald-50", border: "border-emerald-300", ring: "ring-emerald-200" },
@@ -27,6 +38,7 @@ export default function InputPage() {
   const params = useParams();
   const router = useRouter();
   const token = params.token as string;
+  const { isOn } = useFeatures();
 
   const [participant, setParticipant] = useState<ParticipantBasic | null>(null);
   const [step, setStep] = useState(1);
@@ -42,6 +54,22 @@ export default function InputPage() {
   const [morningClosed, setMorningClosed] = useState(false); // 12:00過ぎで朝未記入
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [alreadyCompleted, setAlreadyCompleted] = useState(false);
+  const [showDoubleLoop, setShowDoubleLoop] = useState(true);
+  const [structuredInput, setStructuredInput] = useState<StructuredInputState>({
+    fact: "",
+    observation: "",
+    lesson: "",
+  });
+  const eveningTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const morningTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const useStructured = isOn("tier-s.structuredInput");
+  const useDoubleLoop = isOn("tier-s.doubleLoopPrompt");
+  const useRumination = isOn("tier-e.ruminationTimer");
+  const useVoice = isOn("tier-e.voiceInput");
+
+  const ruminationEveningState = useRuminationDetector(eveningTextareaRef, useRumination && !isMorning);
+  const ruminationMorningState = useRuminationDetector(morningTextareaRef, useRumination && isMorning);
 
   const today = getTodayJST();
 
@@ -140,6 +168,13 @@ export default function InputPage() {
     setSubmitError("");
 
     try {
+      // Prepare evening insight text
+      let eveningText = evening;
+      if (useStructured && !isMorning) {
+        // Concatenate structured fields
+        eveningText = `【事実】\n${structuredInput.fact}\n\n【観察】\n${structuredInput.observation}\n\n【教訓】\n${structuredInput.lesson}`;
+      }
+
       let body;
       if (isMorning) {
         body = {
@@ -147,7 +182,7 @@ export default function InputPage() {
           token,
           participantName: participant.name,
           date: today,
-          morningIntent: morning,
+          morningIntent: useStructured ? structuredInput.fact : morning,
           energy,
           dojoPhase: participant.dojoPhase || "守",
           weekNum: participant.weekNum || 1,
@@ -159,7 +194,7 @@ export default function InputPage() {
           token,
           participantName: participant.name,
           date: today,
-          eveningInsight: evening,
+          eveningInsight: eveningText,
           energy,
           dojoPhase: participant.dojoPhase || "守",
           weekNum: participant.weekNum || 1,
@@ -169,7 +204,7 @@ export default function InputPage() {
           type: "evening",
           token,
           pageId: todayLog?.id || "",
-          eveningInsight: evening,
+          eveningInsight: eveningText,
           energy,
         };
       }
@@ -194,12 +229,28 @@ export default function InputPage() {
   };
 
   const handleNext = () => {
-    if (step === 1 && (isMorning ? !morning : !evening)) return;
+    if (step === 1) {
+      if (isMorning) {
+        if (useStructured && !structuredInput.fact) return;
+        if (!useStructured && !morning) return;
+      } else {
+        if (useStructured && !structuredInput.lesson) return;
+        if (!useStructured && !evening) return;
+      }
+    }
     if (step === 2 && !energy) return;
     if (step === 2) {
       submitEntry();
     } else {
       setStep(step + 1);
+    }
+  };
+
+  const isStep1Complete = (): boolean => {
+    if (isMorning) {
+      return useStructured ? !!structuredInput.fact : !!morning;
+    } else {
+      return useStructured ? !!structuredInput.lesson : !!evening;
     }
   };
 
@@ -256,6 +307,15 @@ export default function InputPage() {
       </div>
 
       <div className="max-w-md mx-auto px-5 pt-6 animate-fade-up">
+        {/* Double-Loop Prompt (Monday morning only) */}
+        {step === 1 && useDoubleLoop && isMorning && showDoubleLoop && (
+          <DoubleLoopPrompt
+            token={token}
+            isVisible={showDoubleLoop}
+            onDismiss={() => setShowDoubleLoop(false)}
+          />
+        )}
+
         {/* Progress Bar */}
         <div className="flex gap-2 mb-8">
           <div className={`flex-1 h-1 rounded-full transition-colors duration-300 ${
@@ -275,19 +335,55 @@ export default function InputPage() {
                 <p className="text-sm text-[#1A1A2E] leading-relaxed">{todayLog.morningIntent}</p>
               </div>
             )}
-            <textarea
-              value={isMorning ? morning : evening}
-              onChange={(e) => (isMorning ? setMorning(e.target.value) : setEvening(e.target.value))}
-              placeholder={
-                isMorning
-                  ? "例：午後のプレゼンで「結論から先に言う」を意識する"
-                  : "例：チームミーティングで意見が出やすい雰囲気を作った"
-              }
-              className="input-field min-h-[200px] resize-none leading-relaxed"
-            />
-            <p className="text-[11px] text-[#C9BDAE] text-right">
-              {(isMorning ? morning : evening).length} 文字
-            </p>
+
+            {useStructured ? (
+              <StructuredInput
+                value={structuredInput}
+                onChange={setStructuredInput}
+                isMorning={isMorning}
+              />
+            ) : (
+              <div className="space-y-4">
+                <div className="relative">
+                  <textarea
+                    ref={isMorning ? morningTextareaRef : eveningTextareaRef}
+                    value={isMorning ? morning : evening}
+                    onChange={(e) => (isMorning ? setMorning(e.target.value) : setEvening(e.target.value))}
+                    placeholder={
+                      isMorning
+                        ? "例：午後のプレゼンで「結論から先に言う」を意識する"
+                        : "例：チームミーティングで意見が出やすい雰囲気を作った"
+                    }
+                    className="input-field min-h-[200px] resize-none leading-relaxed pr-12"
+                  />
+                  {useVoice && (
+                    <div className="absolute bottom-3 right-3">
+                      <VoiceInputButton
+                        token={token}
+                        onTextReceived={(text) => {
+                          if (isMorning) {
+                            setMorning((prev) => (prev ? prev + "\n" + text : text));
+                          } else {
+                            setEvening((prev) => (prev ? prev + "\n" + text : text));
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+                <p className="text-[11px] text-[#C9BDAE] text-right">
+                  {(isMorning ? morning : evening).length} 文字
+                </p>
+              </div>
+            )}
+
+            {/* Rumination breathing prompt */}
+            {useRumination && isMorning && ruminationMorningState.showBreathingPrompt && (
+              <BreathingPrompt onDismiss={ruminationMorningState.handleDismiss} />
+            )}
+            {useRumination && !isMorning && ruminationEveningState.showBreathingPrompt && (
+              <BreathingPrompt onDismiss={ruminationEveningState.handleDismiss} />
+            )}
           </div>
         )}
 
@@ -325,7 +421,7 @@ export default function InputPage() {
             onClick={handleNext}
             disabled={
               isSubmitting ||
-              (step === 1 && (isMorning ? !morning : !evening)) ||
+              (step === 1 && !isStep1Complete()) ||
               (step === 2 && !energy)
             }
             className="btn-primary w-full py-3.5 text-sm"

@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
+import { useFeatures } from "@/lib/use-features";
 
 type ParticipantData = {
   id: string;
@@ -51,6 +52,7 @@ const energyEmoji: Record<string, string> = {
 export default function AdminDashboard() {
   const params = useParams();
   const token = params.token as string;
+  const { isOn, loaded: featuresLoaded } = useFeatures();
   const [data, setData] = useState<AdminData | null>(null);
   const [loading, setLoading] = useState(true);
   const [unauthorized, setUnauthorized] = useState(false);
@@ -683,6 +685,94 @@ export default function AdminDashboard() {
             ))}
           </div>
         </div>
+
+        {/* Feature Management Tools */}
+        {featuresLoaded && (
+          <>
+            {/* Organization Analysis */}
+            {(isOn("tier-b.cultureScore") || isOn("tier-f.growthRoi") || isOn("tier-e.microRitualOptimizer")) && (
+              <div className="mb-6">
+                <h2 className="text-sm font-semibold text-[#5B5560] uppercase tracking-wide px-1 mb-3">組織分析</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {isOn("tier-b.cultureScore") && (
+                    <a href={`/a/${token}/features/culture`} className="card p-4 hover:shadow-md transition-shadow">
+                      <div className="text-2xl mb-2">📊</div>
+                      <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">カルチャースコア</h3>
+                      <p className="text-xs text-[#8B8489]">組織文化メトリクス</p>
+                    </a>
+                  )}
+                  {isOn("tier-f.growthRoi") && (
+                    <a href={`/a/${token}/features/growth-roi`} className="card p-4 hover:shadow-md transition-shadow">
+                      <div className="text-2xl mb-2">📈</div>
+                      <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">成長ROI</h3>
+                      <p className="text-xs text-[#8B8489]">学習効果を可視化</p>
+                    </a>
+                  )}
+                  {isOn("tier-e.microRitualOptimizer") && (
+                    <a href={`/a/${token}/features/ritual-metrics`} className="card p-4 hover:shadow-md transition-shadow">
+                      <div className="text-2xl mb-2">🔄</div>
+                      <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">リチュアルメトリクス</h3>
+                      <p className="text-xs text-[#8B8489]">実施統計</p>
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Reports */}
+            {(isOn("tier-f.clientReport") || isOn("tier-g.pitchGenerator")) && (
+              <div className="mb-6">
+                <h2 className="text-sm font-semibold text-[#5B5560] uppercase tracking-wide px-1 mb-3">レポート生成</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {isOn("tier-f.clientReport") && (
+                    <a href={`/a/${token}/features/client-report`} className="card p-4 hover:shadow-md transition-shadow">
+                      <div className="text-2xl mb-2">📄</div>
+                      <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">クライアントレポート</h3>
+                      <p className="text-xs text-[#8B8489]">成果報告書生成</p>
+                    </a>
+                  )}
+                  {isOn("tier-g.pitchGenerator") && (
+                    <a href={`/a/${token}/features/pitch`} className="card p-4 hover:shadow-md transition-shadow">
+                      <div className="text-2xl mb-2">🎯</div>
+                      <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">ピッチ生成</h3>
+                      <p className="text-xs text-[#8B8489]">営業提案書</p>
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Operations */}
+            {(isOn("tier-g.multiTenant") || isOn("tier-g.consultIntervention") || isOn("tier-b.knowledgeLibrary")) && (
+              <div className="mb-6">
+                <h2 className="text-sm font-semibold text-[#5B5560] uppercase tracking-wide px-1 mb-3">運用管理</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {isOn("tier-g.multiTenant") && (
+                    <a href={`/a/${token}/features/tenants`} className="card p-4 hover:shadow-md transition-shadow">
+                      <div className="text-2xl mb-2">🏢</div>
+                      <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">マルチテナント</h3>
+                      <p className="text-xs text-[#8B8489]">複数組織管理</p>
+                    </a>
+                  )}
+                  {isOn("tier-g.consultIntervention") && (
+                    <a href={`/a/${token}/features/consult`} className="card p-4 hover:shadow-md transition-shadow">
+                      <div className="text-2xl mb-2">👥</div>
+                      <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">介入ログ</h3>
+                      <p className="text-xs text-[#8B8489]">コーチング記録</p>
+                    </a>
+                  )}
+                  {isOn("tier-b.knowledgeLibrary") && (
+                    <a href={`/a/${token}/features/knowledge`} className="card p-4 hover:shadow-md transition-shadow">
+                      <div className="text-2xl mb-2">📚</div>
+                      <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">ナレッジ</h3>
+                      <p className="text-xs text-[#8B8489]">組織学習</p>
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        )}
 
         {/* Quick Links */}
         <div className="card overflow-hidden mb-8">

@@ -62,7 +62,7 @@ export default function ParticipantHome() {
   const [unreadFeedback, setUnreadFeedback] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  useFeatures(); // features hook is still used by BottomNav via context
+  const { isOn } = useFeatures(); // features hook is still used by BottomNav via context
 
   useEffect(() => {
     async function fetchData() {
@@ -412,6 +412,97 @@ export default function ParticipantHome() {
             </div>
           </div>
         )}
+
+        {/* Feature Menu Section */}
+        <div>
+          <h3 className="font-semibold text-sm text-[#1A1A2E] mb-3">機能メニュー</h3>
+
+          {/* 内省深化 */}
+          {(() => {
+            const features = [
+              { key: "tier-s.ruminationDetection", label: "反芻分析", icon: "🧠", path: "rumination" },
+              { key: "tier-s.weeklyConceptualization", label: "週次コンセプト", icon: "💡", path: "conceptualize" },
+              { key: "tier-c.unlearnChallenge", label: "アンラーン", icon: "🔄", path: "unlearn" },
+              { key: "tier-c.identityTracking", label: "自分の変化", icon: "🌱", path: "identity" },
+            ];
+            const enabledFeatures = features.filter(f => isOn(f.key));
+            return enabledFeatures.length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-[#5B5560] tracking-wide uppercase mb-2 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-[#1A1A2E] rounded-full"></div>
+                  内省深化
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {enabledFeatures.map(f => (
+                    <Link key={f.key} href={`/p/${token}/features/${f.path}`}>
+                      <div className="card p-3 text-center hover:bg-[#FBF8F4] transition-colors cursor-pointer">
+                        <div className="text-xl mb-1">{f.icon}</div>
+                        <p className="text-xs font-medium text-[#1A1A2E]">{f.label}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 成長測定 */}
+          {(() => {
+            const features = [
+              { key: "tier-d.heroAssessment", label: "HERO自己評価", icon: "📊", path: "hero" },
+              { key: "tier-d.efficacyBooster", label: "効力感", icon: "💪", path: "efficacy" },
+              { key: "tier-d.hopeDesign", label: "希望設計", icon: "🎯", path: "hope" },
+              { key: "tier-f.beforeAfter", label: "ビフォー・アフター", icon: "📈", path: "before-after" },
+            ];
+            const enabledFeatures = features.filter(f => isOn(f.key));
+            return enabledFeatures.length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-[#5B5560] tracking-wide uppercase mb-2 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-[#1A1A2E] rounded-full"></div>
+                  成長測定
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {enabledFeatures.map(f => (
+                    <Link key={f.key} href={`/p/${token}/features/${f.path}`}>
+                      <div className="card p-3 text-center hover:bg-[#FBF8F4] transition-colors cursor-pointer">
+                        <div className="text-xl mb-1">{f.icon}</div>
+                        <p className="text-xs font-medium text-[#1A1A2E]">{f.label}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 組織学習 */}
+          {(() => {
+            const features = [
+              { key: "tier-b.peerReflection", label: "ピア振り返り", icon: "👥", path: "peer" },
+              { key: "tier-b.aar", label: "AAR", icon: "📋", path: "aar" },
+              { key: "tier-c.outsightTask", label: "アウトサイト", icon: "🔍", path: "outsight" },
+            ];
+            const enabledFeatures = features.filter(f => isOn(f.key));
+            return enabledFeatures.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-[#5B5560] tracking-wide uppercase mb-2 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-[#1A1A2E] rounded-full"></div>
+                  組織学習
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {enabledFeatures.map(f => (
+                    <Link key={f.key} href={`/p/${token}/features/${f.path}`}>
+                      <div className="card p-3 text-center hover:bg-[#FBF8F4] transition-colors cursor-pointer">
+                        <div className="text-xl mb-1">{f.icon}</div>
+                        <p className="text-xs font-medium text-[#1A1A2E]">{f.label}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
 
         {/* Recent Logs */}
         <div className="card overflow-hidden">

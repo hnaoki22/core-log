@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useFeatures } from "@/lib/use-features";
 
 type ParticipantData = {
   name: string;
@@ -27,6 +28,13 @@ type ManagerData = {
   participants: ParticipantData[];
 };
 
+type BurnoutScore = {
+  participantId: string;
+  participantName: string;
+  composite: number;
+  riskLevel: "low" | "medium" | "high";
+};
+
 const energyEmoji: Record<string, string> = {
   excellent: "🔥",
   good: "😊",
@@ -37,9 +45,11 @@ const energyEmoji: Record<string, string> = {
 export default function ManagerHome() {
   const params = useParams();
   const token = params.token as string;
+  const { isOn } = useFeatures();
   const [data, setData] = useState<ManagerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [highRiskParticipant, setHighRiskParticipant] = useState<BurnoutScore | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -48,6 +58,22 @@ export default function ManagerHome() {
         if (!res.ok) { setError("上司が見つかりません"); return; }
         const json = await res.json();
         setData(json);
+
+        // Fetch burnout scores to check for high-risk participants
+        if (isOn("tier-a.burnoutScore")) {
+          try {
+            const burnoutRes = await fetch(`/api/features/burnout?token=${token}`);
+            if (burnoutRes.ok) {
+              const burnoutData = await burnoutRes.json();
+              const highRisk = burnoutData.scores?.find((s: BurnoutScore) => s.riskLevel === "high");
+              if (highRisk) {
+                setHighRiskParticipant(highRisk);
+              }
+            }
+          } catch {
+            // Silent fail - burnout alert is optional
+          }
+        }
       } catch {
         setError("データの取得に失敗しました");
       } finally {
@@ -55,7 +81,7 @@ export default function ManagerHome() {
       }
     }
     fetchData();
-  }, [token]);
+  }, [token, isOn]);
 
   if (loading) {
     return (
@@ -128,6 +154,21 @@ export default function ManagerHome() {
       </div>
 
       <div className="max-w-md mx-auto px-5 pt-5 space-y-4 animate-fade-up relative z-10">
+        {/* High Risk Burnout Alert */}
+        {highRiskParticipant && isOn("tier-a.burnoutScore") && (
+          <Link href={`/m/${token}/features/burnout`}>
+            <div className="card p-3 border-2 border-red-300 bg-red-50 hover:bg-red-100 transition-colors cursor-pointer">
+              <div className="flex items-start gap-2">
+                <span className="text-lg flex-shrink-0">⚠️</span>
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-red-700">要注意: {highRiskParticipant.participantName}さんのバーンアウトリスクが高まっています</p>
+                  <p className="text-[10px] text-red-600 mt-0.5">詳細を確認する →</p>
+                </div>
+              </div>
+            </div>
+          </Link>
+        )}
+
         {/* Summary Stats */}
         <div className="grid grid-cols-3 gap-2.5">
           <div className="card p-3.5 text-center">
@@ -144,6 +185,77 @@ export default function ManagerHome() {
           </div>
         </div>
 
+        {/* Manager Tools Section */}
+        {(isOn("tier-a.oneOnOneBriefing") ||
+          isOn("tier-a.burnoutScore") ||
+          isOn("tier-a.managerSelfReflection") ||
+          isOn("tier-a.psychSafetyMonitor")) && (
+          <div>
+            <h2 className="text-xs font-semibold text-[#5B5560] tracking-wide uppercase mb-3 px-1">
+              マネージャーツール
+            </h2>
+            <div className="overflow-x-auto pb-2 -mx-5 px-5">
+              <div className="flex gap-2.5 w-max">
+                {isOn("tier-a.oneOnOneBriefing") && (
+                  <Link href={`/m/${token}/features/briefing`}>
+                    <div className="card p-4 w-44 hover:shadow-md transition-shadow cursor-pointer flex-shrink-0">
+                      <div className="flex items-center justify-center h-10 mb-2 rounded-lg bg-indigo-100/50">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-600">
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                      </div>
+                      <h3 className="text-xs font-semibold text-[#1A1A2E]">1on1ブリーフィング</h3>
+                      <p className="text-[10px] text-[#8B8489] mt-1 leading-relaxed">対話の準備を効率化</p>
+                    </div>
+                  </Link>
+                )}
+
+                {isOn("tier-a.burnoutScore") && (
+                  <Link href={`/m/${token}/features/burnout`}>
+                    <div className="card p-4 w-44 hover:shadow-md transition-shadow cursor-pointer flex-shrink-0">
+                      <div className="flex items-center justify-center h-10 mb-2 rounded-lg bg-red-100/50">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-600">
+                          <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+                        </svg>
+                      </div>
+                      <h3 className="text-xs font-semibold text-[#1A1A2E]">バーンアウトスコア</h3>
+                      <p className="text-[10px] text-[#8B8489] mt-1 leading-relaxed">リスク監視と評価</p>
+                    </div>
+                  </Link>
+                )}
+
+                {isOn("tier-a.managerSelfReflection") && (
+                  <Link href={`/m/${token}/features/reflection`}>
+                    <div className="card p-4 w-44 hover:shadow-md transition-shadow cursor-pointer flex-shrink-0">
+                      <div className="flex items-center justify-center h-10 mb-2 rounded-lg bg-blue-100/50">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                        </svg>
+                      </div>
+                      <h3 className="text-xs font-semibold text-[#1A1A2E]">自己省察</h3>
+                      <p className="text-[10px] text-[#8B8489] mt-1 leading-relaxed">週次リーダーシップ振り返り</p>
+                    </div>
+                  </Link>
+                )}
+
+                {isOn("tier-a.psychSafetyMonitor") && (
+                  <Link href={`/m/${token}/features/psych-safety`}>
+                    <div className="card p-4 w-44 hover:shadow-md transition-shadow cursor-pointer flex-shrink-0">
+                      <div className="flex items-center justify-center h-10 mb-2 rounded-lg bg-green-100/50">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-600">
+                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        </svg>
+                      </div>
+                      <h3 className="text-xs font-semibold text-[#1A1A2E]">心理的安全性</h3>
+                      <p className="text-[10px] text-[#8B8489] mt-1 leading-relaxed">チーム環境分析</p>
+                    </div>
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Participant Cards */}
         <div>
           <h2 className="text-xs font-semibold text-[#5B5560] tracking-wide uppercase mb-3 px-1">
@@ -154,75 +266,95 @@ export default function ManagerHome() {
               const status = getStatusIndicator(participant);
 
               return (
-                <Link key={participant.name} href={`/m/${token}/${encodeURIComponent(participant.name)}`}>
-                  <div className="card-interactive p-4 cursor-pointer">
-                    {/* Header Row */}
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-medium text-sm text-[#1A1A2E]">{participant.name}</h3>
-                          {participant.todayHasLog && (
-                            <span className="bg-[#1A1A2E] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">
-                              NEW
-                            </span>
-                          )}
+                <div key={participant.name}>
+                  <Link href={`/m/${token}/${encodeURIComponent(participant.name)}`}>
+                    <div className="card-interactive p-4 cursor-pointer">
+                      {/* Header Row */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-medium text-sm text-[#1A1A2E]">{participant.name}</h3>
+                            {participant.todayHasLog && (
+                              <span className="bg-[#1A1A2E] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">
+                                NEW
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-[#8B8489] mt-0.5">{participant.department}</p>
                         </div>
-                        <p className="text-[11px] text-[#8B8489] mt-0.5">{participant.department}</p>
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${status.color}`}></div>
+                          <span className="text-[10px] text-[#8B8489]">{status.label}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${status.color}`}></div>
-                        <span className="text-[10px] text-[#8B8489]">{status.label}</span>
-                      </div>
-                    </div>
 
-                    {/* Progress */}
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="flex-shrink-0">
-                        <div className="relative w-11 h-11">
-                          <svg viewBox="0 0 36 36" className="w-11 h-11 -rotate-90">
-                            <circle cx="18" cy="18" r="15.5" fill="none" stroke="#EFE8DD" strokeWidth="3" />
-                            <circle cx="18" cy="18" r="15.5" fill="none" stroke="#1A1A2E" strokeWidth="3"
-                              strokeDasharray={`${participant.entryRate * 0.9738} 97.38`}
-                              strokeLinecap="round" />
-                          </svg>
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="text-[10px] font-bold text-[#1A1A2E]">{participant.entryRate}%</span>
+                      {/* Progress */}
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="flex-shrink-0">
+                          <div className="relative w-11 h-11">
+                            <svg viewBox="0 0 36 36" className="w-11 h-11 -rotate-90">
+                              <circle cx="18" cy="18" r="15.5" fill="none" stroke="#EFE8DD" strokeWidth="3" />
+                              <circle cx="18" cy="18" r="15.5" fill="none" stroke="#1A1A2E" strokeWidth="3"
+                                strokeDasharray={`${participant.entryRate * 0.9738} 97.38`}
+                                strokeLinecap="round" />
+                            </svg>
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <span className="text-[10px] font-bold text-[#1A1A2E]">{participant.entryRate}%</span>
+                            </div>
                           </div>
                         </div>
+                        <div className="flex-1 text-xs text-[#5B5560]">
+                          <span>{participant.entryDays}日記入</span>
+                          <span className="mx-1.5 text-[#E5DCD0]">|</span>
+                          <span>{participant.streak}連続</span>
+                        </div>
                       </div>
-                      <div className="flex-1 text-xs text-[#5B5560]">
-                        <span>{participant.entryDays}日記入</span>
-                        <span className="mx-1.5 text-[#E5DCD0]">|</span>
-                        <span>{participant.streak}連続</span>
+
+                      {/* Latest Log */}
+                      {participant.latestLog && participant.latestLog.morningIntent && (
+                        <div className="mb-3 p-2.5 bg-[#F5F0EB] rounded-xl border border-[#EFE8DD]">
+                          <p className="text-[10px] text-[#8B8489] mb-0.5">最新 ({participant.latestLog.date})</p>
+                          <p className="text-xs text-[#2C2C4A] line-clamp-2 leading-relaxed">{participant.latestLog.morningIntent}</p>
+                        </div>
+                      )}
+
+                      {/* Energy + Bottom */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          {(participant.recentEnergy || []).map((energy, idx) => (
+                            <span key={idx} className="text-sm leading-none">
+                              {energy ? energyEmoji[energy] : "·"}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px] text-[#1A1A2E] font-medium">
+                          <span>詳細</span>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="9 18 15 12 9 6"/>
+                          </svg>
+                        </div>
                       </div>
                     </div>
+                  </Link>
 
-                    {/* Latest Log */}
-                    {participant.latestLog && participant.latestLog.morningIntent && (
-                      <div className="mb-3 p-2.5 bg-[#F5F0EB] rounded-xl border border-[#EFE8DD]">
-                        <p className="text-[10px] text-[#8B8489] mb-0.5">最新 ({participant.latestLog.date})</p>
-                        <p className="text-xs text-[#2C2C4A] line-clamp-2 leading-relaxed">{participant.latestLog.morningIntent}</p>
-                      </div>
-                    )}
-
-                    {/* Energy + Bottom */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        {(participant.recentEnergy || []).map((energy, idx) => (
-                          <span key={idx} className="text-sm leading-none">
-                            {energy ? energyEmoji[energy] : "·"}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="flex items-center gap-1 text-[10px] text-[#1A1A2E] font-medium">
-                        <span>詳細</span>
+                  {/* Quick Action: 1on1 Briefing */}
+                  {isOn("tier-a.oneOnOneBriefing") && (
+                    <Link href={`/m/${token}/features/briefing`}>
+                      <button
+                        className="w-full mt-2 px-3 py-2 rounded-xl text-xs font-medium bg-indigo-100/50 text-indigo-700 hover:bg-indigo-100 transition-colors flex items-center justify-center gap-1.5"
+                        onClick={(e) => {
+                          // This allows both Link and button to work
+                          e.stopPropagation();
+                        }}
+                      >
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="9 18 15 12 9 6"/>
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                         </svg>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
+                        1on1準備
+                      </button>
+                    </Link>
+                  )}
+                </div>
               );
             })}
           </div>
