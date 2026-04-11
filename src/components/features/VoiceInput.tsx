@@ -1,80 +1,97 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useCallback } from "react";
+
+// Extend Window for SpeechRecognition (vendor-prefixed in some browsers)
+interface SpeechRecognitionEvent extends Event {
+  results: { [index: number]: { [index: number]: { transcript: string } }; length: number };
+  resultIndex: number;
+}
+
+interface SpeechRecognitionInstance extends EventTarget {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start(): void;
+  stop(): void;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: Event & { error: string }) => void) | null;
+  onend: (() => void) | null;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: new () => SpeechRecognitionInstance;
+    webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
+  }
+}
 
 interface VoiceInputProps {
-  token: string;
   onTextReceived: (text: string) => void;
 }
 
-export function VoiceInputButton({ token, onTextReceived }: VoiceInputProps) {
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<BlobPart[]>([]);
+export function VoiceInputButton({ onTextReceived }: VoiceInputProps) {
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState("");
 
-  const handleStartRecording = async () => {
+  const isSupported = typeof window !== "undefined" &&
+    (!!window.SpeechRecognition || !!window.webkitSpeechRecognition);
+
+  const handleStartRecording = useCallback(() => {
     setError("");
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
 
-      mediaRecorder.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
-      };
-
-      mediaRecorder.onstop = async () => {
-        setIsRecording(false);
-        await handleAudioProcessing();
-        stream.getTracks().forEach((track) => track.stop());
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-    } catch (err) {
-      setError("マイクへのアクセスが許可されていません");
-      console.error("Microphone access error:", err);
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setError("このブラウザは音声入力に対応していません");
+      return;
     }
-  };
 
-  const handleStopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
+    const recognition = new SpeechRecognition();
+    recognition.lang = "ja-JP";
+    recognition.continuous = true;
+    recognition.interimResults = false;
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let transcript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      if (transcript) {
+        onTextReceived(transcript);
+      }
+    };
+
+    recognition.onerror = (event) => {
+      if (event.error === "not-allowed") {
+        setError("マイクへのアクセスが許可されていません");
+      } else if (event.error === "no-speech") {
+        setError("音声が検出されませんでした");
+      } else {
+        setError("音声認識エラーが発生しました");
+      }
+      setIsRecording(false);
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsRecording(true);
+  }, [onTextReceived]);
+
+  const handleStopRecording = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
       setIsRecording(false);
     }
-  };
+  }, []);
 
-  const handleAudioProcessing = async () => {
-    setIsProcessing(true);
-    try {
-      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-      const formData = new FormData();
-      formData.append("audio", audioBlob);
-      formData.append("token", token);
-
-      const res = await fetch("/api/features/voice-input", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.text) {
-          onTextReceived(data.text);
-        }
-      } else {
-        setError("音声の処理に失敗しました");
-      }
-    } catch (err) {
-      setError("通信エラーが発生しました");
-      console.error("Voice input processing error:", err);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  if (!isSupported) {
+    return null; // Don't show button if browser doesn't support it
+  }
 
   return (
     <div className="flex items-center gap-2">
@@ -88,12 +105,11 @@ export function VoiceInputButton({ token, onTextReceived }: VoiceInputProps) {
 
       <button
         onClick={isRecording ? handleStopRecording : handleStartRecording}
-        disabled={isProcessing}
         className={`p-2 rounded-lg transition-colors ${
           isRecording
             ? "bg-red-100 text-red-600 hover:bg-red-200"
             : "bg-[#F2F2F7] text-[#1A1A2E] hover:bg-[#E5DCD0]"
-        } disabled:opacity-50 disabled:cursor-not-allowed`}
+        }`}
         title={isRecording ? "録音を停止" : "音声入力"}
       >
         <svg
@@ -107,9 +123,7 @@ export function VoiceInputButton({ token, onTextReceived }: VoiceInputProps) {
           strokeLinejoin="round"
         >
           {isRecording ? (
-            <>
-              <rect x="4" y="4" width="16" height="16" rx="2" />
-            </>
+            <rect x="4" y="4" width="16" height="16" rx="2" />
           ) : (
             <>
               <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />

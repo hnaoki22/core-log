@@ -1,14 +1,14 @@
 /**
  * LLM Utility for CORE Log feature analysis.
- * Uses OpenAI GPT-4o-mini for cost-efficient analysis tasks.
+ * Uses Anthropic Claude Sonnet for high-quality Japanese text analysis.
  * All prompts are in Japanese to match the application context.
  */
 
-import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "" });
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "" });
 
-const MODEL = "gpt-4o-mini";
+const MODEL = "claude-sonnet-4-20250514";
 
 // ---------------------------------------------------------------------------
 // Generic helper
@@ -18,21 +18,22 @@ export async function llmAnalyze(
   userContent: string,
   options?: { temperature?: number; maxTokens?: number }
 ): Promise<string> {
-  if (!process.env.OPENAI_API_KEY) {
-    console.warn("OPENAI_API_KEY not set – returning fallback");
-    return "（AI分析は現在利用できません。OPENAI_API_KEYを設定してください。）";
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.warn("ANTHROPIC_API_KEY not set – returning fallback");
+    return "（AI分析は現在利用できません。ANTHROPIC_API_KEYを設定してください。）";
   }
   try {
-    const res = await openai.chat.completions.create({
+    const res = await anthropic.messages.create({
       model: MODEL,
-      temperature: options?.temperature ?? 0.7,
       max_tokens: options?.maxTokens ?? 1024,
+      temperature: options?.temperature ?? 0.7,
+      system: systemPrompt,
       messages: [
-        { role: "system", content: systemPrompt },
         { role: "user", content: userContent },
       ],
     });
-    return res.choices[0]?.message?.content?.trim() || "";
+    const block = res.content[0];
+    return block.type === "text" ? block.text.trim() : "";
   } catch (err) {
     console.error("LLM analysis error:", err);
     return "（AI分析でエラーが発生しました。）";

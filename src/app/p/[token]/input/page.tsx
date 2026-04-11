@@ -359,7 +359,6 @@ export default function InputPage() {
                   {useVoice && (
                     <div className="absolute bottom-3 right-3">
                       <VoiceInputButton
-                        token={token}
                         onTextReceived={(text) => {
                           if (isMorning) {
                             setMorning((prev) => (prev ? prev + "\n" + text : text));
