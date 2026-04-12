@@ -733,6 +733,7 @@ export async function updateManagerInSupabase(
     email?: string;
     department?: string;
     isAdmin?: boolean;
+    role?: string;
   },
   tenantId: string
 ): Promise<boolean> {
@@ -741,6 +742,7 @@ export async function updateManagerInSupabase(
   if (updates.email !== undefined) updateData.email = updates.email;
   if (updates.department !== undefined) updateData.department = updates.department;
   if (updates.isAdmin !== undefined) updateData.is_admin = updates.isAdmin;
+  if (updates.role !== undefined) updateData.role = updates.role;
 
   if (Object.keys(updateData).length === 0) return true;
 

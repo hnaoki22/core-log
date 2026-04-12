@@ -31,7 +31,7 @@ export async function PUT(
     }
 
     // Validate allowed fields
-    const allowedFields = ["name", "email", "department", "isAdmin"];
+    const allowedFields = ["name", "email", "department", "isAdmin", "role"];
     const updateData: Record<string, unknown> = {};
     for (const key of allowedFields) {
       if (updates[key] !== undefined) {

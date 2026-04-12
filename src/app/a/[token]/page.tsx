@@ -116,8 +116,8 @@ export default function AdminDashboard() {
   // Manager edit state
   const [editingManager, setEditingManager] = useState<ManagerData | null>(null);
   const [editManagerForm, setEditManagerForm] = useState<{
-    name: string; email: string; department: string; isAdmin: boolean;
-  }>({ name: "", email: "", department: "", isAdmin: false });
+    name: string; email: string; department: string; isAdmin: boolean; role: string;
+  }>({ name: "", email: "", department: "", isAdmin: false, role: "manager" });
   const [editManagerSaving, setEditManagerSaving] = useState(false);
 
   // Manager CSV Import state
@@ -184,6 +184,7 @@ export default function AdminDashboard() {
       email: m.email || "",
       department: m.department || "",
       isAdmin: m.isAdmin || false,
+      role: m.role || (m.isAdmin ? "admin" : "manager"),
     });
   };
 
@@ -1541,11 +1542,18 @@ export default function AdminDashboard() {
                 <input type="text" value={editManagerForm.department} onChange={(e) => setEditManagerForm({ ...editManagerForm, department: e.target.value })}
                   className="w-full text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none" />
               </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="editManagerIsAdmin" checked={editManagerForm.isAdmin}
-                  onChange={(e) => setEditManagerForm({ ...editManagerForm, isAdmin: e.target.checked })}
-                  className="rounded border-[#EFE8DD]" />
-                <label htmlFor="editManagerIsAdmin" className="text-xs text-[#5B5560]">管理者権限を付与する</label>
+              <div>
+                <label className="text-xs font-medium text-[#5B5560] block mb-1">役割</label>
+                <select value={editManagerForm.role}
+                  onChange={(e) => {
+                    const newRole = e.target.value;
+                    setEditManagerForm({ ...editManagerForm, role: newRole, isAdmin: newRole === "admin" });
+                  }}
+                  className="w-full text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none bg-white">
+                  <option value="admin">管理者（管理画面アクセス可）</option>
+                  <option value="manager">マネージャー</option>
+                  <option value="observer">閲覧者（オブザーバー）</option>
+                </select>
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button onClick={() => setEditingManager(null)}
