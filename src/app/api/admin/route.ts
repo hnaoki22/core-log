@@ -129,5 +129,13 @@ export async function GET(request: NextRequest) {
     viewerRole,
     tenantId,
     tenants: tenants.map((t) => ({ id: t.id, name: t.name, slug: t.slug, companyName: t.companyName })),
+    _debug: {
+      managerBackend: manager.backend,
+      managerId: manager.id,
+      managerTenantId: manager.tenantId,
+      resolvedTenantId: tenantId,
+      participantCount: enrichedParticipants.length,
+      managerCount: managerData.length,
+    },
   });
 }
