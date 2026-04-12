@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
   const viewerRole = manager.role;
 
   // Determine which tenant to view
+  console.log("[ADMIN DEBUG] manager.tenantId:", manager.tenantId, "manager.name:", manager.name, "manager.isAdmin:", manager.isAdmin);
   let tenantId = manager.tenantId || DEFAULT_TENANT_ID;
   if (tenantSlug && manager.isAdmin) {
     const requestedTenant = await getTenantBySlug(tenantSlug);
