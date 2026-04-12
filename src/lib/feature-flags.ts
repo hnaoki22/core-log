@@ -9,10 +9,9 @@
 //   import { isFeatureEnabled } from "@/lib/feature-flags";
 //   if (await isFeatureEnabled("feature.managerFeedback")) { ... }
 
-import { getClient } from "@/lib/supabase";
+import { getClient, DEFAULT_TENANT_ID } from "@/lib/supabase";
 
 const DEFAULT_CLIENT = process.env.FEATURE_FLAGS_CLIENT || "default";
-const DEFAULT_TENANT_ID = "81f91c26-214e-4da2-9893-6ac6c8984062";
 
 // ===== Catalog =====
 // Every feature (existing or new) is declared here. Adding a flag = one entry.

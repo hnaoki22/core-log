@@ -8,7 +8,7 @@ import { getManagerByTokenFromSupabase } from "@/lib/supabase";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { generate1on1Briefing } from "@/lib/llm";
 
-const TENANT_ID = "81f91c26-214e-4da2-9893-6ac6c8984062";
+
 
 interface LogData {
   date: string;
@@ -45,13 +45,14 @@ async function handleSelectConcept(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const tenantId = manager.tenantId || "default";
     // Update concept selection
     const client = getClient();
     const { data, error } = await client
       .from("weekly_concepts")
       .update({ selected_index: selectedIndex })
       .eq("id", conceptId)
-      .eq("tenant_id", TENANT_ID)
+      .eq("tenant_id", tenantId)
       .select("id")
       .single();
 
@@ -96,6 +97,7 @@ export async function GET(req: NextRequest) {
     if (!manager) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const tenantId = manager.tenantId || "default";
 
     if (!participantId) {
       return NextResponse.json({ error: "Participant ID required" }, { status: 400 });
@@ -108,7 +110,7 @@ export async function GET(req: NextRequest) {
       .from("participants")
       .select("*")
       .eq("id", participantId)
-      .eq("tenant_id", TENANT_ID)
+      .eq("tenant_id", tenantId)
       .single();
 
     if (participantError || !participantData) {
@@ -120,7 +122,7 @@ export async function GET(req: NextRequest) {
     const { data: logs, error: logsError } = await client
       .from("logs")
       .select("date, morning_intent, evening_insight, energy")
-      .eq("tenant_id", TENANT_ID)
+      .eq("tenant_id", tenantId)
       .eq("participant_id", participantId)
       .gte("created_at", sevenDaysAgo)
       .order("date", { ascending: true });
@@ -144,7 +146,7 @@ export async function GET(req: NextRequest) {
     const { data: ruminationData } = await client
       .from("rumination_analyses")
       .select("score")
-      .eq("tenant_id", TENANT_ID)
+      .eq("tenant_id", tenantId)
       .eq("participant_id", participantId)
       .gte("created_at", sevenDaysAgo)
       .order("created_at", { ascending: true });

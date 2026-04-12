@@ -3,7 +3,7 @@
 // Prevents duplicate entries for the same day
 
 import { NextRequest, NextResponse } from "next/server";
-import { createMorningEntry, createEveningOnlyEntry, updateEveningEntry, hasLoggedToday } from "@/lib/supabase";
+import { createMorningEntry, createEveningOnlyEntry, updateEveningEntry, hasLoggedToday, DEFAULT_TENANT_ID } from "@/lib/supabase";
 import { getParticipantByToken, getManagerById } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
 import { isProgramEnded, isProgramNotStarted, getCurrentHourJST } from "@/lib/date-utils";
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
 
     // Check if participant's program is still active
     const participant = await getParticipantByToken(token);
-    const tenantId = participant?.tenantId || "81f91c26-214e-4da2-9893-6ac6c8984062";
+    const tenantId = participant?.tenantId || DEFAULT_TENANT_ID;
     const participantId = participant?.id || "";
     if (participant) {
       if (participant.endDate && isProgramEnded(participant.endDate)) {

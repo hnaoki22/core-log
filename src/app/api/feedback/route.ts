@@ -6,6 +6,7 @@ import {
   markFeedbackAsRead,
   getUnreadFeedbackCount,
   getLogsByParticipant,
+  DEFAULT_TENANT_ID,
 } from "@/lib/supabase";
 import { getParticipantByToken, getManagerByToken, getParticipantByName } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
@@ -25,8 +26,8 @@ export async function GET(req: NextRequest) {
   // Check if participant token
   const participant = await getParticipantByToken(token);
   if (participant) {
-    const feedback = await getFeedbackByParticipant(participant.name, participant.tenantId || "81f91c26-214e-4da2-9893-6ac6c8984062");
-    const unreadCount = await getUnreadFeedbackCount(participant.name, participant.tenantId || "81f91c26-214e-4da2-9893-6ac6c8984062");
+    const feedback = await getFeedbackByParticipant(participant.name, participant.tenantId || DEFAULT_TENANT_ID);
+    const unreadCount = await getUnreadFeedbackCount(participant.name, participant.tenantId || DEFAULT_TENANT_ID);
     return NextResponse.json({ feedback, unreadCount, totalCount: feedback.length });
   }
 
@@ -35,9 +36,9 @@ export async function GET(req: NextRequest) {
   const isAdmin = await isAdminToken(token);
   if ((manager || isAdmin) && participantName) {
     const includeLogs = req.nextUrl.searchParams.get("includeLogs") === "true";
-    const feedback = await getFeedbackByParticipant(participantName, "81f91c26-214e-4da2-9893-6ac6c8984062");
+    const feedback = await getFeedbackByParticipant(participantName, DEFAULT_TENANT_ID);
     if (includeLogs) {
-      const allLogs = await getLogsByParticipant(participantName, "81f91c26-214e-4da2-9893-6ac6c8984062");
+      const allLogs = await getLogsByParticipant(participantName, DEFAULT_TENANT_ID);
       // Return only last 7 days of logs
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -78,6 +79,7 @@ export async function POST(req: NextRequest) {
 
     const authorName = manager?.name || "Human Mature";
     const feedbackType = type || (isAdmin ? "HMフィードバック" : "上司コメント");
+    const tenantId = manager?.tenantId || DEFAULT_TENANT_ID;
 
     let result;
     try {
@@ -88,7 +90,7 @@ export async function POST(req: NextRequest) {
         content,
         period: period || "",
         weekNum: weekNum || 1,
-      }, "81f91c26-214e-4da2-9893-6ac6c8984062", "");
+      }, tenantId, "");
     } catch (fbError: unknown) {
       const msg = fbError instanceof Error ? fbError.message : String(fbError);
       return NextResponse.json({ error: "Failed to create feedback", detail: msg }, { status: 500 });

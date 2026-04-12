@@ -8,7 +8,7 @@ import { getClient } from "@/lib/supabase";
 import { getParticipantByTokenFromSupabase } from "@/lib/supabase";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 
-const TENANT_ID = "81f91c26-214e-4da2-9893-6ac6c8984062";
+
 
 export async function GET(req: NextRequest) {
   try {
@@ -33,12 +33,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const tenantId = participant.tenantId || "default";
     // Fetch all shared knowledge items for this tenant
     const client = getClient();
     const { data, error } = await client
       .from("knowledge_items")
       .select("*")
-      .eq("tenant_id", TENANT_ID)
+      .eq("tenant_id", tenantId)
       .eq("is_shared", true)
       .order("created_at", { ascending: false })
       .limit(100);
@@ -87,13 +88,14 @@ export async function POST(req: NextRequest) {
     if (!participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const tenantId = participant.tenantId || "default";
 
     // Store knowledge item in database
     const client = getClient();
     const { data, error } = await client
       .from("knowledge_items")
       .insert({
-        tenant_id: TENANT_ID,
+        tenant_id: tenantId,
         participant_id: participant.id,
         title,
         content,

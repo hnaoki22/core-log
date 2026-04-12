@@ -2,8 +2,8 @@
 // Exports all participants and their logs as CSV
 
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminOrObserverToken, getAllParticipants } from "@/lib/participant-db";
-import { getLogsByParticipant } from "@/lib/supabase";
+import { getAllParticipants, getManagerByToken } from "@/lib/participant-db";
+import { DEFAULT_TENANT_ID, getLogsByParticipant } from "@/lib/supabase";
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
@@ -12,14 +12,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Token required" }, { status: 400 });
   }
 
-  const authorized = await isAdminOrObserverToken(token);
-  if (!authorized) {
+  const manager = await getManagerByToken(token);
+  if (!manager || (!manager.isAdmin && manager.role !== "observer")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
   try {
+    const tenantId = manager.tenantId || DEFAULT_TENANT_ID;
     // Get all participants
-    const participants = await getAllParticipants();
+    const participants = await getAllParticipants(tenantId);
 
     // Collect all logs for all participants
     const csvRows: string[] = [];
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
     // Fetch logs for each participant
     for (const participant of participants) {
       // Supabase mode: fetch from API
-      const logs = await getLogsByParticipant(participant.name, "81f91c26-214e-4da2-9893-6ac6c8984062");
+      const logs = await getLogsByParticipant(participant.name, tenantId);
 
       // Convert logs to CSV rows
       for (const log of logs) {

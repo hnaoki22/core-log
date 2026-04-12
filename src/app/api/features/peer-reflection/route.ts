@@ -10,7 +10,7 @@ import { getClient } from "@/lib/supabase";
 import { getParticipantByToken } from "@/lib/participant-db";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 
-const TENANT_ID = "81f91c26-214e-4da2-9893-6ac6c8984062";
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
     if (!participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const tenantId = participant.tenantId || "default";
 
     // Look up the target participant's name
     const client = getClient();
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
     const { data, error } = await client
       .from("peer_reflections")
       .insert({
-        tenant_id: TENANT_ID,
+        tenant_id: tenantId,
         from_participant_id: participant.id,
         to_participant_id: toParticipantId,
         from_name: participant.name,
@@ -111,6 +112,7 @@ export async function GET(req: NextRequest) {
     if (!participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const tenantId = participant.tenantId || "default";
 
     const client = getClient();
 
@@ -118,7 +120,7 @@ export async function GET(req: NextRequest) {
     const { data: members } = await client
       .from("participants")
       .select("id, name, role")
-      .eq("tenant_id", TENANT_ID)
+      .eq("tenant_id", tenantId)
       .neq("id", participant.id)
       .order("name");
 
@@ -126,7 +128,7 @@ export async function GET(req: NextRequest) {
     const { data: pendingForMe } = await client
       .from("peer_reflections")
       .select("*")
-      .eq("tenant_id", TENANT_ID)
+      .eq("tenant_id", tenantId)
       .eq("to_participant_id", participant.id)
       .eq("status", "pending")
       .order("created_at", { ascending: false });
@@ -135,7 +137,7 @@ export async function GET(req: NextRequest) {
     const { data: sentByMe } = await client
       .from("peer_reflections")
       .select("*")
-      .eq("tenant_id", TENANT_ID)
+      .eq("tenant_id", tenantId)
       .eq("from_participant_id", participant.id)
       .order("created_at", { ascending: false });
 
@@ -143,7 +145,7 @@ export async function GET(req: NextRequest) {
     const { data: receivedAnswers } = await client
       .from("peer_reflections")
       .select("*")
-      .eq("tenant_id", TENANT_ID)
+      .eq("tenant_id", tenantId)
       .eq("to_participant_id", participant.id)
       .eq("status", "answered")
       .order("created_at", { ascending: false });

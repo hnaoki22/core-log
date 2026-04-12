@@ -2,7 +2,7 @@
 // Returns all participants + managers with enriched Supabase data
 
 import { NextRequest, NextResponse } from "next/server";
-import { getAllLogsForTenant } from "@/lib/supabase";
+import { DEFAULT_TENANT_ID, getAllLogsForTenant, getTenantBySlug, getAllTenants } from "@/lib/supabase";
 import {
   getAllParticipants,
   getAllManagers,
@@ -13,10 +13,9 @@ import { getTodayJST, calculateWeekNum } from "@/lib/date-utils";
 
 export const dynamic = "force-dynamic";
 
-const TENANT_ID = "81f91c26-214e-4da2-9893-6ac6c8984062";
-
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
+  const tenantSlug = request.nextUrl.searchParams.get("tenant");
 
   if (!token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
@@ -30,11 +29,21 @@ export async function GET(request: NextRequest) {
   }
   const viewerRole = manager.role;
 
-  // Fetch ALL data in parallel — 3 queries total instead of N+1
-  const [participantMocks, managers, allLogsMap] = await Promise.all([
-    getAllParticipants(),
-    getAllManagers(),
-    getAllLogsForTenant(TENANT_ID),
+  // Determine which tenant to view
+  let tenantId = manager.tenantId || DEFAULT_TENANT_ID;
+  if (tenantSlug && manager.isAdmin) {
+    const requestedTenant = await getTenantBySlug(tenantSlug);
+    if (requestedTenant) {
+      tenantId = requestedTenant.id;
+    }
+  }
+
+  // Fetch ALL data in parallel — 4 queries total instead of N+1
+  const [participantMocks, managers, allLogsMap, tenants] = await Promise.all([
+    getAllParticipants(tenantId),
+    getAllManagers(tenantId),
+    getAllLogsForTenant(tenantId),
+    manager.isAdmin ? getAllTenants() : Promise.resolve([]),
   ]);
   const todayJST = getTodayJST();
 
@@ -114,5 +123,7 @@ export async function GET(request: NextRequest) {
     participants: enrichedParticipants,
     managers: managerData,
     viewerRole,
+    tenantId,
+    tenants: tenants.map((t) => ({ id: t.id, name: t.name, slug: t.slug, companyName: t.companyName })),
   });
 }

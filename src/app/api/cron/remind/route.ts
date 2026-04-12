@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isBusinessDay, getJSTDateString, getJSTHour } from "@/lib/calendar";
 import { sendReminderEmail, type ReminderType } from "@/lib/email";
-import { hasLoggedToday } from "@/lib/supabase";
+import { hasLoggedToday, getAllTenants } from "@/lib/supabase";
 import { getAllParticipants } from "@/lib/participant-db";
 import { logger } from "@/lib/logger";
 import { isFeatureEnabled } from "@/lib/feature-flags";
@@ -59,31 +59,34 @@ export async function GET(request: NextRequest) {
   // Morning cron runs at JST ~8:00, Evening at ~17:00
   const type: ReminderType = jstHour < 12 ? "morning" : "evening";
 
-  // Get all active participants (those with email and within active period)
-  const participants = await getAllParticipants();
-  const activeParticipants = participants.filter(
-    (p) => p.email && p.email !== "" && !p.email.includes("example.com")
-  );
-
+  // Get all tenants and iterate through each
+  const tenants = await getAllTenants();
   const results: { name: string; email: string; sent: boolean; skipped?: string }[] = [];
 
-  for (const p of activeParticipants) {
-    try {
-      // Check startDate: skip if today is before participant's start date
-      if (p.startDate && todayStr < p.startDate) {
-        results.push({ name: p.name, email: p.email, sent: false, skipped: `before start date (${p.startDate})` });
-        continue;
-      }
+  for (const tenant of tenants) {
+    // Get all active participants for this tenant
+    const participants = await getAllParticipants(tenant.id);
+    const activeParticipants = participants.filter(
+      (p) => p.email && p.email !== "" && !p.email.includes("example.com")
+    );
 
-      // Check endDate: skip if today is after participant's end date
-      if (p.endDate && todayStr > p.endDate) {
-        results.push({ name: p.name, email: p.email, sent: false, skipped: `after end date (${p.endDate})` });
-        continue;
-      }
+    for (const p of activeParticipants) {
+      try {
+        // Check startDate: skip if today is before participant's start date
+        if (p.startDate && todayStr < p.startDate) {
+          results.push({ name: p.name, email: p.email, sent: false, skipped: `before start date (${p.startDate})` });
+          continue;
+        }
 
-      // Check if already logged today
-      let reminderType: ReminderType = type;
-      const logged = await hasLoggedToday(p.name, todayStr, "81f91c26-214e-4da2-9893-6ac6c8984062");
+        // Check endDate: skip if today is after participant's end date
+        if (p.endDate && todayStr > p.endDate) {
+          results.push({ name: p.name, email: p.email, sent: false, skipped: `after end date (${p.endDate})` });
+          continue;
+        }
+
+        // Check if already logged today
+        let reminderType: ReminderType = type;
+        const logged = await hasLoggedToday(p.name, todayStr, tenant.id);
 
       if (type === "morning" && logged.hasMorning) {
         results.push({ name: p.name, email: p.email, sent: false, skipped: "already logged morning" });
@@ -105,23 +108,24 @@ export async function GET(request: NextRequest) {
         type: reminderType,
       });
 
-      results.push({ name: p.name, email: p.email, sent });
-    } catch (error) {
-      logger.error("Participant processing error", { name: p.name, email: p.email, error: String(error) });
-      results.push({ name: p.name, email: p.email, sent: false, skipped: `error: ${String(error).slice(0, 100)}` });
+        results.push({ name: p.name, email: p.email, sent });
+      } catch (error) {
+        logger.error("Participant processing error", { name: p.name, email: p.email, error: String(error) });
+        results.push({ name: p.name, email: p.email, sent: false, skipped: `error: ${String(error).slice(0, 100)}` });
+      }
     }
   }
 
   const sentCount = results.filter((r) => r.sent).length;
 
-  logger.info("Reminder emails sent", { type, date: todayStr, totalParticipants: activeParticipants.length, sentCount });
+  logger.info("Reminder emails sent", { type, date: todayStr, totalParticipants: results.length, sentCount });
 
   return NextResponse.json({
     message: `${type} reminders processed`,
     date: todayStr,
     jstHour,
     type,
-    total: activeParticipants.length,
+    total: results.length,
     sent: sentCount,
     results,
   });

@@ -3,12 +3,12 @@
 // Fetches recent manager feedback and comments, analyzes for safety signals
 
 import { NextRequest, NextResponse } from "next/server";
-import { getClient } from "@/lib/supabase";
-import { isAdminToken } from "@/lib/participant-db";
+import { DEFAULT_TENANT_ID, getClient } from "@/lib/supabase";
+import { getManagerByToken } from "@/lib/participant-db";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { analyzePsychSafety } from "@/lib/llm";
 
-const TENANT_ID = "81f91c26-214e-4da2-9893-6ac6c8984062";
+
 
 interface FeedbackEntry {
   author_name: string;
@@ -45,13 +45,14 @@ export async function GET(req: NextRequest) {
     }
 
     // Admin-only check
-    const isAdmin = await isAdminToken(token);
-    if (!isAdmin) {
+    const manager = await getManagerByToken(token);
+    if (!manager || !manager.isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },
         { status: 403 }
       );
     }
+    const tenantId = manager.tenantId || DEFAULT_TENANT_ID;
 
     const client = getClient();
     const now = new Date();
@@ -61,7 +62,7 @@ export async function GET(req: NextRequest) {
     const { data: managers } = await client
       .from("managers")
       .select("*")
-      .eq("tenant_id", TENANT_ID);
+      .eq("tenant_id", tenantId);
 
     if (!managers || managers.length === 0) {
       return NextResponse.json({
@@ -79,7 +80,7 @@ export async function GET(req: NextRequest) {
       const { data: feedback } = await client
         .from("feedback")
         .select("*")
-        .eq("tenant_id", TENANT_ID)
+        .eq("tenant_id", tenantId)
         .eq("author_name", manager.name)
         .gte("created_at", thirtyDaysAgo.toISOString());
 
@@ -87,7 +88,7 @@ export async function GET(req: NextRequest) {
       const { data: logComments } = await client
         .from("logs")
         .select("manager_comment, manager_comment_time")
-        .eq("tenant_id", TENANT_ID)
+        .eq("tenant_id", tenantId)
         .not("manager_comment", "is", null)
         .gte("manager_comment_time", thirtyDaysAgo.toISOString());
 
@@ -117,7 +118,7 @@ export async function GET(req: NextRequest) {
       const { data: analysisData, error: storeError } = await client
         .from("psych_safety_analyses")
         .insert({
-          tenant_id: TENANT_ID,
+          tenant_id: tenantId,
           manager_id: manager.id,
           score: analysis.score,
           negative_signals: analysis.signals,

@@ -3,11 +3,12 @@
 // Requires admin token for authorization
 
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminToken } from "@/lib/participant-db";
 import {
+  DEFAULT_TENANT_ID,
   createParticipantInSupabase as createParticipant,
   createManagerInSupabase as createManager,
   getAllManagersFromSupabase as getAllManagers,
+  getManagerByTokenFromSupabase as getManagerByTokenSupabase,
 } from "@/lib/supabase";
 
 export async function POST(request: NextRequest) {
@@ -19,10 +20,11 @@ export async function POST(request: NextRequest) {
     if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
-    const authorized = await isAdminToken(token);
-    if (!authorized) {
+    const manager = await getManagerByTokenSupabase(token);
+    if (!manager) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
+    const tenantId = manager.tenantId || DEFAULT_TENANT_ID;
 
     if (type === "participant") {
       const { name, email, department, dojoPhase, managerId } = data;
@@ -37,7 +39,7 @@ export async function POST(request: NextRequest) {
         dojoPhase: dojoPhase || "道場1 覚醒",
         managerId: managerId || undefined,
         fbPolicy: "",
-      }, "81f91c26-214e-4da2-9893-6ac6c8984062");
+      }, tenantId);
 
       if (!result) {
         return NextResponse.json({ error: "参加者の作成に失敗しました" }, { status: 500 });
@@ -65,7 +67,7 @@ export async function POST(request: NextRequest) {
         email,
         department: department || "",
         isAdmin: isAdmin ?? false,
-      }, "81f91c26-214e-4da2-9893-6ac6c8984062");
+      }, tenantId);
 
       if (!result) {
         return NextResponse.json({ error: "マネージャーの作成に失敗しました" }, { status: 500 });
@@ -96,13 +98,14 @@ export async function GET(request: NextRequest) {
   if (!token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
-  const authorized = await isAdminToken(token);
-  if (!authorized) {
+  const manager = await getManagerByTokenSupabase(token);
+  if (!manager) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
+  const tenantId = manager.tenantId || DEFAULT_TENANT_ID;
 
   try {
-    const managers = await getAllManagers("81f91c26-214e-4da2-9893-6ac6c8984062");
+    const managers = await getAllManagers(tenantId);
     return NextResponse.json({
       managers: managers.map((m) => ({
         id: m.id,

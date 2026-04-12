@@ -38,10 +38,19 @@ type ManagerData = {
   participantNames: string[];
 };
 
+type TenantInfo = {
+  id: string;
+  name: string;
+  slug: string;
+  companyName: string;
+};
+
 type AdminData = {
   participants: ParticipantData[];
   managers: ManagerData[];
   viewerRole?: "admin" | "observer" | "manager";
+  tenantId?: string;
+  tenants?: TenantInfo[];
 };
 
 type ManagerOption = { id: string; name: string };
@@ -61,6 +70,7 @@ export default function AdminDashboard() {
   const [data, setData] = useState<AdminData | null>(null);
   const [loading, setLoading] = useState(true);
   const [unauthorized, setUnauthorized] = useState(false);
+  const [selectedTenantSlug, setSelectedTenantSlug] = useState<string>("");
 
   const [showAddParticipant, setShowAddParticipant] = useState(false);
   const [showAddManager, setShowAddManager] = useState(false);
@@ -170,7 +180,7 @@ export default function AdminDashboard() {
       });
       if (res.ok) {
         setEditingParticipant(null);
-        const refreshRes = await fetch(`/api/admin?token=${token}`);
+        const refreshRes = await fetch(`/api/admin?token=${token}${selectedTenantSlug ? `&tenant=${selectedTenantSlug}` : ""}`);
         if (refreshRes.ok) setData(await refreshRes.json());
       } else {
         const err = await res.json();
@@ -201,7 +211,7 @@ export default function AdminDashboard() {
       });
       if (res.ok) {
         setEditingManager(null);
-        const refreshRes = await fetch(`/api/admin?token=${token}`);
+        const refreshRes = await fetch(`/api/admin?token=${token}${selectedTenantSlug ? `&tenant=${selectedTenantSlug}` : ""}`);
         if (refreshRes.ok) setData(await refreshRes.json());
       } else {
         const err = await res.json();
@@ -242,20 +252,23 @@ export default function AdminDashboard() {
     finally { setManagerImportLoading(false); }
   };
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const res = await fetch(`/api/admin?token=${token}`);
-        if (res.status === 403) { setUnauthorized(true); return; }
-        if (res.ok) setData(await res.json());
-      } catch {
-        // silently fail
-      } finally {
-        setLoading(false);
-      }
+  const fetchAdminData = async (tenantSlug?: string) => {
+    setLoading(true);
+    try {
+      const tenantParam = tenantSlug ? `&tenant=${tenantSlug}` : "";
+      const res = await fetch(`/api/admin?token=${token}${tenantParam}`);
+      if (res.status === 403) { setUnauthorized(true); return; }
+      if (res.ok) setData(await res.json());
+    } catch {
+      // silently fail
+    } finally {
+      setLoading(false);
     }
-    fetchData();
-  }, [token]);
+  };
+
+  useEffect(() => {
+    fetchAdminData(selectedTenantSlug || undefined);
+  }, [token, selectedTenantSlug]);
 
   useEffect(() => {
     if (showAddParticipant) {
@@ -289,7 +302,7 @@ export default function AdminDashboard() {
       if (result.success) {
         setAddResult({ type: "participant", name: result.participant.name, token: result.participant.token, url: result.participant.url });
         setShowAddParticipant(false);
-        const refreshRes = await fetch(`/api/admin?token=${token}`);
+        const refreshRes = await fetch(`/api/admin?token=${token}${selectedTenantSlug ? `&tenant=${selectedTenantSlug}` : ""}`);
         if (refreshRes.ok) setData(await refreshRes.json());
       } else { alert(result.error || "追加に失敗しました"); }
     } catch { alert("エラーが発生しました"); } finally { setSubmitting(false); }
@@ -316,7 +329,7 @@ export default function AdminDashboard() {
       if (result.success) {
         setAddResult({ type: "manager", name: result.manager.name, token: result.manager.token, url: result.manager.url });
         setShowAddManager(false);
-        const refreshRes = await fetch(`/api/admin?token=${token}`);
+        const refreshRes = await fetch(`/api/admin?token=${token}${selectedTenantSlug ? `&tenant=${selectedTenantSlug}` : ""}`);
         if (refreshRes.ok) setData(await refreshRes.json());
       } else { alert(result.error || "追加に失敗しました"); }
     } catch { alert("エラーが発生しました"); } finally { setSubmitting(false); }
@@ -377,7 +390,7 @@ export default function AdminDashboard() {
       if (result.success) {
         setFbSuccess(true);
         setTimeout(() => { setShowFeedbackModal(false); setFbSuccess(false); }, 1500);
-        const refreshRes = await fetch(`/api/admin?token=${token}`);
+        const refreshRes = await fetch(`/api/admin?token=${token}${selectedTenantSlug ? `&tenant=${selectedTenantSlug}` : ""}`);
         if (refreshRes.ok) setData(await refreshRes.json());
       } else { alert(result.error || "フィードバックの送信に失敗しました"); }
     } catch { alert("エラーが発生しました"); } finally { setFbSubmitting(false); }
@@ -498,6 +511,27 @@ export default function AdminDashboard() {
             <h1 className="text-xl font-semibold tracking-tight">管理者ダッシュボード</h1>
           </div>
           <p className="text-gray-400 text-sm font-light ml-7">CORE Log システム全体の状況</p>
+          {/* Tenant switcher — only visible for admins with multiple tenants */}
+          {data.tenants && data.tenants.length > 1 && data.viewerRole === "admin" && (
+            <div className="ml-7 mt-2 flex items-center gap-2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+              </svg>
+              <select
+                value={selectedTenantSlug}
+                onChange={(e) => setSelectedTenantSlug(e.target.value)}
+                className="bg-white/15 text-white text-xs font-medium px-3 py-1.5 rounded-lg border border-white/20 outline-none cursor-pointer hover:bg-white/25 transition-colors appearance-none pr-7"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center" }}
+              >
+                <option value="" className="text-gray-900">全テナント（デフォルト）</option>
+                {data.tenants.map((t) => (
+                  <option key={t.slug} value={t.slug} className="text-gray-900">
+                    {t.companyName || t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           {isObserver && (
             <div className="ml-7 mt-1.5 inline-flex items-center gap-1.5 bg-white/15 text-white/90 text-[10px] font-medium px-2.5 py-1 rounded-lg">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1407,7 +1441,7 @@ export default function AdminDashboard() {
                             setImportResult(json);
                             setImportStep("result");
                             // refresh participant list
-                            const refreshRes = await fetch(`/api/admin?token=${token}`);
+                            const refreshRes = await fetch(`/api/admin?token=${token}${selectedTenantSlug ? `&tenant=${selectedTenantSlug}` : ""}`);
                             if (refreshRes.ok) { const d = await refreshRes.json(); setData(d); }
                           } else {
                             setImportError({ error: json.error, details: json.details });
@@ -1703,7 +1737,7 @@ export default function AdminDashboard() {
                     </table>
                   </div>
                   <div className="flex justify-end">
-                    <button onClick={async () => { setShowManagerImport(false); const refreshRes = await fetch(`/api/admin?token=${token}`); if (refreshRes.ok) setData(await refreshRes.json()); }}
+                    <button onClick={async () => { setShowManagerImport(false); const refreshRes = await fetch(`/api/admin?token=${token}${selectedTenantSlug ? `&tenant=${selectedTenantSlug}` : ""}`); if (refreshRes.ok) setData(await refreshRes.json()); }}
                       className="btn-accent text-xs px-4 py-2">
                       閉じる
                     </button>

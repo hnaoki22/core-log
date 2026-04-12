@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isBusinessDay, getJSTDateString, getJSTHour } from "@/lib/calendar";
 import { sendReminderEmail, type ReminderType } from "@/lib/email";
-import { hasLoggedToday } from "@/lib/supabase";
+import { hasLoggedToday, getAllTenants } from "@/lib/supabase";
 import { getAllParticipants } from "@/lib/participant-db";
 
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -36,15 +36,20 @@ export async function GET(request: NextRequest) {
   };
 
   // Participant check
-  let participants: Awaited<ReturnType<typeof getAllParticipants>> = [];
+  let allParticipants: Awaited<ReturnType<typeof getAllParticipants>> = [];
   let participantError: string | null = null;
+  const tenants = await getAllTenants();
+
   try {
-    participants = await getAllParticipants();
+    for (const tenant of tenants) {
+      const tenantParticipants = await getAllParticipants(tenant.id);
+      allParticipants = allParticipants.concat(tenantParticipants);
+    }
   } catch (error) {
     participantError = String(error);
   }
 
-  const activeParticipants = participants.filter(
+  const activeParticipants = allParticipants.filter(
     (p) => p.email && p.email !== "" && !p.email.includes("example.com")
   );
 
@@ -57,7 +62,7 @@ export async function GET(request: NextRequest) {
     let skipReason = "";
 
     try {
-      logStatus = await hasLoggedToday(p.name, todayStr, "81f91c26-214e-4da2-9893-6ac6c8984062");
+      logStatus = await hasLoggedToday(p.name, todayStr, p.tenantId || tenants[0]?.id);
       if (type === "morning" && logStatus.hasMorning) {
         wouldSkip = true;
         skipReason = "already logged morning";
@@ -106,7 +111,7 @@ export async function GET(request: NextRequest) {
     },
     environment: envCheck,
     participants: {
-      total: participants.length,
+      total: allParticipants.length,
       active: activeParticipants.length,
       fetchError: participantError,
     },

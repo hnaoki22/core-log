@@ -2,8 +2,8 @@
 // Returns analytics data for admin dashboard
 
 import { NextRequest, NextResponse } from "next/server";
-import { getLogsByParticipant } from "@/lib/supabase";
-import { getAllParticipants, isAdminOrObserverToken } from "@/lib/participant-db";
+import { DEFAULT_TENANT_ID, getLogsByParticipant } from "@/lib/supabase";
+import { getAllParticipants, getManagerByToken } from "@/lib/participant-db";
 import { getTodayJST } from "@/lib/date-utils";
 
 export async function GET(request: NextRequest) {
@@ -11,11 +11,12 @@ export async function GET(request: NextRequest) {
   if (!token)
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
-  const authorized = await isAdminOrObserverToken(token);
-  if (!authorized)
+  const manager = await getManagerByToken(token);
+  if (!manager || (!manager.isAdmin && manager.role !== "observer"))
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
-  const participants = await getAllParticipants();
+  const tenantId = manager.tenantId || DEFAULT_TENANT_ID;
+  const participants = await getAllParticipants(tenantId);
   const todayJST = getTodayJST();
 
   // Collect all logs
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
 
   for (const p of participants) {
     try {
-      const logs = await getLogsByParticipant(p.name, "81f91c26-214e-4da2-9893-6ac6c8984062");
+      const logs = await getLogsByParticipant(p.name, tenantId);
       allParticipantLogs.push({
         name: p.name,
         logs: logs.map((l) => ({

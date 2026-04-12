@@ -2,7 +2,8 @@
 // Shows individual participant's log entries + full mission management
 
 import Link from "next/link";
-import { getLogsByParticipant, getMissionsByParticipant, NotionLogEntry } from "@/lib/supabase";
+import { getLogsByParticipant, getMissionsByParticipant, NotionLogEntry, DEFAULT_TENANT_ID } from "@/lib/supabase";
+import { getManagerByToken } from "@/lib/participant-db";
 import CommentForm from "./CommentForm";
 import MissionManager from "./MissionManager";
 
@@ -36,9 +37,13 @@ export default async function ParticipantDetailPage({ params }: Params) {
   let missions: any[] = [];
 
   try {
+    // Fetch manager to get tenantId
+    const manager = await getManagerByToken(token);
+    const tenantId = manager?.tenantId || DEFAULT_TENANT_ID;
+
     const [fetchedLogs, fetchedMissions] = await Promise.all([
-      getLogsByParticipant(participantName, "81f91c26-214e-4da2-9893-6ac6c8984062"),
-      getMissionsByParticipant(participantName, "81f91c26-214e-4da2-9893-6ac6c8984062"),
+      getLogsByParticipant(participantName, tenantId),
+      getMissionsByParticipant(participantName, tenantId),
     ]);
     logs = fetchedLogs;
     missions = fetchedMissions;

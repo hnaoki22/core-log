@@ -2,12 +2,10 @@
 // Update manager fields (name, email, department, isAdmin)
 
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminToken } from "@/lib/participant-db";
-import { updateManagerInSupabase } from "@/lib/supabase";
+import { getManagerByToken } from "@/lib/participant-db";
+import { DEFAULT_TENANT_ID, updateManagerInSupabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
-
-const DEFAULT_TENANT_ID = "81f91c26-214e-4da2-9893-6ac6c8984062";
 
 export async function PUT(
   request: NextRequest,
@@ -18,9 +16,14 @@ export async function PUT(
     const { token, ...updates } = body;
 
     // Auth check
-    if (!token || !(await isAdminToken(token))) {
+    if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
+    const manager = await getManagerByToken(token);
+    if (!manager || !manager.isAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+    const tenantId = manager.tenantId || DEFAULT_TENANT_ID;
 
     const managerId = params.id;
     if (!managerId) {
@@ -49,7 +52,7 @@ export async function PUT(
     const success = await updateManagerInSupabase(
       managerId,
       updateData as Parameters<typeof updateManagerInSupabase>[1],
-      DEFAULT_TENANT_ID
+      tenantId
     );
 
     if (!success) {

@@ -7,6 +7,7 @@ import {
   createMission,
   updateMissionStatus,
   getMissionsByParticipant,
+  DEFAULT_TENANT_ID,
 } from "@/lib/supabase";
 import { getManagerByToken, getParticipantByToken, getParticipantByName } from "@/lib/participant-db";
 import { getTodayJST } from "@/lib/date-utils";
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const tenantId = "81f91c26-214e-4da2-9893-6ac6c8984062";
+    const tenantId = DEFAULT_TENANT_ID;
     const missions = await getMissionsByParticipant(participantName, tenantId);
     return NextResponse.json({ missions });
   } catch (error) {
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "participantName required" }, { status: 400 });
     }
 
-    const tenantId = participant?.tenantId || manager?.tenantId || "81f91c26-214e-4da2-9893-6ac6c8984062";
+    const tenantId = participant?.tenantId || manager?.tenantId || DEFAULT_TENANT_ID;
     const targetParticipantObj = participant || await getParticipantByName(effectiveName, tenantId);
     const participantId = targetParticipantObj?.id || "";
 

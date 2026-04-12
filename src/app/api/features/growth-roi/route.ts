@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
       if (!participant) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
-      tenantId = participant.tenantId;
+      tenantId = participant.tenantId || "default";
       participantId = participant.id;
     }
 

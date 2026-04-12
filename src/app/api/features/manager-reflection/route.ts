@@ -8,7 +8,7 @@ import { getClient } from "@/lib/supabase";
 import { getManagerByTokenFromSupabase } from "@/lib/supabase";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 
-const TENANT_ID = "81f91c26-214e-4da2-9893-6ac6c8984062";
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,12 +37,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const tenantId = manager.tenantId || "default";
     // Store reflection in database
     const client = getClient();
     const { data, error } = await client
       .from("manager_reflections")
       .insert({
-        tenant_id: TENANT_ID,
+        tenant_id: tenantId,
         manager_id: manager.id,
         reflection,
         support_actions: supportActions || null,
@@ -91,13 +92,14 @@ export async function GET(req: NextRequest) {
     if (!manager) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const tenantId = manager.tenantId || "default";
 
     // Fetch past reflections for this manager
     const client = getClient();
     const { data, error } = await client
       .from("manager_reflections")
       .select("*")
-      .eq("tenant_id", TENANT_ID)
+      .eq("tenant_id", tenantId)
       .eq("manager_id", manager.id)
       .order("created_at", { ascending: false })
       .limit(50);

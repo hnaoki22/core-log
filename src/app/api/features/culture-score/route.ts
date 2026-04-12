@@ -8,7 +8,7 @@ import { getManagerByTokenFromSupabase } from "@/lib/supabase";
 import { isAdminOrObserverToken } from "@/lib/participant-db";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 
-const TENANT_ID = "81f91c26-214e-4da2-9893-6ac6c8984062";
+
 
 interface LogEntry {
   participant_id?: string;
@@ -34,6 +34,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Verify admin or manager token
+    let tenantId: string | undefined;
     const isAdminOrObserver = await isAdminOrObserverToken(token);
     if (!isAdminOrObserver) {
       // Try manager-specific access
@@ -44,6 +45,10 @@ export async function GET(req: NextRequest) {
           { status: 403 }
         );
       }
+      tenantId = manager.tenantId || "default";
+    } else {
+      // Admin/observer - use default tenant
+      tenantId = "default";
     }
 
     const client = getClient();
@@ -54,13 +59,13 @@ export async function GET(req: NextRequest) {
     const { count: totalParticipants } = await client
       .from("participants")
       .select("id", { count: "exact", head: true })
-      .eq("tenant_id", TENANT_ID);
+      .eq("tenant_id", tenantId);
 
     // Active participants (logged in last 30 days)
     const { data: activeLogs } = await client
       .from("logs")
       .select("participant_id")
-      .eq("tenant_id", TENANT_ID)
+      .eq("tenant_id", tenantId)
       .gte("datetime", thirtyDaysAgo.toISOString());
 
     const activeParticipantIds = new Set(
@@ -77,7 +82,7 @@ export async function GET(req: NextRequest) {
     const { data: allLogs } = await client
       .from("logs")
       .select("participant_id, status")
-      .eq("tenant_id", TENANT_ID)
+      .eq("tenant_id", tenantId)
       .gte("datetime", thirtyDaysAgo.toISOString());
 
     let avgEntryRate = 0;
@@ -109,7 +114,7 @@ export async function GET(req: NextRequest) {
     const { data: energyLogs } = await client
       .from("logs")
       .select("energy")
-      .eq("tenant_id", TENANT_ID)
+      .eq("tenant_id", tenantId)
       .gte("datetime", thirtyDaysAgo.toISOString())
       .not("energy", "is", null);
 

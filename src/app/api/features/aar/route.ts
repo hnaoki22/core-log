@@ -12,7 +12,7 @@ import { getClient } from "@/lib/supabase";
 import { getParticipantByTokenFromSupabase } from "@/lib/supabase";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 
-const TENANT_ID = "81f91c26-214e-4da2-9893-6ac6c8984062";
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,13 +40,14 @@ export async function POST(req: NextRequest) {
     if (!participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const tenantId = participant.tenantId || "default";
 
     // Store AAR in database
     const client = getClient();
     const { data, error } = await client
       .from("aar_entries")
       .insert({
-        tenant_id: TENANT_ID,
+        tenant_id: tenantId,
         participant_id: participant.id,
         project_name: projectName,
         expected: expected || null,
@@ -98,13 +99,14 @@ export async function GET(req: NextRequest) {
     if (!participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const tenantId = participant.tenantId || "default";
 
     // Fetch past AARs for this participant
     const client = getClient();
     const { data, error } = await client
       .from("aar_entries")
       .select("*")
-      .eq("tenant_id", TENANT_ID)
+      .eq("tenant_id", tenantId)
       .eq("participant_id", participant.id)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -153,6 +155,7 @@ export async function PUT(req: NextRequest) {
     if (!participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const tenantId = participant.tenantId || "default";
 
     // Update AAR
     const client = getClient();
@@ -166,7 +169,7 @@ export async function PUT(req: NextRequest) {
         lessons: lessons || null,
         next_actions: nextActions || null,
       })
-      .eq("tenant_id", TENANT_ID)
+      .eq("tenant_id", tenantId)
       .eq("participant_id", participant.id)
       .eq("id", aarId);
 

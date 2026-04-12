@@ -6,8 +6,9 @@
 //   managerName: 参加者のみ。上司の名前（先にマネージャー行を書くこと）
 
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminToken } from "@/lib/participant-db";
+import { getManagerByToken, isAdminToken } from "@/lib/participant-db";
 import {
+  DEFAULT_TENANT_ID,
   createParticipantInSupabase as createParticipant,
   createManagerInSupabase as createManager,
   getAllManagersFromSupabase as getAllManagers,
@@ -15,8 +16,6 @@ import {
 } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
-
-const DEFAULT_TENANT_ID = "81f91c26-214e-4da2-9893-6ac6c8984062";
 
 const VALID_DOJO_PHASES = [
   "道場1 覚醒",
@@ -146,9 +145,14 @@ export async function POST(request: NextRequest) {
     const { token, csv, dryRun } = body;
 
     // 認証
-    if (!token || !(await isAdminToken(token))) {
+    if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
+    const manager = await getManagerByToken(token);
+    if (!manager || !manager.isAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+    const tenantId = manager.tenantId || DEFAULT_TENANT_ID;
 
     if (!csv || typeof csv !== "string") {
       return NextResponse.json(
@@ -177,8 +181,8 @@ export async function POST(request: NextRequest) {
 
     // 既存データ取得（重複チェック用）
     const [existingParticipants, existingManagers] = await Promise.all([
-      getAllParticipants(DEFAULT_TENANT_ID),
-      getAllManagers(DEFAULT_TENANT_ID),
+      getAllParticipants(tenantId),
+      getAllManagers(tenantId),
     ]);
 
     const existingEmails = new Set([
@@ -321,7 +325,7 @@ export async function POST(request: NextRequest) {
           department: row.department,
           isAdmin,
         },
-        DEFAULT_TENANT_ID
+        tenantId
       );
 
       if (result) {
@@ -376,7 +380,7 @@ export async function POST(request: NextRequest) {
           managerId,
           fbPolicy: "",
         },
-        DEFAULT_TENANT_ID
+        tenantId
       );
 
       if (result) {

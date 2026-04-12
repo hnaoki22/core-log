@@ -10,6 +10,7 @@
 
 
 import {
+  DEFAULT_TENANT_ID,
   getParticipantByTokenFromSupabase,
   getManagerByTokenFromSupabase,
   getManagerByIdFromSupabase,
@@ -162,13 +163,14 @@ function mockManagerToInfo(mm: Manager): ManagerInfo {
 
 // ===== Public API =====
 
-export async function getAllParticipants(): Promise<ParticipantInfo[]> {
+export async function getAllParticipants(tenantId?: string): Promise<ParticipantInfo[]> {
+  const tid = tenantId || DEFAULT_TENANT_ID;
   if (hasSupabase()) {
-    const sps = await getAllParticipantsFromSupabase("81f91c26-214e-4da2-9893-6ac6c8984062");
+    const sps = await getAllParticipantsFromSupabase(tid);
     return sps.map((sp) => ({
       ...notionParticipantToInfo(sp),
       backend: "supabase" as BackendType,
-      tenantId: "81f91c26-214e-4da2-9893-6ac6c8984062",
+      tenantId: tid,
     }));
   }
   return mockGetAllParticipants().map(mockParticipantToInfo);
@@ -229,17 +231,18 @@ export async function getParticipantByEmail(email: string, tenantId?: string): P
   return mp ? mockParticipantToInfo(mp) : null;
 }
 
-export async function getParticipantById(id: string): Promise<ParticipantInfo | null> {
+export async function getParticipantById(id: string, tenantId?: string): Promise<ParticipantInfo | null> {
   if (hasSupabase()) {
     try {
-      // Check all participants and find by ID
-      const all = await getAllParticipantsFromSupabase("81f91c26-214e-4da2-9893-6ac6c8984062");
+      // Check all participants in the tenant and find by ID
+      const tid = tenantId || DEFAULT_TENANT_ID;
+      const all = await getAllParticipantsFromSupabase(tid);
       const found = all.find((p) => p.id === id);
       if (found) {
         return {
           ...notionParticipantToInfo(found),
           backend: "supabase",
-          tenantId: "81f91c26-214e-4da2-9893-6ac6c8984062",
+          tenantId: tid,
         };
       }
     } catch {
@@ -250,13 +253,14 @@ export async function getParticipantById(id: string): Promise<ParticipantInfo | 
   return mp ? mockParticipantToInfo(mp) : null;
 }
 
-export async function getAllManagers(): Promise<ManagerInfo[]> {
+export async function getAllManagers(tenantId?: string): Promise<ManagerInfo[]> {
+  const tid = tenantId || DEFAULT_TENANT_ID;
   if (hasSupabase()) {
-    const sms = await getAllManagersFromSupabase("81f91c26-214e-4da2-9893-6ac6c8984062");
+    const sms = await getAllManagersFromSupabase(tid);
     return sms.map((sm) => ({
       ...notionManagerToInfo(sm),
       backend: "supabase" as BackendType,
-      tenantId: "81f91c26-214e-4da2-9893-6ac6c8984062",
+      tenantId: tid,
     }));
   }
   return mockGetAllManagers().map(mockManagerToInfo);

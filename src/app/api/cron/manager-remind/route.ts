@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { isBusinessDay, getJSTDateString, getJSTDayOfWeek } from "@/lib/calendar";
-import { getLogsByParticipant } from "@/lib/supabase";
+import { getLogsByParticipant, getAllTenants } from "@/lib/supabase";
 import { getAllParticipants, getAllManagers } from "@/lib/participant-db";
 import { isProgramEnded } from "@/lib/date-utils";
 import { logger } from "@/lib/logger";
@@ -38,17 +38,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: "Skipped: not a business day", date: todayStr });
   }
 
-  const participants = await getAllParticipants();
-  const managers = await getAllManagers();
+  const tenants = await getAllTenants();
+  let allParticipants: Awaited<ReturnType<typeof getAllParticipants>> = [];
+  let allManagers: Awaited<ReturnType<typeof getAllManagers>> = [];
+
+  // Load all participants and managers from all tenants
+  for (const tenant of tenants) {
+    const tenantParticipants = await getAllParticipants(tenant.id);
+    const tenantManagers = await getAllManagers(tenant.id);
+    allParticipants = allParticipants.concat(tenantParticipants);
+    allManagers = allManagers.concat(tenantManagers);
+  }
+
   const isFriday = getJSTDayOfWeek() === 5;
 
   const results: { managerName: string; type: string; sent: boolean; reason?: string }[] = [];
 
-  for (const manager of managers) {
+  for (const manager of allManagers) {
     if (!manager.email) continue;
 
-    // Find this manager's participants
-    const myParticipants = participants.filter((p) => p.managerId === manager.id);
+    // Find this manager's participants (from same tenant)
+    const myParticipants = allParticipants.filter((p) => p.managerId === manager.id && p.tenantId === manager.tenantId);
     if (myParticipants.length === 0) continue;
 
     // Check for each participant if manager has commented recently
@@ -67,7 +77,7 @@ export async function GET(request: NextRequest) {
       if (p.endDate && isProgramEnded(p.endDate)) continue;
 
       try {
-        const logs = await getLogsByParticipant(p.name, "81f91c26-214e-4da2-9893-6ac6c8984062");
+        const logs = await getLogsByParticipant(p.name, p.tenantId || tenants[0]?.id);
 
         // Check if manager commented in last 3 days
         const recentLogs = logs.filter((l) => {

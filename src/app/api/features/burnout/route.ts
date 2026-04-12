@@ -3,11 +3,9 @@
 // Returns: list of burnout scores with risk levels
 
 import { NextRequest, NextResponse } from "next/server";
-import { getClient } from "@/lib/supabase";
+import { DEFAULT_TENANT_ID, getClient } from "@/lib/supabase";
 import { getManagerByTokenFromSupabase } from "@/lib/supabase";
 import { isFeatureEnabled } from "@/lib/feature-flags";
-
-const TENANT_ID = "81f91c26-214e-4da2-9893-6ac6c8984062";
 
 type EnergyLevel = "excellent" | "good" | "okay" | "low" | null;
 
@@ -61,6 +59,7 @@ export async function GET(req: NextRequest) {
     if (!manager) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const tenantId = manager.tenantId || DEFAULT_TENANT_ID;
 
     const client = getClient();
     const now = new Date();
@@ -74,7 +73,7 @@ export async function GET(req: NextRequest) {
       const { data: participant } = await client
         .from("participants")
         .select("*")
-        .eq("tenant_id", TENANT_ID)
+        .eq("tenant_id", tenantId)
         .eq("id", participantId)
         .single();
 
@@ -84,7 +83,7 @@ export async function GET(req: NextRequest) {
       const { data: logs } = await client
         .from("logs")
         .select("*")
-        .eq("tenant_id", TENANT_ID)
+        .eq("tenant_id", tenantId)
         .eq("participant_id", participantId)
         .gte("datetime", fourteenDaysAgo.toISOString());
 
@@ -109,7 +108,7 @@ export async function GET(req: NextRequest) {
       const { data: ruminationData } = await client
         .from("rumination_analyses")
         .select("score")
-        .eq("tenant_id", TENANT_ID)
+        .eq("tenant_id", tenantId)
         .eq("participant_id", participantId)
         .gte("created_at", fourteenDaysAgo.toISOString());
 
@@ -154,7 +153,7 @@ export async function GET(req: NextRequest) {
       .from("burnout_scores")
       .insert(
         scores.map((score) => ({
-          tenant_id: TENANT_ID,
+          tenant_id: tenantId,
           manager_id: manager.id,
           participant_id: score.participantId,
           energy_avg: score.energyAvg,
