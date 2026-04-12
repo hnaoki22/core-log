@@ -2,7 +2,7 @@
 // Returns all participants + managers with enriched Supabase data
 
 import { NextRequest, NextResponse } from "next/server";
-import { DEFAULT_TENANT_ID, getAllLogsForTenant, getTenantBySlug, getAllTenants } from "@/lib/supabase";
+import { DEFAULT_TENANT_ID, getAllLogsForTenant, getTenantBySlug, getAllTenants, getClient } from "@/lib/supabase";
 import {
   getAllParticipants,
   getAllManagers,
@@ -129,14 +129,21 @@ export async function GET(request: NextRequest) {
     viewerRole,
     tenantId,
     tenants: tenants.map((t) => ({ id: t.id, name: t.name, slug: t.slug, companyName: t.companyName })),
-    _debug: {
-      supabaseUrl: (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "none").replace(/^(https?:\/\/[^/]+).*/, "$1"),
-      managerBackend: manager.backend,
-      managerId: manager.id,
-      managerTenantId: manager.tenantId,
-      resolvedTenantId: tenantId,
-      participantCount: enrichedParticipants.length,
-      managerCount: managerData.length,
-    },
+    _debug: await (async () => {
+      // Raw Supabase client query for comparison
+      const rawResult = await getClient().from("managers").select("id,name,tenant_id").order("name");
+      return {
+        supabaseUrl: (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "none").replace(/^(https?:\/\/[^/]+).*/, "$1"),
+        managerBackend: manager.backend,
+        managerId: manager.id,
+        managerTenantId: manager.tenantId,
+        resolvedTenantId: tenantId,
+        participantCount: enrichedParticipants.length,
+        managerCount: managerData.length,
+        rawManagerCount: rawResult.data?.length || 0,
+        rawManagers: rawResult.data?.map(m => ({ id: m.id, name: m.name, tid: m.tenant_id })),
+        rawError: rawResult.error?.message,
+      };
+    })(),
   });
 }
