@@ -1,13 +1,35 @@
 /**
  * OTP (One-Time Password) Service
- * - In-memory store with TTL-based expiration
- * - Auto-cleanup every 5 minutes
+ * - Supabase-backed store (persistent across serverless invocations)
+ * - Falls back to in-memory store if Supabase table doesn't exist
  * - Rate limiting: max 3 OTPs per token per hour
  * - Verification: max 5 attempts per OTP
+ * - Cryptographically secure code generation
  */
 
-import crypto from 'crypto';
+import crypto from "crypto";
+import { logger } from "./logger";
 
+// Try to import Supabase client
+let supabaseClient: ReturnType<typeof import("@supabase/supabase-js").createClient> | null = null;
+
+async function getSupabaseClient() {
+  if (supabaseClient) return supabaseClient;
+  try {
+    const { createClient } = await import("@supabase/supabase-js");
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (url && key) {
+      supabaseClient = createClient(url, key);
+      return supabaseClient;
+    }
+  } catch {
+    // Fall through to null
+  }
+  return null;
+}
+
+// In-memory fallback store
 interface OTPEntry {
   code: string;
   email: string;
@@ -15,46 +37,134 @@ interface OTPEntry {
   attempts: number;
   createdAt: number;
 }
-
-interface OTPStore {
-  [tokenKey: string]: OTPEntry;
-}
-
-const otpStore: OTPStore = {};
-let cleanupInterval: NodeJS.Timeout | null = null;
+interface OTPStore { [tokenKey: string]: OTPEntry; }
+const memoryStore: OTPStore = {};
 
 const OTP_TTL = 10 * 60 * 1000; // 10 minutes
 const MAX_ATTEMPTS = 5;
 const MAX_OTPS_PER_HOUR = 3;
-const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const CLEANUP_INTERVAL = 5 * 60 * 1000;
+
+let cleanupInterval: NodeJS.Timeout | null = null;
+let useSupabase: boolean | null = null; // null = not yet determined
+
+/**
+ * Check if otp_codes table exists in Supabase
+ */
+async function checkSupabaseOTP(): Promise<boolean> {
+  if (useSupabase !== null) return useSupabase;
+  try {
+    const client = await getSupabaseClient();
+    if (!client) { useSupabase = false; return false; }
+    // Try a simple query to check if table exists
+    const { error } = await client.from("otp_codes").select("id").limit(1);
+    if (error && error.message.includes("does not exist")) {
+      logger.info("OTP: otp_codes table not found, using in-memory fallback");
+      useSupabase = false;
+      return false;
+    }
+    useSupabase = !error;
+    if (useSupabase) logger.info("OTP: Using Supabase-backed store");
+    return useSupabase;
+  } catch {
+    useSupabase = false;
+    return false;
+  }
+}
 
 /**
  * Generate a 6-digit OTP code using cryptographically secure random
  */
 function generateCode(): string {
-  const randomValue = crypto.randomInt(100000, 999999);
-  return randomValue.toString();
+  return crypto.randomInt(100000, 999999).toString();
 }
 
-/**
- * Get OTP key for storage
- */
-function getOTPKey(token: string, code?: string): string {
-  if (code) {
-    return `${token}:${code}`;
+// === Supabase-backed operations ===
+
+async function supabaseCountOTPsInLastHour(token: string): Promise<number> {
+  const client = await getSupabaseClient();
+  if (!client) return 0;
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count, error } = await client
+    .from("otp_codes")
+    .select("id", { count: "exact", head: true })
+    .eq("token", token)
+    .gte("created_at", oneHourAgo);
+  if (error) { logger.error("OTP count failed", { error: error.message }); return 0; }
+  return count ?? 0;
+}
+
+async function supabaseGenerateOTP(token: string, email: string): Promise<string> {
+  const count = await supabaseCountOTPsInLastHour(token);
+  if (count >= MAX_OTPS_PER_HOUR) {
+    throw new Error("OTP request rate limit exceeded. Please try again in 1 hour.");
   }
-  return token;
+  const code = generateCode();
+  const client = await getSupabaseClient();
+  if (!client) throw new Error("Supabase unavailable");
+  const otpData: Record<string, string | number> = {
+    token,
+    code,
+    email,
+    attempts: 0,
+    expires_at: new Date(Date.now() + OTP_TTL).toISOString(),
+  };
+  const { error } = await client.from("otp_codes").insert(otpData as never);
+  if (error) {
+    logger.error("OTP insert failed", { error: error.message });
+    throw new Error("Failed to generate OTP");
+  }
+  return code;
 }
 
-/**
- * Count OTPs created for a token in the last hour
- */
-function countOTPsInLastHour(token: string): number {
-  const now = Date.now();
-  const oneHourAgo = now - 60 * 60 * 1000;
-  return Object.entries(otpStore)
+interface OTPRecord {
+  id: string;
+  attempts: number;
+  email: string;
+}
+
+async function supabaseVerifyOTP(token: string, code: string): Promise<{ valid: boolean; email?: string }> {
+  const client = await getSupabaseClient();
+  if (!client) return { valid: false };
+
+  const { data, error } = await client
+    .from("otp_codes")
+    .select("*")
+    .eq("token", token)
+    .eq("code", code)
+    .gte("expires_at", new Date().toISOString())
+    .single() as unknown as { data: OTPRecord | null; error: { message: string } | null };
+
+  if (error || !data) return { valid: false };
+
+  // Check attempts
+  if (data.attempts >= MAX_ATTEMPTS) {
+    await client.from("otp_codes").delete().eq("id", data.id);
+    return { valid: false };
+  }
+
+  // Increment attempts atomically
+  const updatePayload: Record<string, number> = { attempts: data.attempts + 1 };
+  const { error: updateError } = await client
+    .from("otp_codes")
+    .update(updatePayload as never)
+    .eq("id", data.id);
+
+  if (updateError) {
+    logger.error("OTP attempt update failed", { error: updateError.message });
+  }
+
+  // Valid — delete the OTP
+  await client.from("otp_codes").delete().eq("id", data.id);
+  return { valid: true, email: data.email };
+}
+
+// === In-memory fallback operations ===
+
+function memoryCountOTPsInLastHour(token: string): number {
+  const oneHourAgo = Date.now() - 60 * 60 * 1000;
+  return Object.entries(memoryStore)
     .filter(([key]) => {
-      // Ensure exact token match by verifying key splits correctly
       const parts = key.split(":");
       return parts.length === 2 && parts[0] === token;
     })
@@ -62,134 +172,72 @@ function countOTPsInLastHour(token: string): number {
     .length;
 }
 
-/**
- * Initialize auto-cleanup
- */
-function initCleanup(): void {
-  if (cleanupInterval) return;
-
-  cleanupInterval = setInterval(() => {
-    cleanupExpiredOTPs();
-  }, CLEANUP_INTERVAL);
-
-  // Clear on process exit
-  if (typeof process !== "undefined") {
-    process.on("exit", () => {
-      if (cleanupInterval) {
-        clearInterval(cleanupInterval);
-      }
-    });
-  }
-}
-
-/**
- * Generate OTP for a token and email
- * Returns the 6-digit code
- * Throws error if rate limit exceeded
- */
-export function generateOTP(token: string, email: string): string {
-  initCleanup();
-
-  // Check rate limit: max 3 OTPs per token per hour
-  const otpsInLastHour = countOTPsInLastHour(token);
-  if (otpsInLastHour >= MAX_OTPS_PER_HOUR) {
+function memoryGenerateOTP(token: string, email: string): string {
+  const count = memoryCountOTPsInLastHour(token);
+  if (count >= MAX_OTPS_PER_HOUR) {
     throw new Error("OTP request rate limit exceeded. Please try again in 1 hour.");
   }
-
-  // Generate code
   const code = generateCode();
-  const key = getOTPKey(token, code);
+  const key = `${token}:${code}`;
   const now = Date.now();
-
-  // Store OTP entry
-  otpStore[key] = {
-    code,
-    email,
-    expiresAt: now + OTP_TTL,
-    attempts: 0,
-    createdAt: now,
-  };
-
+  memoryStore[key] = { code, email, expiresAt: now + OTP_TTL, attempts: 0, createdAt: now };
   return code;
 }
 
-/**
- * Verify OTP code
- * Returns { valid: true, email: string } on success
- * Returns { valid: false } on failure
- */
-export function verifyOTP(token: string, code: string): { valid: boolean; email?: string } {
-  const key = getOTPKey(token, code);
-  const entry = otpStore[key];
-
-  if (!entry) {
-    return { valid: false };
-  }
-
-  // Check expiration
-  if (Date.now() > entry.expiresAt) {
-    delete otpStore[key];
-    return { valid: false };
-  }
-
-  // Check attempts
+function memoryVerifyOTP(token: string, code: string): { valid: boolean; email?: string } {
+  const key = `${token}:${code}`;
+  const entry = memoryStore[key];
+  if (!entry) return { valid: false };
+  if (Date.now() > entry.expiresAt) { delete memoryStore[key]; return { valid: false }; }
   entry.attempts++;
-  if (entry.attempts > MAX_ATTEMPTS) {
-    delete otpStore[key];
-    return { valid: false };
-  }
-
-  // Valid OTP - delete and return email
+  if (entry.attempts > MAX_ATTEMPTS) { delete memoryStore[key]; return { valid: false }; }
   const email = entry.email;
-  delete otpStore[key];
-
+  delete memoryStore[key];
   return { valid: true, email };
 }
 
-/**
- * Get remaining attempts for a token/code combination
- * Returns null if OTP doesn't exist
- */
+// === Cleanup ===
+
+function initCleanup(): void {
+  if (cleanupInterval) return;
+  cleanupInterval = setInterval(() => { cleanupExpiredOTPs(); }, CLEANUP_INTERVAL);
+  if (typeof process !== "undefined") {
+    process.on("exit", () => { if (cleanupInterval) clearInterval(cleanupInterval); });
+  }
+}
+
+// === Public API ===
+
+export async function generateOTP(token: string, email: string): Promise<string> {
+  if (await checkSupabaseOTP()) {
+    return supabaseGenerateOTP(token, email);
+  }
+  initCleanup();
+  return memoryGenerateOTP(token, email);
+}
+
+export async function verifyOTP(token: string, code: string): Promise<{ valid: boolean; email?: string }> {
+  if (await checkSupabaseOTP()) {
+    return supabaseVerifyOTP(token, code);
+  }
+  return memoryVerifyOTP(token, code);
+}
+
 export function getRemainingAttempts(token: string, code: string): number | null {
-  const key = getOTPKey(token, code);
-  const entry = otpStore[key];
-
-  if (!entry) {
-    return null;
-  }
-
-  // Check expiration
-  if (Date.now() > entry.expiresAt) {
-    delete otpStore[key];
-    return null;
-  }
-
+  const key = `${token}:${code}`;
+  const entry = memoryStore[key];
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) { delete memoryStore[key]; return null; }
   return Math.max(0, MAX_ATTEMPTS - entry.attempts);
 }
 
-/**
- * Clean up expired OTPs
- */
 export function cleanupExpiredOTPs(): void {
   const now = Date.now();
-  const expiredKeys: string[] = [];
-
-  for (const [key, entry] of Object.entries(otpStore)) {
-    if (now > entry.expiresAt) {
-      expiredKeys.push(key);
-    }
+  for (const [key, entry] of Object.entries(memoryStore)) {
+    if (now > entry.expiresAt) delete memoryStore[key];
   }
-
-  expiredKeys.forEach((key) => {
-    delete otpStore[key];
-  });
 }
 
-/**
- * Clear all OTPs (for testing)
- */
 export function clearAllOTPs(): void {
-  Object.keys(otpStore).forEach((key) => {
-    delete otpStore[key];
-  });
+  Object.keys(memoryStore).forEach((key) => delete memoryStore[key]);
 }

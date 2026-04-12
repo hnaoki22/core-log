@@ -93,42 +93,49 @@ export async function middleware(request: NextRequest) {
     const method = request.method;
     const clientIp = getClientIp(request);
 
-    // Apply rate limiting to API routes
-    const rateLimitResult = rateLimit(clientIp, 60, 60000);
+    // Only apply rate limiting if we have a valid IP
+    // Skip for "unknown" IPs to avoid incorrectly rate-limiting them together
+    if (clientIp !== "unknown") {
+      // Apply rate limiting to API routes
+      const rateLimitResult = rateLimit(clientIp, 60, 60000);
 
-    // Log the request
-    logApiRequest(method, pathname, clientIp, rateLimitResult);
+      // Log the request
+      logApiRequest(method, pathname, clientIp, rateLimitResult);
 
-    // If rate limited, return 429
-    if (!rateLimitResult.success) {
-      return NextResponse.json(
-        {
-          error: "Too Many Requests",
-          message: "Rate limit exceeded. Maximum 60 requests per 60 seconds.",
-        },
-        {
-          status: 429,
-          headers: {
-            "Retry-After": "60",
-            ...securityHeaders,
+      // If rate limited, return 429
+      if (!rateLimitResult.success) {
+        return NextResponse.json(
+          {
+            error: "Too Many Requests",
+            message: "Rate limit exceeded. Maximum 60 requests per 60 seconds.",
           },
-        }
-      );
-    }
+          {
+            status: 429,
+            headers: {
+              "Retry-After": "60",
+              ...securityHeaders,
+            },
+          }
+        );
+      }
 
-    // Add rate limit info headers to response
-    response.headers.set(
-      "X-RateLimit-Limit",
-      "60"
-    );
-    response.headers.set(
-      "X-RateLimit-Remaining",
-      rateLimitResult.remaining.toString()
-    );
-    response.headers.set(
-      "X-RateLimit-Reset",
-      Math.ceil((Date.now() + 60000) / 1000).toString()
-    );
+      // Add rate limit info headers to response
+      response.headers.set(
+        "X-RateLimit-Limit",
+        "60"
+      );
+      response.headers.set(
+        "X-RateLimit-Remaining",
+        rateLimitResult.remaining.toString()
+      );
+      response.headers.set(
+        "X-RateLimit-Reset",
+        Math.ceil((Date.now() + 60000) / 1000).toString()
+      );
+    } else {
+      // Log requests with unknown IP
+      logApiRequest(method, pathname, clientIp);
+    }
   }
 
   return response;

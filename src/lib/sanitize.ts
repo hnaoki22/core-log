@@ -11,8 +11,11 @@ export function sanitizeInput(input: string): string {
     return "";
   }
 
-  // Remove HTML tags
+  // Remove complete HTML tags
   let sanitized = input.replace(/<[^>]*>/g, "");
+
+  // Remove unclosed/malformed tags (e.g., "<script" without ">")
+  sanitized = sanitized.replace(/<[a-zA-Z][^>]*/g, "");
 
   // Decode HTML entities that might be used to bypass tag removal
   sanitized = sanitized
@@ -20,10 +23,18 @@ export function sanitizeInput(input: string): string {
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#x27;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
     .replace(/&amp;/g, "&");
 
-  // Remove any remaining HTML tags after entity decoding
+  // Remove any remaining HTML tags after entity decoding (second pass)
   sanitized = sanitized.replace(/<[^>]*>/g, "");
+  sanitized = sanitized.replace(/<[a-zA-Z][^>]*/g, "");
+
+  // Remove dangerous event handler patterns that could be used in innerHTML contexts
+  sanitized = sanitized.replace(/\bon\w+\s*=/gi, "");
 
   // Trim whitespace
   return sanitized.trim();

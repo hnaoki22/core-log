@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { generateOTP, verifyOTP, getRemainingAttempts } from "@/lib/otp";
-import { getSessionCookieName } from "@/lib/session";
+import { getSessionCookieName, createSignedSessionValue } from "@/lib/session";
 import { getParticipantByToken, getManagerByToken } from "@/lib/participant-db";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { logger } from "@/lib/logger";
@@ -150,7 +150,7 @@ async function handleSendOTP(token: string): Promise<NextResponse> {
   // Generate OTP
   let code: string;
   try {
-    code = generateOTP(token, email);
+    code = await generateOTP(token, email);
   } catch (error) {
     logger.warn("OTP generation failed", { token, error: String(error) });
     return NextResponse.json(
@@ -179,7 +179,7 @@ async function handleSendOTP(token: string): Promise<NextResponse> {
  */
 async function handleVerifyOTP(token: string, code: string): Promise<NextResponse> {
   // Verify the OTP code
-  const result = verifyOTP(token, code);
+  const result = await verifyOTP(token, code);
 
   if (!result.valid) {
     const remaining = getRemainingAttempts(token, code);
@@ -197,6 +197,7 @@ async function handleVerifyOTP(token: string, code: string): Promise<NextRespons
 
   // Create session cookie
   const cookieName = getSessionCookieName(token);
+  const signedValue = createSignedSessionValue(token);
   const response = NextResponse.json({
     success: true,
     verified: true,
@@ -204,7 +205,7 @@ async function handleVerifyOTP(token: string, code: string): Promise<NextRespons
 
   response.cookies.set({
     name: cookieName,
-    value: "verified",
+    value: signedValue,
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",

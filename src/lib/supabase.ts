@@ -7,6 +7,15 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "./logger";
 
 // ---------------------------------------------------------------------------
+// Default tenant ID configuration
+// ---------------------------------------------------------------------------
+/**
+ * Default tenant ID — configured via environment variable
+ * Falls back to the Daiko Pharmaceutical tenant for backwards compatibility
+ */
+export const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || "81f91c26-214e-4da2-9893-6ac6c8984062";
+
+// ---------------------------------------------------------------------------
 // Client singleton
 // ---------------------------------------------------------------------------
 let _client: SupabaseClient | null = null;

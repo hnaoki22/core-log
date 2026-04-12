@@ -9,6 +9,89 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const FROM_EMAIL = process.env.REMIND_FROM_EMAIL || "CORE Log <noreply@resend.dev>";
 const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://core-log-lilac.vercel.app";
 
+// Daily email quota tracking
+const DAILY_QUOTA = 100;
+let emailsSentToday = 0;
+let quotaResetDate = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+function checkAndIncrementQuota(): boolean {
+  const today = new Date().toISOString().split("T")[0];
+  if (today !== quotaResetDate) {
+    emailsSentToday = 0;
+    quotaResetDate = today;
+  }
+  if (emailsSentToday >= DAILY_QUOTA) {
+    logger.error("Daily email quota exceeded", { sent: emailsSentToday, quota: DAILY_QUOTA });
+    return false;
+  }
+  emailsSentToday++;
+  return true;
+}
+
+/**
+ * Send email via Resend API with retry logic
+ * Retries up to 2 times with exponential backoff (1s, 2s)
+ */
+async function sendWithRetry(payload: {
+  from: string;
+  to: string[];
+  subject: string;
+  html: string;
+}, context: { type: string; email: string }): Promise<boolean> {
+  if (!checkAndIncrementQuota()) {
+    logger.error("Email blocked: daily quota reached", context);
+    return false;
+  }
+
+  const maxRetries = 2;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        if (attempt > 0) {
+          logger.info("Email sent after retry", { ...context, attempt });
+        }
+        return true;
+      }
+
+      const err = await res.text();
+
+      // Don't retry on 4xx errors (client errors like invalid email)
+      if (res.status >= 400 && res.status < 500) {
+        logger.error("Email send failed (client error, not retrying)", { ...context, status: res.status, error: err });
+        return false;
+      }
+
+      // Retry on 5xx errors
+      if (attempt < maxRetries) {
+        const delay = Math.pow(2, attempt) * 1000; // 1s, 2s
+        logger.warn("Email send failed, retrying", { ...context, attempt, delay, error: err });
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        logger.error("Email send failed after all retries", { ...context, attempts: attempt + 1, error: err });
+      }
+    } catch (error) {
+      if (attempt < maxRetries) {
+        const delay = Math.pow(2, attempt) * 1000;
+        logger.warn("Email send error, retrying", { ...context, attempt, delay, error: String(error) });
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        logger.error("Email send error after all retries", { ...context, attempts: attempt + 1, error: String(error) });
+      }
+    }
+  }
+  return false;
+}
+
 export type ReminderType = "morning" | "evening" | "evening_no_morning";
 
 interface SendEmailOptions {
@@ -256,33 +339,10 @@ export async function sendNotificationEmail(options: NotificationOptions): Promi
 
   const emailContent = buildNotificationEmail(options);
 
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: FROM_EMAIL,
-        to: [options.to],
-        subject: emailContent.subject,
-        html: emailContent.html,
-      }),
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      logger.error("Notification send failed", { type: options.type, email: options.to, error: err });
-      return false;
-    }
-
-    logger.info("Notification sent", { type: options.type, email: options.to, senderName: options.senderName });
-    return true;
-  } catch (error) {
-    logger.error("Notification error", { type: options.type, email: options.to, error: String(error) });
-    return false;
-  }
+  return sendWithRetry(
+    { from: FROM_EMAIL, to: [options.to], subject: emailContent.subject, html: emailContent.html },
+    { type: options.type, email: options.to }
+  );
 }
 
 // ===== Daily Reminder Emails =====
@@ -310,31 +370,8 @@ export async function sendReminderEmail(options: SendEmailOptions): Promise<bool
     emailContent = buildEveningEmail(participantName, token);
   }
 
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: FROM_EMAIL,
-        to: [to],
-        subject: emailContent.subject,
-        html: emailContent.html,
-      }),
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      logger.error("Reminder send failed", { type, email: to, error: err });
-      return false;
-    }
-
-    logger.info("Reminder sent", { type, email: to, participantName });
-    return true;
-  } catch (error) {
-    logger.error("Reminder error", { type, email: to, error: String(error) });
-    return false;
-  }
+  return sendWithRetry(
+    { from: FROM_EMAIL, to: [to], subject: emailContent.subject, html: emailContent.html },
+    { type, email: to }
+  );
 }

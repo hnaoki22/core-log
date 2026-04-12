@@ -91,23 +91,29 @@ export function rateLimit(
 
 /**
  * Get client IP from request headers
- * Handles various proxy scenarios (X-Forwarded-For, CF-Connecting-IP, etc.)
+ * On Vercel: x-forwarded-for is set by the platform (trustworthy for last entry)
+ * Falls back through headers in order of trust
  */
 export function getClientIp(request: Request): string {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    // Take the first IP if multiple are present
-    return forwardedFor.split(",")[0].trim();
-  }
-
-  const cloudflareIp = request.headers.get("cf-connecting-ip");
-  if (cloudflareIp) {
-    return cloudflareIp;
-  }
-
+  // Vercel sets x-real-ip to the actual client IP
   const realIp = request.headers.get("x-real-ip");
   if (realIp) {
-    return realIp;
+    return realIp.trim();
+  }
+
+  // Cloudflare sets cf-connecting-ip
+  const cloudflareIp = request.headers.get("cf-connecting-ip");
+  if (cloudflareIp) {
+    return cloudflareIp.trim();
+  }
+
+  // X-Forwarded-For: use the LAST entry (added by the closest trusted proxy)
+  // Attackers can prepend fake IPs, but can't control what the proxy appends
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    const ips = forwardedFor.split(",").map(ip => ip.trim());
+    // Last IP is the one added by the edge proxy (most trustworthy)
+    return ips[ips.length - 1];
   }
 
   return "unknown";
