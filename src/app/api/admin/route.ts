@@ -89,7 +89,10 @@ export async function GET(request: NextRequest) {
   const managerData = managers.map((m) => ({
     id: m.id,
     name: m.name,
+    email: m.email || "",
     department: m.department,
+    isAdmin: m.isAdmin || false,
+    role: (m as unknown as { role?: string }).role || (m.isAdmin ? "admin" : "manager"),
     participantIds: m.participantIds,
     participantNames: m.participantIds
       .map((pid) => {

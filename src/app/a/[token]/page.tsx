@@ -28,7 +28,10 @@ type ParticipantData = {
 type ManagerData = {
   id: string;
   name: string;
+  email: string;
   department: string;
+  isAdmin: boolean;
+  role: string;
   participantIds: string[];
   participantNames: string[];
 };
@@ -110,6 +113,13 @@ export default function AdminDashboard() {
   }>({ name: "", email: "", department: "", dojoPhase: "", managerId: "", fbPolicy: "", emailEnabled: true, startDate: "", endDate: "" });
   const [editSaving, setEditSaving] = useState(false);
 
+  // Manager edit state
+  const [editingManager, setEditingManager] = useState<ManagerData | null>(null);
+  const [editManagerForm, setEditManagerForm] = useState<{
+    name: string; email: string; department: string; isAdmin: boolean;
+  }>({ name: "", email: "", department: "", isAdmin: false });
+  const [editManagerSaving, setEditManagerSaving] = useState(false);
+
   // Manager CSV Import state
   const [showManagerImport, setShowManagerImport] = useState(false);
   const [managerCsvText, setManagerCsvText] = useState("");
@@ -165,6 +175,36 @@ export default function AdminDashboard() {
         alert(err.error || "更新に失敗しました");
       }
     } catch { alert("エラーが発生しました"); } finally { setEditSaving(false); }
+  };
+
+  const openEditManager = (m: ManagerData) => {
+    setEditingManager(m);
+    setEditManagerForm({
+      name: m.name,
+      email: m.email || "",
+      department: m.department || "",
+      isAdmin: m.isAdmin || false,
+    });
+  };
+
+  const handleSaveManager = async () => {
+    if (!editingManager) return;
+    setEditManagerSaving(true);
+    try {
+      const res = await fetch(`/api/admin/managers/${editingManager.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, ...editManagerForm }),
+      });
+      if (res.ok) {
+        setEditingManager(null);
+        const refreshRes = await fetch(`/api/admin?token=${token}`);
+        if (refreshRes.ok) setData(await refreshRes.json());
+      } else {
+        const err = await res.json();
+        alert(err.error || "更新に失敗しました");
+      }
+    } catch { alert("エラーが発生しました"); } finally { setEditManagerSaving(false); }
   };
 
   const handleManagerImportDryRun = async () => {
@@ -763,12 +803,30 @@ export default function AdminDashboard() {
               <div key={m.id} className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="font-medium text-sm text-[#1A1A2E]">{m.name}</div>
-                    <div className="text-[11px] text-[#8B8489] mt-0.5">{m.department}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm text-[#1A1A2E]">{m.name}</span>
+                      {m.isAdmin && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">管理者</span>
+                      )}
+                      {m.role === "observer" && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">閲覧者</span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-[#8B8489] mt-0.5">{m.department}{m.email ? ` · ${m.email}` : ""}</div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-xs text-[#1A1A2E] font-medium">担当: {m.participantNames.length}名</div>
-                    <div className="text-[11px] text-[#8B8489] mt-0.5">{m.participantNames.join("、")}</div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <div className="text-xs text-[#1A1A2E] font-medium">担当: {m.participantNames.length}名</div>
+                      <div className="text-[11px] text-[#8B8489] mt-0.5">{m.participantNames.join("、")}</div>
+                    </div>
+                    {!isObserver && (
+                      <button
+                        onClick={() => openEditManager(m)}
+                        className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-[#EFE8DD] text-[#5B5560] hover:bg-[#E5DDD3] transition-colors shrink-0"
+                      >
+                        編集
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1452,6 +1510,51 @@ export default function AdminDashboard() {
                 <button onClick={handleSaveParticipant} disabled={editSaving}
                   className="btn-accent text-xs px-4 py-2 disabled:opacity-50">
                   {editSaving ? "保存中..." : "保存"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manager Edit Modal */}
+      {editingManager && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setEditingManager(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-[#EFE8DD] flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[#1A1A2E]">マネージャーを編集: {editingManager.name}</h3>
+              <button onClick={() => setEditingManager(null)} className="text-[#8B8489] hover:text-[#1A1A2E]">✕</button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-medium text-[#5B5560] block mb-1">名前</label>
+                <input type="text" value={editManagerForm.name} onChange={(e) => setEditManagerForm({ ...editManagerForm, name: e.target.value })}
+                  className="w-full text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[#5B5560] block mb-1">メールアドレス</label>
+                <input type="email" value={editManagerForm.email} onChange={(e) => setEditManagerForm({ ...editManagerForm, email: e.target.value })}
+                  className="w-full text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[#5B5560] block mb-1">部署</label>
+                <input type="text" value={editManagerForm.department} onChange={(e) => setEditManagerForm({ ...editManagerForm, department: e.target.value })}
+                  className="w-full text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none" />
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="editManagerIsAdmin" checked={editManagerForm.isAdmin}
+                  onChange={(e) => setEditManagerForm({ ...editManagerForm, isAdmin: e.target.checked })}
+                  className="rounded border-[#EFE8DD]" />
+                <label htmlFor="editManagerIsAdmin" className="text-xs text-[#5B5560]">管理者権限を付与する</label>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button onClick={() => setEditingManager(null)}
+                  className="text-xs px-4 py-2 rounded-xl border border-[#EFE8DD] text-[#5B5560] hover:bg-[#FBF8F4] transition-colors">
+                  キャンセル
+                </button>
+                <button onClick={handleSaveManager} disabled={editManagerSaving}
+                  className="btn-accent text-xs px-4 py-2 disabled:opacity-50">
+                  {editManagerSaving ? "保存中..." : "保存"}
                 </button>
               </div>
             </div>
