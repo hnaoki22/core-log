@@ -34,7 +34,11 @@ function parseCookies(cookieHeader: string): Record<string, string> {
   for (const part of parts) {
     const [name, value] = part.trim().split("=");
     if (name && value) {
-      cookies[name] = decodeURIComponent(value);
+      try {
+        cookies[name] = decodeURIComponent(value);
+      } catch {
+        cookies[name] = value;
+      }
     }
   }
 

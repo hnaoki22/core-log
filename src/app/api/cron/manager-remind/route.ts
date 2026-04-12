@@ -16,13 +16,19 @@ const FROM_EMAIL = process.env.REMIND_FROM_EMAIL || "CORE Log <noreply@resend.de
 const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://core-log-lilac.vercel.app";
 
 export async function GET(request: NextRequest) {
-  // Verify cron secret is configured and matches (Vercel sends this header)
-  if (!CRON_SECRET) {
-    return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
-  }
-
+  // Authenticate cron request:
+  // 1. Vercel Cron automatically includes `x-vercel-cron: 1` header for scheduled runs
+  // 2. Manual invocations must include Bearer CRON_SECRET (if configured)
+  const isVercelCron = request.headers.get("x-vercel-cron") === "1";
   const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${CRON_SECRET}`) {
+  const hasValidSecret = CRON_SECRET && authHeader === `Bearer ${CRON_SECRET}`;
+
+  if (!isVercelCron && !hasValidSecret) {
+    logger.warn("Manager cron unauthorized", {
+      hasCronHeader: !!request.headers.get("x-vercel-cron"),
+      hasAuth: !!authHeader,
+      secretConfigured: !!CRON_SECRET,
+    });
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -151,7 +157,7 @@ export async function GET(request: NextRequest) {
 function daysBetween(from: string, to: string): number {
   const f = new Date(from + "T12:00:00+09:00");
   const t = new Date(to + "T12:00:00+09:00");
-  return Math.round((t.getTime() - f.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.abs(Math.round((t.getTime() - f.getTime()) / (1000 * 60 * 60 * 24)));
 }
 
 function getDayOfWeek(dateStr: string): number {

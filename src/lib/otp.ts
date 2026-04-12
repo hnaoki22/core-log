@@ -6,6 +6,8 @@
  * - Verification: max 5 attempts per OTP
  */
 
+import crypto from 'crypto';
+
 interface OTPEntry {
   code: string;
   email: string;
@@ -27,10 +29,11 @@ const MAX_OTPS_PER_HOUR = 3;
 const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Generate a 6-digit OTP code
+ * Generate a 6-digit OTP code using cryptographically secure random
  */
 function generateCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  const randomValue = crypto.randomInt(100000, 999999);
+  return randomValue.toString();
 }
 
 /**
@@ -49,10 +52,12 @@ function getOTPKey(token: string, code?: string): string {
 function countOTPsInLastHour(token: string): number {
   const now = Date.now();
   const oneHourAgo = now - 60 * 60 * 1000;
-  const prefix = token + ":";
-
   return Object.entries(otpStore)
-    .filter(([key]) => key.startsWith(prefix))
+    .filter(([key]) => {
+      // Ensure exact token match by verifying key splits correctly
+      const parts = key.split(":");
+      return parts.length === 2 && parts[0] === token;
+    })
     .filter(([, entry]) => entry.createdAt > oneHourAgo)
     .length;
 }

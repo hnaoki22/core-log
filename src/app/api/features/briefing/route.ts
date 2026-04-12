@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-e.briefing");
+    const featureEnabled = await isFeatureEnabled("tier-a.oneOnOneBriefing");
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Briefing feature is not enabled" },

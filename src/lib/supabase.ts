@@ -4,6 +4,7 @@
  */
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { logger } from "./logger";
 
 // ---------------------------------------------------------------------------
 // Client singleton
@@ -219,7 +220,10 @@ function rowToFeedback(r: any): NotionFeedback {
 // Tenant resolution helper — every query is scoped by tenant_id
 // ---------------------------------------------------------------------------
 async function getTenantIdBySlug(slug: string): Promise<string | null> {
-  const { data } = await getClient().from("tenants").select("id").eq("slug", slug).single();
+  const { data, error } = await getClient().from("tenants").select("id").eq("slug", slug).single();
+  if (error) {
+    logger.error("Query failed", { error: error.message, slug });
+  }
   return data?.id ?? null;
 }
 
@@ -236,7 +240,10 @@ export async function getLogsByParticipant(
     .eq("tenant_id", tenantId)
     .eq("participant_name", participantName)
     .order("date", { ascending: false });
-  if (error || !data) return [];
+  if (error) {
+    logger.error("Query failed", { error: error.message, participantName, tenantId });
+  }
+  if (!data) return [];
   return data.map(rowToLog);
 }
 
@@ -245,7 +252,7 @@ export async function hasLoggedToday(
   todayStr: string,
   tenantId: string
 ): Promise<{ hasMorning: boolean; hasEvening: boolean }> {
-  const { data } = await getClient()
+  const { data, error } = await getClient()
     .from("logs")
     .select("morning_intent, evening_insight")
     .eq("tenant_id", tenantId)
@@ -253,6 +260,9 @@ export async function hasLoggedToday(
     .eq("date", todayStr)
     .limit(1)
     .maybeSingle();
+  if (error) {
+    logger.error("Query failed", { error: error.message, participantName, tenantId, todayStr });
+  }
   if (!data) return { hasMorning: false, hasEvening: false };
   return {
     hasMorning: !!data.morning_intent,
@@ -263,11 +273,14 @@ export async function hasLoggedToday(
 export async function getLogEntryOwner(
   pageId: string
 ): Promise<string | null> {
-  const { data } = await getClient()
+  const { data, error } = await getClient()
     .from("logs")
     .select("participant_name")
     .eq("id", pageId)
     .single();
+  if (error) {
+    logger.error("Query failed", { error: error.message, pageId });
+  }
   return data?.participant_name ?? null;
 }
 
@@ -305,7 +318,14 @@ export async function createMorningEntry(
     })
     .select("id")
     .single();
-  if (error || !data) return null;
+  if (error) {
+    logger.error("Insert failed", { error: error.message, participantName, date });
+    return null;
+  }
+  if (!data) {
+    logger.warn("Insert returned no data", { participantName, date });
+    return null;
+  }
   return data.id;
 }
 
@@ -315,16 +335,26 @@ export async function updateEveningEntry(
   energy: string | null
 ): Promise<boolean> {
   const now = new Date();
-  const { error } = await getClient()
+  const updateData = {
+    evening_insight: eveningInsight,
+    energy: energy || undefined,
+    status: "complete",
+    evening_time: now.toISOString(),
+  };
+  const { error, data: updated } = await getClient()
     .from("logs")
-    .update({
-      evening_insight: eveningInsight,
-      energy: energy || undefined,
-      status: "complete",
-      evening_time: now.toISOString(),
-    })
-    .eq("id", pageId);
-  return !error;
+    .update(updateData)
+    .eq("id", pageId)
+    .select("id");
+  if (error) {
+    logger.error("Update failed", { error: error.message, pageId });
+    return false;
+  }
+  if (!updated || updated.length === 0) {
+    logger.warn("Update matched 0 rows", { pageId });
+    return false;
+  }
+  return true;
 }
 
 export async function createEveningOnlyEntry(
@@ -358,7 +388,14 @@ export async function createEveningOnlyEntry(
     })
     .select("id")
     .single();
-  if (error || !data) return null;
+  if (error) {
+    logger.error("Insert failed", { error: error.message, participantName, date });
+    return null;
+  }
+  if (!data) {
+    logger.warn("Insert returned no data", { participantName, date });
+    return null;
+  }
   return data.id;
 }
 
@@ -367,14 +404,24 @@ export async function addManagerComment(
   comment: string
 ): Promise<boolean> {
   const now = new Date();
-  const { error } = await getClient()
+  const updateData = {
+    manager_comment: comment,
+    manager_comment_time: now.toISOString(),
+  };
+  const { error, data: updated } = await getClient()
     .from("logs")
-    .update({
-      manager_comment: comment,
-      manager_comment_time: now.toISOString(),
-    })
-    .eq("id", pageId);
-  return !error;
+    .update(updateData)
+    .eq("id", pageId)
+    .select("id");
+  if (error) {
+    logger.error("Update failed", { error: error.message, pageId });
+    return false;
+  }
+  if (!updated || updated.length === 0) {
+    logger.warn("Update matched 0 rows", { pageId });
+    return false;
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -383,21 +430,27 @@ export async function addManagerComment(
 export async function getAllParticipantsFromSupabase(
   tenantId: string
 ): Promise<NotionParticipant[]> {
-  const { data } = await getClient()
+  const { data, error } = await getClient()
     .from("participants")
     .select("*")
     .eq("tenant_id", tenantId);
+  if (error) {
+    logger.error("Query failed", { error: error.message, tenantId });
+  }
   return (data || []).map(rowToParticipant);
 }
 
 export async function getParticipantByTokenFromSupabase(
   token: string
 ): Promise<(NotionParticipant & { tenantId: string }) | null> {
-  const { data } = await getClient()
+  const { data, error } = await getClient()
     .from("participants")
     .select("*")
     .eq("token", token)
     .maybeSingle();
+  if (error) {
+    logger.error("Query failed", { error: error.message, token });
+  }
   if (!data) return null;
   return { ...rowToParticipant(data), tenantId: data.tenant_id };
 }
@@ -406,12 +459,15 @@ export async function getParticipantByNameFromSupabase(
   name: string,
   tenantId: string
 ): Promise<NotionParticipant | null> {
-  const { data } = await getClient()
+  const { data, error } = await getClient()
     .from("participants")
     .select("*")
     .eq("tenant_id", tenantId)
     .eq("name", name)
     .maybeSingle();
+  if (error) {
+    logger.error("Query failed", { error: error.message, name, tenantId });
+  }
   if (!data) return null;
   return rowToParticipant(data);
 }
@@ -420,12 +476,15 @@ export async function getParticipantByEmailFromSupabase(
   email: string,
   tenantId: string
 ): Promise<NotionParticipant | null> {
-  const { data } = await getClient()
+  const { data, error } = await getClient()
     .from("participants")
     .select("*")
     .eq("tenant_id", tenantId)
     .eq("email", email)
     .maybeSingle();
+  if (error) {
+    logger.error("Query failed", { error: error.message, email, tenantId });
+  }
   if (!data) return null;
   return rowToParticipant(data);
 }
@@ -456,7 +515,14 @@ export async function createParticipantInSupabase(
     })
     .select("id, token")
     .single();
-  if (error || !data) return null;
+  if (error) {
+    logger.error("Insert failed", { error: error.message, name: participant.name, tenantId });
+    return null;
+  }
+  if (!data) {
+    logger.warn("Insert returned no data", { name: participant.name, tenantId });
+    return null;
+  }
   return { id: data.id, token: data.token };
 }
 
@@ -488,12 +554,21 @@ export async function updateParticipantInSupabase(
 
   if (Object.keys(updateData).length === 0) return true;
 
-  const { error } = await getClient()
+  const { error, data: updated } = await getClient()
     .from("participants")
     .update(updateData)
     .eq("id", participantId)
-    .eq("tenant_id", tenantId);
-  return !error;
+    .eq("tenant_id", tenantId)
+    .select("id");
+  if (error) {
+    logger.error("Update failed", { error: error.message, participantId });
+    return false;
+  }
+  if (!updated || updated.length === 0) {
+    logger.warn("Update matched 0 rows", { participantId });
+    return false;
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -502,19 +577,25 @@ export async function updateParticipantInSupabase(
 export async function getAllManagersFromSupabase(
   tenantId: string
 ): Promise<NotionManager[]> {
-  const { data: managers } = await getClient()
+  const { data: managers, error } = await getClient()
     .from("managers")
     .select("*")
     .eq("tenant_id", tenantId);
+  if (error) {
+    logger.error("Query failed", { error: error.message, tenantId });
+  }
   if (!managers) return [];
 
   // Populate participantIds for each manager
   const result: NotionManager[] = [];
   for (const m of managers) {
-    const { data: participants } = await getClient()
+    const { data: participants, error: participantsError } = await getClient()
       .from("participants")
       .select("id")
       .eq("manager_id", m.id);
+    if (participantsError) {
+      logger.error("Query failed", { error: participantsError.message, managerId: m.id });
+    }
     result.push({
       ...rowToManager(m),
       participantIds: (participants || []).map((p: { id: string }) => p.id),
@@ -526,16 +607,22 @@ export async function getAllManagersFromSupabase(
 export async function getManagerByTokenFromSupabase(
   token: string
 ): Promise<(NotionManager & { tenantId: string }) | null> {
-  const { data } = await getClient()
+  const { data, error } = await getClient()
     .from("managers")
     .select("*")
     .eq("token", token)
     .maybeSingle();
+  if (error) {
+    logger.error("Query failed", { error: error.message, token });
+  }
   if (!data) return null;
-  const { data: participants } = await getClient()
+  const { data: participants, error: participantsError } = await getClient()
     .from("participants")
     .select("id")
     .eq("manager_id", data.id);
+  if (participantsError) {
+    logger.error("Query failed", { error: participantsError.message, managerId: data.id });
+  }
   return {
     ...rowToManager(data),
     participantIds: (participants || []).map((p: { id: string }) => p.id),
@@ -546,16 +633,22 @@ export async function getManagerByTokenFromSupabase(
 export async function getManagerByIdFromSupabase(
   managerId: string
 ): Promise<NotionManager | null> {
-  const { data } = await getClient()
+  const { data, error } = await getClient()
     .from("managers")
     .select("*")
     .eq("id", managerId)
     .maybeSingle();
+  if (error) {
+    logger.error("Query failed", { error: error.message, managerId });
+  }
   if (!data) return null;
-  const { data: participants } = await getClient()
+  const { data: participants, error: participantsError } = await getClient()
     .from("participants")
     .select("id")
     .eq("manager_id", data.id);
+  if (participantsError) {
+    logger.error("Query failed", { error: participantsError.message, managerId: data.id });
+  }
   return {
     ...rowToManager(data),
     participantIds: (participants || []).map((p: { id: string }) => p.id),
@@ -566,22 +659,28 @@ export async function getParticipantsForManagerFromSupabase(
   managerId: string,
   tenantId: string
 ): Promise<NotionParticipant[]> {
-  const { data } = await getClient()
+  const { data, error } = await getClient()
     .from("participants")
     .select("*")
     .eq("tenant_id", tenantId)
     .eq("manager_id", managerId);
+  if (error) {
+    logger.error("Query failed", { error: error.message, managerId, tenantId });
+  }
   return (data || []).map(rowToParticipant);
 }
 
 export async function isAdminTokenFromSupabase(
   token: string
 ): Promise<boolean> {
-  const { data } = await getClient()
+  const { data, error } = await getClient()
     .from("managers")
     .select("is_admin")
     .eq("token", token)
     .maybeSingle();
+  if (error) {
+    logger.error("Query failed", { error: error.message, token });
+  }
   return data?.is_admin || false;
 }
 
@@ -607,7 +706,14 @@ export async function createManagerInSupabase(
     })
     .select("id, token")
     .single();
-  if (error || !data) return null;
+  if (error) {
+    logger.error("Insert failed", { error: error.message, name: manager.name, tenantId });
+    return null;
+  }
+  if (!data) {
+    logger.warn("Insert returned no data", { name: manager.name, tenantId });
+    return null;
+  }
   return { id: data.id, token: data.token };
 }
 
@@ -629,12 +735,21 @@ export async function updateManagerInSupabase(
 
   if (Object.keys(updateData).length === 0) return true;
 
-  const { error } = await getClient()
+  const { error, data: updated } = await getClient()
     .from("managers")
     .update(updateData)
     .eq("id", managerId)
-    .eq("tenant_id", tenantId);
-  return !error;
+    .eq("tenant_id", tenantId)
+    .select("id");
+  if (error) {
+    logger.error("Update failed", { error: error.message, managerId });
+    return false;
+  }
+  if (!updated || updated.length === 0) {
+    logger.warn("Update matched 0 rows", { managerId });
+    return false;
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -643,11 +758,14 @@ export async function updateManagerInSupabase(
 export async function getMissionById(
   missionId: string
 ): Promise<MissionEntry | null> {
-  const { data } = await getClient()
+  const { data, error } = await getClient()
     .from("missions")
     .select("*")
     .eq("id", missionId)
     .maybeSingle();
+  if (error) {
+    logger.error("Query failed", { error: error.message, missionId });
+  }
   if (!data) return null;
   return rowToMission(data);
 }
@@ -656,23 +774,29 @@ export async function getMissionsByParticipant(
   participantName: string,
   tenantId: string
 ): Promise<MissionEntry[]> {
-  const { data } = await getClient()
+  const { data, error } = await getClient()
     .from("missions")
     .select("*")
     .eq("tenant_id", tenantId)
     .eq("participant_name", participantName)
     .order("created_at", { ascending: false });
+  if (error) {
+    logger.error("Query failed", { error: error.message, participantName, tenantId });
+  }
   return (data || []).map(rowToMission);
 }
 
 export async function getMissionComments(
   missionId: string
 ): Promise<MissionComment[]> {
-  const { data } = await getClient()
+  const { data, error } = await getClient()
     .from("mission_comments")
     .select("*")
     .eq("mission_id", missionId)
     .order("created_at", { ascending: true });
+  if (error) {
+    logger.error("Query failed", { error: error.message, missionId });
+  }
   return (data || []).map(rowToComment);
 }
 
@@ -700,7 +824,14 @@ export async function createMission(
     })
     .select("id")
     .single();
-  if (error || !data) return null;
+  if (error) {
+    logger.error("Insert failed", { error: error.message, participantName, title });
+    return null;
+  }
+  if (!data) {
+    logger.warn("Insert returned no data", { participantName, title });
+    return null;
+  }
   return data.id;
 }
 
@@ -711,11 +842,20 @@ export async function updateMissionStatus(
 ): Promise<boolean> {
   const update: Record<string, unknown> = { status };
   if (finalReview !== null) update.final_review = finalReview;
-  const { error } = await getClient()
+  const { error, data: updated } = await getClient()
     .from("missions")
     .update(update)
-    .eq("id", missionId);
-  return !error;
+    .eq("id", missionId)
+    .select("id");
+  if (error) {
+    logger.error("Update failed", { error: error.message, missionId });
+    return false;
+  }
+  if (!updated || updated.length === 0) {
+    logger.warn("Update matched 0 rows", { missionId });
+    return false;
+  }
+  return true;
 }
 
 export async function addMissionComment(
@@ -742,12 +882,15 @@ export async function getFeedbackByParticipant(
   participantName: string,
   tenantId: string
 ): Promise<NotionFeedback[]> {
-  const { data } = await getClient()
+  const { data, error } = await getClient()
     .from("feedback")
     .select("*")
     .eq("tenant_id", tenantId)
     .eq("participant_name", participantName)
     .order("created_at", { ascending: false });
+  if (error) {
+    logger.error("Query failed", { error: error.message, participantName, tenantId });
+  }
   return (data || []).map(rowToFeedback);
 }
 
@@ -755,12 +898,15 @@ export async function getUnreadFeedbackCount(
   participantName: string,
   tenantId: string
 ): Promise<number> {
-  const { count } = await getClient()
+  const { count, error } = await getClient()
     .from("feedback")
     .select("id", { count: "exact", head: true })
     .eq("tenant_id", tenantId)
     .eq("participant_name", participantName)
     .eq("is_read", false);
+  if (error) {
+    logger.error("Query failed", { error: error.message, participantName, tenantId });
+  }
   return count ?? 0;
 }
 
@@ -791,18 +937,34 @@ export async function createFeedback(
     })
     .select("id")
     .single();
-  if (error || !data) return null;
+  if (error) {
+    logger.error("Insert failed", { error: error.message, participantName: fb.participantName });
+    return null;
+  }
+  if (!data) {
+    logger.warn("Insert returned no data", { participantName: fb.participantName });
+    return null;
+  }
   return { id: data.id };
 }
 
 export async function markFeedbackAsRead(
   feedbackId: string
 ): Promise<boolean> {
-  const { error } = await getClient()
+  const { error, data: updated } = await getClient()
     .from("feedback")
     .update({ is_read: true })
-    .eq("id", feedbackId);
-  return !error;
+    .eq("id", feedbackId)
+    .select("id");
+  if (error) {
+    logger.error("Update failed", { error: error.message, feedbackId });
+    return false;
+  }
+  if (!updated || updated.length === 0) {
+    logger.warn("Update matched 0 rows", { feedbackId });
+    return false;
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -811,12 +973,15 @@ export async function markFeedbackAsRead(
 export async function getAiSystemPrompt(
   tenantId: string
 ): Promise<string> {
-  const { data } = await getClient()
+  const { data, error } = await getClient()
     .from("ai_settings")
     .select("value")
     .eq("tenant_id", tenantId)
     .eq("key", "system_prompt")
     .maybeSingle();
+  if (error) {
+    logger.error("Query failed", { error: error.message, tenantId });
+  }
   return data?.value || "";
 }
 
@@ -824,14 +989,23 @@ export async function updateAiSystemPrompt(
   tenantId: string,
   newPrompt: string
 ): Promise<boolean> {
-  const { error } = await getClient()
+  const { error, data: updated } = await getClient()
     .from("ai_settings")
     .upsert({
       tenant_id: tenantId,
       key: "system_prompt",
       value: newPrompt,
-    }, { onConflict: "tenant_id,key" });
-  return !error;
+    }, { onConflict: "tenant_id,key" })
+    .select("tenant_id");
+  if (error) {
+    logger.error("Upsert failed", { error: error.message, tenantId });
+    return false;
+  }
+  if (!updated || updated.length === 0) {
+    logger.warn("Upsert returned no data", { tenantId });
+    return false;
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -866,11 +1040,14 @@ export async function createTenant(
 export async function getTenantBySlug(
   slug: string
 ): Promise<{ id: string; name: string; slug: string; companyName: string; featureFlags: Record<string, boolean> } | null> {
-  const { data } = await getClient()
+  const { data, error } = await getClient()
     .from("tenants")
     .select("*")
     .eq("slug", slug)
     .maybeSingle();
+  if (error) {
+    logger.error("Query failed", { error: error.message, slug });
+  }
   if (!data) return null;
   return {
     id: data.id,
@@ -884,10 +1061,13 @@ export async function getTenantBySlug(
 export async function getAllTenants(): Promise<
   { id: string; name: string; slug: string; companyName: string; plan: string }[]
 > {
-  const { data } = await getClient()
+  const { data, error } = await getClient()
     .from("tenants")
     .select("id, name, slug, company_name, plan")
     .order("created_at", { ascending: true });
+  if (error) {
+    logger.error("Query failed", { error: error.message });
+  }
   return (data || []).map((t) => ({
     id: t.id,
     name: t.name,

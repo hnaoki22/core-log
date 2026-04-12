@@ -63,7 +63,8 @@ function getJapaneseHolidays(year: number): Set<string> {
   add(3, shunbun);
 
   // 秋分の日（概算）: 9月22日 or 23日
-  const shubun = year % 4 === 0 ? 22 : 23; // 2026は9/23
+  // For leap years: September 22, for non-leap years: September 23
+  const shubun = year % 4 === 0 ? 22 : 23;
   add(9, shubun);
 
   // 振替休日: 祝日が日曜の場合、翌月曜が休日

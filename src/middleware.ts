@@ -10,6 +10,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { isSessionValid } from "@/lib/session";
 import { isFeatureEnabled } from "@/lib/feature-flags";
+import { validateEnv } from "@/lib/env";
+
+// Validate environment variables on cold start
+validateEnv();
 
 // Security headers to add to all responses
 const securityHeaders = {

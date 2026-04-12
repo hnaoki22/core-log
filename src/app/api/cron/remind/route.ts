@@ -9,6 +9,7 @@ import { sendReminderEmail, type ReminderType } from "@/lib/email";
 import { hasLoggedToday } from "@/lib/supabase";
 import { getAllParticipants } from "@/lib/participant-db";
 import { logger } from "@/lib/logger";
+import { isFeatureEnabled } from "@/lib/feature-flags";
 
 // Vercel Cron secret for authentication
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -38,6 +39,17 @@ export async function GET(request: NextRequest) {
     logger.info("Reminder skipped: not a business day", { date: todayStr });
     return NextResponse.json({
       message: "Skipped: not a business day",
+      date: todayStr,
+      sent: 0,
+    });
+  }
+
+  // Check if reminder mail feature is enabled
+  const reminderMailEnabled = await isFeatureEnabled("feature.reminderMail");
+  if (!reminderMailEnabled) {
+    logger.info("Reminder skipped: feature disabled", { date: todayStr });
+    return NextResponse.json({
+      message: "Reminder mail feature disabled",
       date: todayStr,
       sent: 0,
     });
