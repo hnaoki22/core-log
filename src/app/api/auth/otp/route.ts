@@ -197,7 +197,7 @@ async function handleVerifyOTP(token: string, code: string): Promise<NextRespons
 
   // Create session cookie
   const cookieName = getSessionCookieName(token);
-  const signedValue = createSignedSessionValue(token);
+  const signedValue = await createSignedSessionValue(token);
   const response = NextResponse.json({
     success: true,
     verified: true,

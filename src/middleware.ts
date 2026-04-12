@@ -68,8 +68,8 @@ export async function middleware(request: NextRequest) {
       const [, , token] = tokenMatch;
       const cookieHeader = request.headers.get("cookie");
 
-      // Check if session is valid
-      if (!isSessionValid(token, cookieHeader)) {
+      // Check if session is valid (async — uses Web Crypto API for HMAC)
+      if (!(await isSessionValid(token, cookieHeader))) {
         // Redirect to verification page
         const verifyUrl = new URL(`/verify/${token}`, request.url);
         return NextResponse.redirect(verifyUrl);
