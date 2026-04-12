@@ -6,6 +6,7 @@ import { useFeatures } from "@/lib/use-features";
 
 type ParticipantData = {
   id: string;
+  token: string;
   name: string;
   department: string;
   dojoPhase: string;
@@ -27,6 +28,7 @@ type ParticipantData = {
 
 type ManagerData = {
   id: string;
+  token: string;
   name: string;
   email: string;
   department: string;
@@ -842,11 +844,12 @@ export default function AdminDashboard() {
           </div>
           <div className="p-4 space-y-0">
             {[
-              { label: "データソース", value: "Notion API（リアルタイム）", status: "" },
-              { label: "デプロイ先", value: "Vercel", status: "" },
-              { label: "認証方式", value: "トークン付きURL", status: "" },
-              { label: "Notion DB", value: "接続済み", status: "emerald" },
-              { label: "AIフィードバック", value: "実装済み", status: "green" },
+              { label: "データベース", value: "Supabase（PostgreSQL）", status: "emerald" },
+              { label: "ホスティング", value: "Vercel", status: "emerald" },
+              { label: "認証方式", value: "OTP認証 + セッションCookie", status: "" },
+              { label: "マネージャー数", value: `${data?.managers?.length ?? 0}名`, status: "" },
+              { label: "参加者数", value: `${data?.participants?.length ?? 0}名`, status: "" },
+              { label: "AIフィードバック", value: "Claude Sonnet", status: "emerald" },
             ].map((item, i) => (
               <div key={i} className="flex justify-between items-center py-2.5 border-b border-[#F5F0EB] last:border-0">
                 <span className="text-xs text-[#8B8489]">{item.label}</span>
@@ -951,20 +954,54 @@ export default function AdminDashboard() {
           <div className="px-5 py-4 border-b border-[#EFE8DD]">
             <h2 className="text-sm font-semibold text-[#1A1A2E]">クイックリンク</h2>
           </div>
-          <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-            <a href="/p/FAe9diVTAxUR8gRv" className="block p-3.5 bg-indigo-50/50 rounded-xl border border-indigo-100 hover:bg-indigo-50 transition-colors">
-              <div className="font-medium text-[#1A1A2E] text-xs mb-0.5">参加者画面（土居 由奈）</div>
-              <div className="text-[11px] text-[#8B8489]">日報入力・フィードバック確認・ミッション確認</div>
-            </a>
-            <a href="/m/pn_Oc1ykCMXUQZpZ" className="block p-3.5 bg-amber-50/50 rounded-xl border border-amber-100 hover:bg-amber-50 transition-colors">
-              <div className="font-medium text-amber-600 text-xs mb-0.5">上司画面（本藤 直樹）</div>
-              <div className="text-[11px] text-[#8B8489]">参加者一覧・詳細・コメント入力</div>
-            </a>
+          <div className="p-4 space-y-3">
+            {/* Manager links */}
+            {data?.managers && data.managers.length > 0 && (
+              <div>
+                <div className="text-[10px] font-semibold text-[#8B8489] uppercase tracking-wider mb-2">マネージャー画面</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {data.managers.map((m: ManagerData) => (
+                    <a key={m.id} href={`/m/${m.token}`} className="block p-3 bg-amber-50/50 rounded-xl border border-amber-100 hover:bg-amber-50 transition-colors">
+                      <div className="font-medium text-amber-600 text-xs mb-0.5">{m.name}</div>
+                      <div className="text-[10px] text-[#8B8489]">{m.department || ""}{m.role === "admin" ? " · 管理者" : m.role === "observer" ? " · 閲覧者" : ""}</div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Participant links */}
+            {data?.participants && data.participants.length > 0 && (
+              <div>
+                <div className="text-[10px] font-semibold text-[#8B8489] uppercase tracking-wider mb-2">参加者画面</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {data.participants.map((p: ParticipantData) => (
+                    <a key={p.id} href={`/p/${p.token}`} className="block p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 hover:bg-indigo-50 transition-colors">
+                      <div className="font-medium text-[#1A1A2E] text-xs mb-0.5">{p.name}</div>
+                      <div className="text-[10px] text-[#8B8489]">{p.managerId && data?.managers ? `上司: ${data.managers.find((m: ManagerData) => m.id === p.managerId)?.name || ""}` : ""}</div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* External links */}
+            <div>
+              <div className="text-[10px] font-semibold text-[#8B8489] uppercase tracking-wider mb-2">外部ツール</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <a href="https://supabase.com/dashboard/project/vnfmbkftbnjruwsdlvtv" target="_blank" rel="noopener noreferrer" className="block p-3 bg-emerald-50/50 rounded-xl border border-emerald-100 hover:bg-emerald-50 transition-colors">
+                  <div className="font-medium text-emerald-600 text-xs mb-0.5">Supabase Dashboard</div>
+                  <div className="text-[10px] text-[#8B8489]">データベース管理・テーブル編集</div>
+                </a>
+                <a href="https://vercel.com/naokihondo-humanmatures-projects/core-log" target="_blank" rel="noopener noreferrer" className="block p-3 bg-gray-50/50 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors">
+                  <div className="font-medium text-[#1A1A2E] text-xs mb-0.5">Vercel Dashboard</div>
+                  <div className="text-[10px] text-[#8B8489]">デプロイ状況・ログ確認</div>
+                </a>
+              </div>
+            </div>
           </div>
         </div>
 
         <div className="text-center text-[11px] text-[#C9BDAE] pb-8">
-          CORE Log v1.0 — Powered by Next.js + Notion API
+          CORE Log v1.0 — Powered by Next.js + Supabase
         </div>
       </div>
 
@@ -1168,7 +1205,7 @@ export default function AdminDashboard() {
                 <>
                   <div>
                     <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">システムプロンプト</label>
-                    <p className="text-[10px] text-[#8B8489] mb-2">AIがフィードバックを生成する際のベースとなる指示文です。参加者ごとの個別方針はNotion参加者DBの「FB方針」欄で設定できます。</p>
+                    <p className="text-[10px] text-[#8B8489] mb-2">AIがフィードバックを生成する際のベースとなる指示文です。参加者ごとの個別方針は、参加者一覧の編集画面から「FB方針」欄で設定できます。</p>
                     <textarea
                       value={promptText}
                       onChange={(e) => setPromptText(e.target.value)}
@@ -1179,7 +1216,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="bg-violet-50 rounded-xl p-3 border border-violet-100">
                     <p className="text-[10px] font-medium text-violet-600 mb-1">参加者ごとの個別調整</p>
-                    <p className="text-[10px] text-violet-500 leading-relaxed">NotionのParticipant DBの「FB方針」欄に、参加者ごとの方針を記入するとAI生成時に反映されます。例: 「具体的な数値目標を含めて厳しめに」「モチベーション維持を重視して」</p>
+                    <p className="text-[10px] text-violet-500 leading-relaxed">参加者一覧の編集ボタンから「FB方針」欄に、参加者ごとの方針を記入するとAI生成時に反映されます。例: 「具体的な数値目標を含めて厳しめに」「モチベーション維持を重視して」</p>
                   </div>
                 </>
               )}

@@ -1,5 +1,5 @@
 // GET /api/admin?token=xxx
-// Returns all participants + managers with enriched Notion data
+// Returns all participants + managers with enriched Supabase data
 
 import { NextRequest, NextResponse } from "next/server";
 import { getLogsByParticipant } from "@/lib/supabase";
@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
         const hasLogToday = logs.some((l) => l.date === todayJST && l.morningIntent);
         return {
           id: p.id,
+          token: p.token,
           name: p.name,
           department: p.department,
           dojoPhase: p.dojoPhase,
@@ -67,6 +68,7 @@ export async function GET(request: NextRequest) {
         console.error(`Error fetching data for ${p.name}:`, error);
         return {
           id: p.id,
+          token: p.token,
           name: p.name,
           department: p.department,
           dojoPhase: p.dojoPhase,
@@ -88,6 +90,7 @@ export async function GET(request: NextRequest) {
   // Manager data (from registry - no Notion DB for managers)
   const managerData = managers.map((m) => ({
     id: m.id,
+    token: m.token,
     name: m.name,
     email: m.email || "",
     department: m.department,
