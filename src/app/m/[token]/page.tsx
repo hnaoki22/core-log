@@ -24,7 +24,7 @@ type ParticipantData = {
 };
 
 type ManagerData = {
-  manager: { name: string; department: string; isAdmin?: boolean };
+  manager: { name: string; department: string; isAdmin?: boolean; role?: string };
   participants: ParticipantData[];
 };
 
@@ -138,7 +138,7 @@ export default function ManagerHome() {
           <h1 className="text-2xl font-semibold tracking-tight mb-1">{manager.name}</h1>
           <div className="flex items-center justify-between">
             <p className="text-indigo-300 text-sm font-light">ダッシュボード</p>
-            {manager.isAdmin && (
+            {(manager.isAdmin || manager.role === "observer") && (
               <Link
                 href={`/a/${token}`}
                 className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-sm text-white/90 hover:text-white hover:bg-white/25 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"

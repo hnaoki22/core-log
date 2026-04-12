@@ -80,6 +80,7 @@ export async function GET(request: NextRequest) {
       name: manager.name,
       department: manager.department,
       isAdmin: manager.isAdmin || false,
+      role: manager.role || (manager.isAdmin ? "admin" : "manager"),
     },
     participants: enrichedParticipants,
   });
