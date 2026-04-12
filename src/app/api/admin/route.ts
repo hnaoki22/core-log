@@ -130,6 +130,7 @@ export async function GET(request: NextRequest) {
     tenantId,
     tenants: tenants.map((t) => ({ id: t.id, name: t.name, slug: t.slug, companyName: t.companyName })),
     _debug: {
+      supabaseUrl: (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "none").replace(/^(https?:\/\/[^/]+).*/, "$1"),
       managerBackend: manager.backend,
       managerId: manager.id,
       managerTenantId: manager.tenantId,
