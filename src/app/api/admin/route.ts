@@ -30,19 +30,27 @@ export async function GET(request: NextRequest) {
   const viewerRole = manager.role;
 
   // Determine which tenant to view
-  let tenantId = manager.tenantId || DEFAULT_TENANT_ID;
+  // tenantSlug === null means "全テナント" (all tenants) was selected
+  // tenantSlug === "some-slug" means a specific tenant was selected
+  let tenantId: string | null = manager.tenantId || DEFAULT_TENANT_ID;
+  const isAllTenants = !tenantSlug && manager.isAdmin;
+
   if (tenantSlug && manager.isAdmin) {
     const requestedTenant = await getTenantBySlug(tenantSlug);
     if (requestedTenant) {
       tenantId = requestedTenant.id;
     }
+  } else if (isAllTenants) {
+    // Admin selected "全テナント" — fetch across all tenants
+    tenantId = null;
   }
 
   // Fetch ALL data in parallel — 4 queries total instead of N+1
+  // When tenantId is null, queries fetch from all tenants
   const [participantMocks, managers, allLogsMap, tenants] = await Promise.all([
     getAllParticipants(tenantId),
     getAllManagers(tenantId),
-    getAllLogsForTenant(tenantId),
+    getAllLogsForTenant(tenantId ?? undefined),
     manager.isAdmin ? getAllTenants() : Promise.resolve([]),
   ]);
   const todayJST = getTodayJST();
@@ -123,7 +131,7 @@ export async function GET(request: NextRequest) {
     participants: enrichedParticipants,
     managers: managerData,
     viewerRole,
-    tenantId,
+    tenantId: tenantId || "all",
     tenants: tenants.map((t) => ({ id: t.id, name: t.name, slug: t.slug, companyName: t.companyName })),
   });
 }

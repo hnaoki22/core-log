@@ -260,17 +260,20 @@ export async function getLogsByParticipant(
   return data.map(rowToLog);
 }
 
-// Batch: fetch ALL logs for a tenant in one query (for admin dashboard)
+// Batch: fetch ALL logs for a tenant (or all tenants) in one query (for admin dashboard)
 export async function getAllLogsForTenant(
-  tenantId: string
+  tenantId?: string
 ): Promise<Map<string, NotionLogEntry[]>> {
-  const { data, error } = await getClient()
+  let query = getClient()
     .from("logs")
     .select("*")
-    .eq("tenant_id", tenantId)
     .order("date", { ascending: false });
+  if (tenantId) {
+    query = query.eq("tenant_id", tenantId);
+  }
+  const { data, error } = await query;
   if (error) {
-    logger.error("Query failed (getAllLogsForTenant)", { error: error.message, tenantId });
+    logger.error("Query failed (getAllLogsForTenant)", { error: error.message, tenantId: tenantId || "ALL" });
   }
   const logMap = new Map<string, NotionLogEntry[]>();
   if (!data) return logMap;
@@ -465,14 +468,17 @@ export async function addManagerComment(
 // PARTICIPANT QUERIES
 // ---------------------------------------------------------------------------
 export async function getAllParticipantsFromSupabase(
-  tenantId: string
+  tenantId?: string
 ): Promise<NotionParticipant[]> {
-  const { data, error } = await getClient()
+  let query = getClient()
     .from("participants")
-    .select("*")
-    .eq("tenant_id", tenantId);
+    .select("*");
+  if (tenantId) {
+    query = query.eq("tenant_id", tenantId);
+  }
+  const { data, error } = await query;
   if (error) {
-    logger.error("Query failed", { error: error.message, tenantId });
+    logger.error("Query failed", { error: error.message, tenantId: tenantId || "ALL" });
   }
   return (data || []).map(rowToParticipant);
 }
@@ -612,18 +618,24 @@ export async function updateParticipantInSupabase(
 // MANAGER QUERIES
 // ---------------------------------------------------------------------------
 export async function getAllManagersFromSupabase(
-  tenantId: string
+  tenantId?: string
 ): Promise<NotionManager[]> {
   // Batch: fetch managers and all participants in just 2 queries (not N+1)
+  let managersQuery = getClient().from("managers").select("*");
+  let participantsQuery = getClient().from("participants").select("id, manager_id");
+  if (tenantId) {
+    managersQuery = managersQuery.eq("tenant_id", tenantId);
+    participantsQuery = participantsQuery.eq("tenant_id", tenantId);
+  }
   const [managersResult, participantsResult] = await Promise.all([
-    getClient().from("managers").select("*").eq("tenant_id", tenantId),
-    getClient().from("participants").select("id, manager_id").eq("tenant_id", tenantId),
+    managersQuery,
+    participantsQuery,
   ]);
   if (managersResult.error) {
-    logger.error("Query failed", { error: managersResult.error.message, tenantId });
+    logger.error("Query failed", { error: managersResult.error.message, tenantId: tenantId || "ALL" });
   }
   if (participantsResult.error) {
-    logger.error("Query failed", { error: participantsResult.error.message, tenantId });
+    logger.error("Query failed", { error: participantsResult.error.message, tenantId: tenantId || "ALL" });
   }
   const managers = managersResult.data || [];
   const participants = participantsResult.data || [];

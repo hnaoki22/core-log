@@ -163,14 +163,16 @@ function mockManagerToInfo(mm: Manager): ManagerInfo {
 
 // ===== Public API =====
 
-export async function getAllParticipants(tenantId?: string): Promise<ParticipantInfo[]> {
-  const tid = tenantId || DEFAULT_TENANT_ID;
+export async function getAllParticipants(tenantId?: string | null): Promise<ParticipantInfo[]> {
+  // tenantId=undefined/null → fetch ALL tenants (cross-tenant admin mode)
+  // tenantId=string → fetch specific tenant
+  const tid = tenantId === null || tenantId === undefined ? undefined : (tenantId || DEFAULT_TENANT_ID);
   if (hasSupabase()) {
     const sps = await getAllParticipantsFromSupabase(tid);
     return sps.map((sp) => ({
       ...notionParticipantToInfo(sp),
       backend: "supabase" as BackendType,
-      tenantId: tid,
+      tenantId: tid || "all",
     }));
   }
   return mockGetAllParticipants().map(mockParticipantToInfo);
@@ -253,14 +255,14 @@ export async function getParticipantById(id: string, tenantId?: string): Promise
   return mp ? mockParticipantToInfo(mp) : null;
 }
 
-export async function getAllManagers(tenantId?: string): Promise<ManagerInfo[]> {
-  const tid = tenantId || DEFAULT_TENANT_ID;
+export async function getAllManagers(tenantId?: string | null): Promise<ManagerInfo[]> {
+  const tid = tenantId === null || tenantId === undefined ? undefined : (tenantId || DEFAULT_TENANT_ID);
   if (hasSupabase()) {
     const sms = await getAllManagersFromSupabase(tid);
     return sms.map((sm) => ({
       ...notionManagerToInfo(sm),
       backend: "supabase" as BackendType,
-      tenantId: tid,
+      tenantId: tid || "all",
     }));
   }
   return mockGetAllManagers().map(mockManagerToInfo);
