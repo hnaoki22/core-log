@@ -82,7 +82,18 @@ export async function middleware(request: NextRequest) {
       const cookieName = getSessionCookieName(token);
       const existingCookie = cookieHeader?.split(";").find((c) => c.trim().startsWith(`${cookieName}=`));
       if (existingCookie) {
-        const cookieValue = existingCookie.split("=").slice(1).join("=").trim();
+        const rawCookieValue = existingCookie.split("=").slice(1).join("=").trim();
+        // IMPORTANT: Decode the cookie value before re-setting it.
+        // The browser stores URL-encoded values (e.g., "verified%3A...").
+        // Next.js cookies.set() re-encodes the value, so passing the raw
+        // encoded value would cause double-encoding ("%253A" instead of "%3A"),
+        // corrupting the cookie on subsequent requests.
+        let cookieValue: string;
+        try {
+          cookieValue = decodeURIComponent(rawCookieValue);
+        } catch {
+          cookieValue = rawCookieValue;
+        }
         const res = NextResponse.next();
         // Re-set the same cookie with a fresh 30-day expiry
         res.cookies.set({
