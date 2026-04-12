@@ -22,15 +22,18 @@ export async function GET(request: NextRequest) {
   }
 
   // Check admin or observer authorization
+  console.log("[ADMIN TRACE] Step 1: Looking up token...");
   const manager = await getManagerByToken(token);
+  console.log("[ADMIN TRACE] Step 2: manager found:", !!manager, "backend:", manager?.backend, "id:", manager?.id, "name:", manager?.name, "role:", manager?.role, "isAdmin:", manager?.isAdmin, "tenantId:", manager?.tenantId);
   const isAdminOrObserver = manager && (manager.role === "admin" || manager.role === "observer" || manager.isAdmin);
   if (!isAdminOrObserver) {
+    console.log("[ADMIN TRACE] Step 3: UNAUTHORIZED - returning 403");
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
   const viewerRole = manager.role;
 
   // Determine which tenant to view
-  console.log("[ADMIN DEBUG] manager.tenantId:", manager.tenantId, "manager.name:", manager.name, "manager.isAdmin:", manager.isAdmin);
+  console.log("[ADMIN TRACE] Step 3: Authorized as", viewerRole, "tenantId:", manager.tenantId);
   let tenantId = manager.tenantId || DEFAULT_TENANT_ID;
   if (tenantSlug && manager.isAdmin) {
     const requestedTenant = await getTenantBySlug(tenantSlug);
