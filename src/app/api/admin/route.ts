@@ -2,7 +2,7 @@
 // Returns all participants + managers with enriched Supabase data
 
 import { NextRequest, NextResponse } from "next/server";
-import { DEFAULT_TENANT_ID, getAllLogsForTenant, getTenantBySlug, getAllTenants, getClient } from "@/lib/supabase";
+import { DEFAULT_TENANT_ID, getAllLogsForTenant, getTenantBySlug, getAllTenants } from "@/lib/supabase";
 import {
   getAllParticipants,
   getAllManagers,
@@ -22,18 +22,14 @@ export async function GET(request: NextRequest) {
   }
 
   // Check admin or observer authorization
-  console.log("[ADMIN TRACE] Step 1: Looking up token...");
   const manager = await getManagerByToken(token);
-  console.log("[ADMIN TRACE] Step 2: manager found:", !!manager, "backend:", manager?.backend, "id:", manager?.id, "name:", manager?.name, "role:", manager?.role, "isAdmin:", manager?.isAdmin, "tenantId:", manager?.tenantId);
   const isAdminOrObserver = manager && (manager.role === "admin" || manager.role === "observer" || manager.isAdmin);
   if (!isAdminOrObserver) {
-    console.log("[ADMIN TRACE] Step 3: UNAUTHORIZED - returning 403");
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
   const viewerRole = manager.role;
 
   // Determine which tenant to view
-  console.log("[ADMIN TRACE] Step 3: Authorized as", viewerRole, "tenantId:", manager.tenantId);
   let tenantId = manager.tenantId || DEFAULT_TENANT_ID;
   if (tenantSlug && manager.isAdmin) {
     const requestedTenant = await getTenantBySlug(tenantSlug);
@@ -129,21 +125,5 @@ export async function GET(request: NextRequest) {
     viewerRole,
     tenantId,
     tenants: tenants.map((t) => ({ id: t.id, name: t.name, slug: t.slug, companyName: t.companyName })),
-    _debug: await (async () => {
-      // Raw Supabase client query for comparison
-      const rawResult = await getClient().from("managers").select("id,name,tenant_id").order("name");
-      return {
-        supabaseUrl: (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "none").replace(/^(https?:\/\/[^/]+).*/, "$1"),
-        managerBackend: manager.backend,
-        managerId: manager.id,
-        managerTenantId: manager.tenantId,
-        resolvedTenantId: tenantId,
-        participantCount: enrichedParticipants.length,
-        managerCount: managerData.length,
-        rawManagerCount: rawResult.data?.length || 0,
-        rawManagers: rawResult.data?.map(m => ({ id: m.id, name: m.name, tid: m.tenant_id })),
-        rawError: rawResult.error?.message,
-      };
-    })(),
   });
 }
