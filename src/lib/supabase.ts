@@ -765,7 +765,8 @@ export async function updateManagerInSupabase(
     isAdmin?: boolean;
     role?: string;
   },
-  tenantId: string
+  tenantId: string,
+  newTenantId?: string
 ): Promise<boolean> {
   const updateData: Record<string, unknown> = {};
   if (updates.name !== undefined) updateData.name = updates.name;
@@ -773,6 +774,7 @@ export async function updateManagerInSupabase(
   if (updates.department !== undefined) updateData.department = updates.department;
   if (updates.isAdmin !== undefined) updateData.is_admin = updates.isAdmin;
   if (updates.role !== undefined) updateData.role = updates.role;
+  if (newTenantId) updateData.tenant_id = newTenantId;
 
   if (Object.keys(updateData).length === 0) return true;
 

@@ -42,7 +42,16 @@ export async function PUT(
       }
     }
 
-    if (Object.keys(updateData).length === 0) {
+    // Admin-only: allow tenant transfer
+    const newTenantId = updates.tenantId as string | undefined;
+    if (newTenantId && !manager.isAdmin) {
+      return NextResponse.json(
+        { error: "テナント変更にはadmin権限が必要です" },
+        { status: 403 }
+      );
+    }
+
+    if (Object.keys(updateData).length === 0 && !newTenantId) {
       return NextResponse.json(
         { error: "更新するフィールドが指定されていません" },
         { status: 400 }
@@ -52,7 +61,8 @@ export async function PUT(
     const success = await updateManagerInSupabase(
       managerId,
       updateData as Parameters<typeof updateManagerInSupabase>[1],
-      tenantId
+      tenantId,
+      newTenantId
     );
 
     if (!success) {
