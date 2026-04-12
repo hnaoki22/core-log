@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
-import { isSessionValid } from "@/lib/session";
+import { isSessionValid, getSessionCookieName, SESSION_MAX_AGE } from "@/lib/session";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { validateEnv } from "@/lib/env";
 
@@ -69,10 +69,36 @@ export async function middleware(request: NextRequest) {
       const cookieHeader = request.headers.get("cookie");
 
       // Check if session is valid (async — uses Web Crypto API for HMAC)
-      if (!(await isSessionValid(token, cookieHeader))) {
+      const sessionValid = await isSessionValid(token, cookieHeader);
+      if (!sessionValid) {
         // Redirect to verification page
         const verifyUrl = new URL(`/verify/${token}`, request.url);
         return NextResponse.redirect(verifyUrl);
+      }
+
+      // Sliding session: renew cookie expiry on every valid page visit
+      // This means users who access CORE Log at least once every 30 days
+      // will never be asked to re-authenticate.
+      const cookieName = getSessionCookieName(token);
+      const existingCookie = cookieHeader?.split(";").find((c) => c.trim().startsWith(`${cookieName}=`));
+      if (existingCookie) {
+        const cookieValue = existingCookie.split("=").slice(1).join("=").trim();
+        const res = NextResponse.next();
+        // Re-set the same cookie with a fresh 30-day expiry
+        res.cookies.set({
+          name: cookieName,
+          value: cookieValue,
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "strict",
+          maxAge: SESSION_MAX_AGE,
+          path: "/",
+        });
+        // Add security headers to this response too
+        Object.entries(securityHeaders).forEach(([key, value]) => {
+          res.headers.set(key, value);
+        });
+        return res;
       }
     }
   }

@@ -11,6 +11,9 @@
 // Falls back to a default for dev only — in prod CRON_SECRET is always set
 const SESSION_SECRET = process.env.CRON_SECRET || process.env.SESSION_SECRET || "dev-session-secret-do-not-use-in-production";
 
+/** Session cookie duration: 30 days in seconds */
+export const SESSION_MAX_AGE = 30 * 24 * 60 * 60;
+
 /**
  * Create HMAC-SHA256 signature using Web Crypto API (Edge Runtime compatible)
  */

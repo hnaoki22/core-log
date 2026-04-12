@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { generateOTP, verifyOTP, getRemainingAttempts } from "@/lib/otp";
-import { getSessionCookieName, createSignedSessionValue } from "@/lib/session";
+import { getSessionCookieName, createSignedSessionValue, SESSION_MAX_AGE } from "@/lib/session";
 import { getParticipantByToken, getManagerByToken } from "@/lib/participant-db";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { logger } from "@/lib/logger";
@@ -209,7 +209,7 @@ async function handleVerifyOTP(token: string, code: string): Promise<NextRespons
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60, // 7 days
+    maxAge: SESSION_MAX_AGE, // 30 days (sliding — renewed on each visit via middleware)
     path: "/",
   });
 
