@@ -1,8 +1,8 @@
 // GET /api/manager?token=xxx
-// Returns manager info + enriched participant data (Supabase / Notion / Mock)
+// Returns manager info + enriched participant data
 
 import { NextRequest, NextResponse } from "next/server";
-import { getLogsByParticipant } from "@/lib/supabase";
+import { getAllLogsForTenant } from "@/lib/supabase";
 import {
   getManagerByToken,
   getParticipantsForManager,
@@ -22,55 +22,58 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Manager not found" }, { status: 404 });
   }
 
-  const participantMocks = await getParticipantsForManager(manager.id, manager.tenantId);
+  const tenantId = manager.tenantId || "81f91c26-214e-4da2-9893-6ac6c8984062";
+
+  // Fetch participants and ALL logs in parallel (2 queries instead of N+1)
+  const [participantMocks, allLogsMap] = await Promise.all([
+    getParticipantsForManager(manager.id, tenantId),
+    getAllLogsForTenant(tenantId),
+  ]);
   const todayJST = getTodayJST();
 
-  // Fetch Supabase data for each participant in parallel
-  const enrichedParticipants = await Promise.all(
-    participantMocks.map(async (p) => {
-      // Supabase mode: fetch from API
-      try {
-        const logs = await getLogsByParticipant(p.name, p.tenantId || "81f91c26-214e-4da2-9893-6ac6c8984062");
-        const stats = computeParticipantStats(logs, todayJST);
-        const latestLog = logs[0] || null;
+  // Enrich participants using pre-fetched log map (no additional queries)
+  const enrichedParticipants = participantMocks.map((p) => {
+    try {
+      const logs = allLogsMap.get(p.name) || [];
+      const stats = computeParticipantStats(logs, todayJST);
+      const latestLog = logs[0] || null;
+      const hasLogToday = logs.some((l) => l.date === todayJST && l.morningIntent);
 
-        const hasLogToday = logs.some((l) => l.date === todayJST && l.morningIntent);
-        return {
-          name: p.name,
-          department: p.department,
-          dojoPhase: p.dojoPhase,
-          entryDays: stats.entryDays,
-          entryRate: stats.entryRate,
-          streak: stats.streak,
-          fbCount: stats.fbCount,
-          todayHasLog: hasLogToday,
-          latestLog: latestLog
-            ? {
-                date: latestLog.date,
-                morningIntent: latestLog.morningIntent,
-                status: latestLog.status,
-                energy: latestLog.energy,
-              }
-            : null,
-          recentEnergy: logs.slice(0, 5).map((l) => l.energy),
-        };
-      } catch (error) {
-        console.error(`Error fetching data for ${p.name}:`, error);
-        return {
-          name: p.name,
-          department: p.department,
-          dojoPhase: p.dojoPhase,
-          entryDays: 0,
-          entryRate: 0,
-          streak: 0,
-          fbCount: 0,
-          todayHasLog: false,
-          latestLog: null,
-          recentEnergy: [],
-        };
-      }
-    })
-  );
+      return {
+        name: p.name,
+        department: p.department,
+        dojoPhase: p.dojoPhase,
+        entryDays: stats.entryDays,
+        entryRate: stats.entryRate,
+        streak: stats.streak,
+        fbCount: stats.fbCount,
+        todayHasLog: hasLogToday,
+        latestLog: latestLog
+          ? {
+              date: latestLog.date,
+              morningIntent: latestLog.morningIntent,
+              status: latestLog.status,
+              energy: latestLog.energy,
+            }
+          : null,
+        recentEnergy: logs.slice(0, 5).map((l) => l.energy),
+      };
+    } catch (error) {
+      console.error(`Error processing data for ${p.name}:`, error);
+      return {
+        name: p.name,
+        department: p.department,
+        dojoPhase: p.dojoPhase,
+        entryDays: 0,
+        entryRate: 0,
+        streak: 0,
+        fbCount: 0,
+        todayHasLog: false,
+        latestLog: null,
+        recentEnergy: [],
+      };
+    }
+  });
 
   return NextResponse.json({
     manager: {

@@ -67,7 +67,12 @@ export default function ParticipantHome() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const res = await fetch(`/api/logs?token=${token}`);
+        // Fetch logs and feedback in parallel instead of sequentially
+        const [res, fbRes] = await Promise.all([
+          fetch(`/api/logs?token=${token}`),
+          fetch(`/api/feedback?token=${token}`),
+        ]);
+
         if (!res.ok) {
           setError("データの取得に失敗しました");
           return;
@@ -77,7 +82,6 @@ export default function ParticipantHome() {
         setLogs(data.logs || []);
         if (data.badges) setBadges(data.badges);
 
-        const fbRes = await fetch(`/api/feedback?token=${token}`);
         if (fbRes.ok) {
           const fbData = await fbRes.json();
           setUnreadFeedback(fbData.unreadCount || 0);

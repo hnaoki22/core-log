@@ -256,6 +256,30 @@ export async function getLogsByParticipant(
   return data.map(rowToLog);
 }
 
+// Batch: fetch ALL logs for a tenant in one query (for admin dashboard)
+export async function getAllLogsForTenant(
+  tenantId: string
+): Promise<Map<string, NotionLogEntry[]>> {
+  const { data, error } = await getClient()
+    .from("logs")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .order("date", { ascending: false });
+  if (error) {
+    logger.error("Query failed (getAllLogsForTenant)", { error: error.message, tenantId });
+  }
+  const logMap = new Map<string, NotionLogEntry[]>();
+  if (!data) return logMap;
+  for (const row of data) {
+    const entry = rowToLog(row);
+    const name = row.participant_name;
+    const list = logMap.get(name) || [];
+    list.push(entry);
+    logMap.set(name, list);
+  }
+  return logMap;
+}
+
 export async function hasLoggedToday(
   participantName: string,
   todayStr: string,
@@ -586,31 +610,33 @@ export async function updateParticipantInSupabase(
 export async function getAllManagersFromSupabase(
   tenantId: string
 ): Promise<NotionManager[]> {
-  const { data: managers, error } = await getClient()
-    .from("managers")
-    .select("*")
-    .eq("tenant_id", tenantId);
-  if (error) {
-    logger.error("Query failed", { error: error.message, tenantId });
+  // Batch: fetch managers and all participants in just 2 queries (not N+1)
+  const [managersResult, participantsResult] = await Promise.all([
+    getClient().from("managers").select("*").eq("tenant_id", tenantId),
+    getClient().from("participants").select("id, manager_id").eq("tenant_id", tenantId),
+  ]);
+  if (managersResult.error) {
+    logger.error("Query failed", { error: managersResult.error.message, tenantId });
   }
-  if (!managers) return [];
+  if (participantsResult.error) {
+    logger.error("Query failed", { error: participantsResult.error.message, tenantId });
+  }
+  const managers = managersResult.data || [];
+  const participants = participantsResult.data || [];
 
-  // Populate participantIds for each manager
-  const result: NotionManager[] = [];
-  for (const m of managers) {
-    const { data: participants, error: participantsError } = await getClient()
-      .from("participants")
-      .select("id")
-      .eq("manager_id", m.id);
-    if (participantsError) {
-      logger.error("Query failed", { error: participantsError.message, managerId: m.id });
-    }
-    result.push({
-      ...rowToManager(m),
-      participantIds: (participants || []).map((p: { id: string }) => p.id),
-    });
+  // Build manager_id → participant_ids map in memory
+  const managerParticipantMap = new Map<string, string[]>();
+  for (const p of participants) {
+    if (!p.manager_id) continue;
+    const list = managerParticipantMap.get(p.manager_id) || [];
+    list.push(p.id);
+    managerParticipantMap.set(p.manager_id, list);
   }
-  return result;
+
+  return managers.map((m) => ({
+    ...rowToManager(m),
+    participantIds: managerParticipantMap.get(m.id) || [],
+  }));
 }
 
 export async function getManagerByTokenFromSupabase(

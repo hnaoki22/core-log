@@ -2,7 +2,7 @@
 // Returns all participants + managers with enriched Supabase data
 
 import { NextRequest, NextResponse } from "next/server";
-import { getLogsByParticipant } from "@/lib/supabase";
+import { getAllLogsForTenant } from "@/lib/supabase";
 import {
   getAllParticipants,
   getAllManagers,
@@ -10,6 +10,10 @@ import {
 } from "@/lib/participant-db";
 import { computeParticipantStats } from "@/lib/stats";
 import { getTodayJST, calculateWeekNum } from "@/lib/date-utils";
+
+export const dynamic = "force-dynamic";
+
+const TENANT_ID = "81f91c26-214e-4da2-9893-6ac6c8984062";
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
@@ -26,68 +30,72 @@ export async function GET(request: NextRequest) {
   }
   const viewerRole = manager.role;
 
-  const participantMocks = await getAllParticipants();
-  const managers = await getAllManagers();
+  // Fetch ALL data in parallel — 3 queries total instead of N+1
+  const [participantMocks, managers, allLogsMap] = await Promise.all([
+    getAllParticipants(),
+    getAllManagers(),
+    getAllLogsForTenant(TENANT_ID),
+  ]);
   const todayJST = getTodayJST();
 
-  // Fetch Supabase data for each participant in parallel
-  const enrichedParticipants = await Promise.all(
-    participantMocks.map(async (p) => {
-      // Supabase mode
-      try {
-        const logs = await getLogsByParticipant(p.name, "81f91c26-214e-4da2-9893-6ac6c8984062");
-        const stats = computeParticipantStats(logs, todayJST);
-        const latestLog = logs[0] || null;
+  // Enrich participants using pre-fetched log map (no additional queries)
+  const enrichedParticipants = participantMocks.map((p) => {
+    try {
+      const logs = allLogsMap.get(p.name) || [];
+      const stats = computeParticipantStats(logs, todayJST);
+      const latestLog = logs[0] || null;
+      const hasLogToday = logs.some((l) => l.date === todayJST && l.morningIntent);
 
-        const hasLogToday = logs.some((l) => l.date === todayJST && l.morningIntent);
-        return {
-          id: p.id,
-          token: p.token,
-          name: p.name,
-          department: p.department,
-          dojoPhase: p.dojoPhase,
-          entryDays: stats.entryDays,
-          entryRate: stats.entryRate,
-          streak: stats.streak,
-          fbCount: stats.fbCount,
-          managerId: p.managerId,
-          fbPolicy: p.fbPolicy || "",
-          weekNum: calculateWeekNum(p.startDate || ""),
-          todayHasLog: hasLogToday,
-          latestLog: latestLog
-            ? {
-                date: latestLog.date,
-                morningIntent: latestLog.morningIntent,
-                status: latestLog.status,
-                energy: latestLog.energy,
-              }
-            : null,
-          recentEnergy: logs.slice(0, 7).map((l) => l.energy),
-        };
-      } catch (error) {
-        console.error(`Error fetching data for ${p.name}:`, error);
-        return {
-          id: p.id,
-          token: p.token,
-          name: p.name,
-          department: p.department,
-          dojoPhase: p.dojoPhase,
-          entryDays: 0,
-          entryRate: 0,
-          streak: 0,
-          fbCount: 0,
-          managerId: p.managerId,
-          fbPolicy: p.fbPolicy || "",
-          weekNum: calculateWeekNum(p.startDate || ""),
-          todayHasLog: false,
-          latestLog: null,
-          recentEnergy: [],
-        };
-      }
-    })
-  );
+      return {
+        id: p.id,
+        token: p.token,
+        name: p.name,
+        department: p.department,
+        dojoPhase: p.dojoPhase,
+        entryDays: stats.entryDays,
+        entryRate: stats.entryRate,
+        streak: stats.streak,
+        fbCount: stats.fbCount,
+        managerId: p.managerId,
+        fbPolicy: p.fbPolicy || "",
+        weekNum: calculateWeekNum(p.startDate || ""),
+        todayHasLog: hasLogToday,
+        latestLog: latestLog
+          ? {
+              date: latestLog.date,
+              morningIntent: latestLog.morningIntent,
+              status: latestLog.status,
+              energy: latestLog.energy,
+            }
+          : null,
+        recentEnergy: logs.slice(0, 7).map((l) => l.energy),
+      };
+    } catch (error) {
+      console.error(`Error processing data for ${p.name}:`, error);
+      return {
+        id: p.id,
+        token: p.token,
+        name: p.name,
+        department: p.department,
+        dojoPhase: p.dojoPhase,
+        entryDays: 0,
+        entryRate: 0,
+        streak: 0,
+        fbCount: 0,
+        managerId: p.managerId,
+        fbPolicy: p.fbPolicy || "",
+        weekNum: calculateWeekNum(p.startDate || ""),
+        todayHasLog: false,
+        latestLog: null,
+        recentEnergy: [],
+      };
+    }
+  });
 
-  // Manager data (from registry - no Notion DB for managers)
+  // Build participant lookup map for manager name resolution
+  const participantMap = new Map(enrichedParticipants.map((p) => [p.id, p]));
+
+  // Manager data
   const managerData = managers.map((m) => ({
     id: m.id,
     token: m.token,
@@ -98,10 +106,7 @@ export async function GET(request: NextRequest) {
     role: (m as unknown as { role?: string }).role || (m.isAdmin ? "admin" : "manager"),
     participantIds: m.participantIds,
     participantNames: m.participantIds
-      .map((pid) => {
-        const p = enrichedParticipants.find((ep) => ep.id === pid);
-        return p?.name || pid;
-      })
+      .map((pid) => participantMap.get(pid)?.name || pid)
       .filter(Boolean),
   }));
 
