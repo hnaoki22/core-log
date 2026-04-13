@@ -33,15 +33,17 @@ export function hasMorning(log: NotionLogEntry): boolean {
 /**
  * Check if evening was submitted for a log entry.
  * Evening is considered submitted if eveningInsight has text,
- * OR if status is "complete" (indicating evening form was submitted),
- * OR if energy is recorded (part of evening form).
+ * OR if status is "complete" / "fb_done" (set only by updateEveningEntry / createEveningOnlyEntry).
+ *
+ * NOTE: energy is NOT used here because it is recorded in BOTH
+ * morning and evening forms. Using it would incorrectly flag
+ * morning-only entries as having evening data.
  */
 export function hasEvening(log: NotionLogEntry): boolean {
   return !!(
     log.eveningInsight ||
     log.status === "complete" ||
-    log.status === "fb_done" ||
-    log.energy
+    log.status === "fb_done"
   );
 }
 
