@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { DEFAULT_TENANT_ID, getLogsByParticipant } from "@/lib/supabase";
 import { getAllParticipants, getManagerByToken } from "@/lib/participant-db";
 import { getTodayJST } from "@/lib/date-utils";
+import { hasMorning, hasEvening, isLogSubmitted } from "@/lib/stats";
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
   // 3. Per-participant weekly energy trend (last 4 weeks)
   const participantTrends = allParticipantLogs.map((p) => {
     const weeklyEnergy = getWeeklyEnergyAvg(p.logs, todayJST, 4);
-    const totalEntries = p.logs.filter((l) => l.morningIntent || l.eveningInsight || (l.status && l.status !== "empty") || l.energy).length;
+    const totalEntries = p.logs.filter((l) => isLogSubmitted(l as Parameters<typeof isLogSubmitted>[0])).length;
     const last7 = p.logs.filter((l) => {
       const diff = daysBetween(l.date, todayJST);
       return diff >= 0 && diff < 7;
@@ -133,7 +134,8 @@ function subtractWeeks(dateStr: string, weeks: number): string {
   return formatDate(d);
 }
 
-// Weekly trend: for each of the last N weeks, calculate overall entry rate
+// Weekly trend: for each of the last N weeks, calculate completion rate
+// Uses weighted scoring: both morning+evening = 1.0, partial = 0.5
 function calculateWeeklyTrend(
   participantLogs: {
     name: string;
@@ -146,6 +148,7 @@ function calculateWeeklyTrend(
     weekStart: string;
     weekLabel: string;
     entryRate: number;
+    completionRate: number;
     totalEntries: number;
   }[] = [];
   const currentWeekStart = getWeekStart(today);
@@ -155,18 +158,32 @@ function calculateWeeklyTrend(
     const weekEnd = subtractWeeks(currentWeekStart, w - 1);
 
     let totalPossible = 0;
+    let weightedScore = 0;
     let totalEntries = 0;
 
     for (const p of participantLogs) {
-      // Count business days this participant had entries
-      const weekEntries = p.logs.filter(
-        (l) => l.date >= weekStart && l.date < weekEnd && (l.morningIntent || l.eveningInsight || (l.status && l.status !== "empty") || l.energy)
+      const weekLogs = p.logs.filter(
+        (l) => l.date >= weekStart && l.date < weekEnd && isLogSubmitted(l as Parameters<typeof isLogSubmitted>[0])
       );
-      totalEntries += weekEntries.length;
+      totalEntries += weekLogs.length;
+
+      for (const l of weekLogs) {
+        const m = hasMorning(l as Parameters<typeof hasMorning>[0]);
+        const e = hasEvening(l as Parameters<typeof hasEvening>[0]);
+        if (m && e) {
+          weightedScore += 1.0;
+        } else {
+          weightedScore += 0.5;
+        }
+      }
       totalPossible += 5; // 5 business days per week per participant
     }
 
-    const rate =
+    const completionRate =
+      totalPossible > 0
+        ? Math.round((weightedScore / totalPossible) * 100)
+        : 0;
+    const entryRate =
       totalPossible > 0
         ? Math.round((totalEntries / totalPossible) * 100)
         : 0;
@@ -174,7 +191,7 @@ function calculateWeeklyTrend(
     const ws = new Date(weekStart + "T12:00:00+09:00");
     const weekLabel = `${ws.getUTCMonth() + 1}/${ws.getUTCDate()}〜`;
 
-    result.push({ weekStart, weekLabel, entryRate: rate, totalEntries });
+    result.push({ weekStart, weekLabel, entryRate, completionRate, totalEntries });
   }
 
   return result;

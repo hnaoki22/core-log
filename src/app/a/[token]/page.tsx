@@ -10,6 +10,13 @@ type ParticipantData = {
   name: string;
   department: string;
   dojoPhase: string;
+  // New morning/evening separated stats
+  completeDays: number;
+  morningCount: number;
+  eveningCount: number;
+  completionRate: number;
+  todayStatus: "complete" | "morning_only" | "evening_only" | "none";
+  // Legacy fields
   entryDays: number;
   entryRate: number;
   streak: number;
@@ -486,12 +493,12 @@ export default function AdminDashboard() {
 
   const { participants, managers } = data;
   const isObserver = data.viewerRole === "observer";
-  const totalLogs = participants.reduce((sum, p) => sum + p.entryDays, 0);
-  const avgEntryRate = participants.length > 0
-    ? Math.round(participants.reduce((sum, p) => sum + p.entryRate, 0) / participants.length) : 0;
+  const avgCompletionRate = participants.length > 0
+    ? Math.round(participants.reduce((sum, p) => sum + (p.completionRate ?? p.entryRate), 0) / participants.length) : 0;
   const totalFeedbacks = participants.reduce((sum, p) => sum + p.fbCount, 0);
-  const todayLogCount = participants.filter((p) => p.todayHasLog).length;
-
+  // Today's status breakdown: ◎ complete, △ partial, ー none
+  const todayComplete = participants.filter((p) => p.todayStatus === "complete").length;
+  const todayPartial = participants.filter((p) => p.todayStatus === "morning_only" || p.todayStatus === "evening_only").length;
   const getStatusBadge = (rate: number, streak: number, entryDays: number) => {
     if (entryDays === 0) return { color: "bg-gray-300", label: "未開始" };
     if (streak > 0 && rate >= 80) return { color: "bg-emerald-500", label: "順調" };
@@ -612,19 +619,26 @@ export default function AdminDashboard() {
         )}
 
         {/* Summary Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 mb-5">
-          {[
-            { value: participants.length, label: "参加者", color: "text-[#1A1A2E]" },
-            { value: `${avgEntryRate}%`, label: "平均記入率", color: "text-[#1A1A2E]", highlight: true },
-            { value: todayLogCount, label: "今日の記入", color: "text-[#1A1A2E]" },
-            { value: totalLogs, label: "総ログ数", color: "text-[#1A1A2E]" },
-            { value: totalFeedbacks, label: "FB配信数", color: "text-[#1A1A2E]" },
-          ].map((stat, i) => (
-            <div key={i} className={`${stat.highlight ? "bg-[#F2F2F7] border border-indigo-200" : "card"} p-4 rounded-2xl`}>
-              <div className={`text-2xl font-bold tracking-tight ${stat.color}`}>{stat.value}</div>
-              <div className="text-[10px] text-[#8B8489] font-medium tracking-wide mt-0.5">{stat.label}</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mb-5">
+          <div className="card p-4 rounded-2xl">
+            <div className="text-2xl font-bold tracking-tight text-[#1A1A2E]">{participants.length}</div>
+            <div className="text-[10px] text-[#8B8489] font-medium tracking-wide mt-0.5">参加者</div>
+          </div>
+          <div className="bg-[#F2F2F7] border border-indigo-200 p-4 rounded-2xl">
+            <div className="text-2xl font-bold tracking-tight text-[#1A1A2E]">{avgCompletionRate}%</div>
+            <div className="text-[10px] text-[#8B8489] font-medium tracking-wide mt-0.5">平均完了率</div>
+          </div>
+          <div className="card p-4 rounded-2xl">
+            <div className="flex items-baseline gap-2">
+              <span className="text-lg font-bold text-emerald-600">◎{todayComplete}</span>
+              <span className="text-lg font-bold text-amber-500">△{todayPartial}</span>
             </div>
-          ))}
+            <div className="text-[10px] text-[#8B8489] font-medium tracking-wide mt-0.5">今日の記入</div>
+          </div>
+          <div className="card p-4 rounded-2xl">
+            <div className="text-2xl font-bold tracking-tight text-[#1A1A2E]">{totalFeedbacks}</div>
+            <div className="text-[10px] text-[#8B8489] font-medium tracking-wide mt-0.5">FB配信数</div>
+          </div>
         </div>
 
         {showAnalytics && (
@@ -643,7 +657,7 @@ export default function AdminDashboard() {
               <div className="p-5 space-y-6">
                 {/* Weekly Entry Rate Trend - Bar Chart */}
                 <div>
-                  <h3 className="text-xs font-semibold text-[#5B5560] mb-3">週次記入率トレンド</h3>
+                  <h3 className="text-xs font-semibold text-[#5B5560] mb-3">週次完了率トレンド</h3>
                   <div className="flex items-end gap-1.5 h-32">
                     {analyticsData.weeklyTrend.map((w, i) => (
                       <div key={i} className="flex-1 flex flex-col items-center gap-1">
@@ -748,7 +762,12 @@ export default function AdminDashboard() {
           </div>
           <div className="divide-y divide-[#EFE8DD]">
             {participants.map((p) => {
-              const status = getStatusBadge(p.entryRate, p.streak, p.entryDays);
+              const cRate = p.completionRate ?? p.entryRate;
+              const status = getStatusBadge(cRate, p.streak, p.entryDays);
+              const todayIcon = p.todayStatus === "complete" ? "◎"
+                : (p.todayStatus === "morning_only" || p.todayStatus === "evening_only") ? "△" : "";
+              const todayColor = p.todayStatus === "complete" ? "text-emerald-600"
+                : (p.todayStatus === "morning_only" || p.todayStatus === "evening_only") ? "text-amber-500" : "";
               return (
                 <div key={p.id} className="p-4 hover:bg-[#FBF8F4] transition-colors">
                   <div className="flex items-start justify-between">
@@ -760,16 +779,16 @@ export default function AdminDashboard() {
                           className="font-medium text-sm text-[#1A1A2E] hover:text-amber-700 hover:underline underline-offset-2 transition-colors"
                         >{p.name}</a>
                         <span className="text-[10px] font-medium bg-indigo-50 text-[#1A1A2E] px-1.5 py-0.5 rounded-md">{p.dojoPhase}</span>
-                        {p.todayHasLog && (
-                          <span className="bg-[#1A1A2E] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">NEW</span>
+                        {todayIcon && (
+                          <span className={`text-sm font-bold ${todayColor}`}>{todayIcon}</span>
                         )}
                       </div>
                       <p className="text-[11px] text-[#8B8489] mb-1.5 ml-4">{p.department}</p>
                       <div className="flex gap-4 text-xs text-[#8B8489] ml-4">
-                        <span>記入率: <strong className="text-[#1A1A2E]">{p.entryRate}%</strong></span>
+                        <span>完了率: <strong className="text-[#1A1A2E]">{cRate}%</strong></span>
                         <span>連続: <strong className="text-[#1A1A2E]">{p.streak}日</strong></span>
+                        <span className="text-[#A09898]">朝<strong className="text-[#1A1A2E]">{p.morningCount ?? "?"}</strong> 夕<strong className="text-[#1A1A2E]">{p.eveningCount ?? "?"}</strong></span>
                         <span>FB: <strong className="text-[#1A1A2E]">{p.fbCount}回</strong></span>
-                        <span>記入: <strong className="text-[#1A1A2E]">{p.entryDays}日</strong></span>
                       </div>
                       {p.latestLog && p.latestLog.morningIntent && (
                         <div className="mt-2 ml-4 text-xs text-[#5B5560] bg-[#F5F0EB] rounded-xl p-2 border border-[#EFE8DD]">

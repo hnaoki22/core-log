@@ -8,7 +8,7 @@ import {
   getAllManagers,
   getManagerByToken,
 } from "@/lib/participant-db";
-import { computeParticipantStats, isLogSubmitted } from "@/lib/stats";
+import { computeParticipantStats } from "@/lib/stats";
 import { getTodayJST, calculateWeekNum } from "@/lib/date-utils";
 
 export const dynamic = "force-dynamic";
@@ -61,7 +61,6 @@ export async function GET(request: NextRequest) {
       const logs = allLogsMap.get(p.name) || [];
       const stats = computeParticipantStats(logs, todayJST);
       const latestLog = logs[0] || null;
-      const hasLogToday = logs.some((l) => l.date === todayJST && isLogSubmitted(l));
 
       return {
         id: p.id,
@@ -69,14 +68,21 @@ export async function GET(request: NextRequest) {
         name: p.name,
         department: p.department,
         dojoPhase: p.dojoPhase,
+        // New morning/evening separated stats
+        completeDays: stats.completeDays,
+        morningCount: stats.morningCount,
+        eveningCount: stats.eveningCount,
+        completionRate: stats.completionRate,
+        todayStatus: stats.todayStatus,
+        // Legacy fields (kept for backward compat)
         entryDays: stats.entryDays,
-        entryRate: stats.entryRate,
+        entryRate: stats.completionRate, // now uses completion rate
         streak: stats.streak,
         fbCount: stats.fbCount,
         managerId: p.managerId,
         fbPolicy: p.fbPolicy || "",
         weekNum: calculateWeekNum(p.startDate || ""),
-        todayHasLog: hasLogToday,
+        todayHasLog: stats.todayStatus !== "none",
         latestLog: latestLog
           ? {
               date: latestLog.date,
@@ -95,6 +101,11 @@ export async function GET(request: NextRequest) {
         name: p.name,
         department: p.department,
         dojoPhase: p.dojoPhase,
+        completeDays: 0,
+        morningCount: 0,
+        eveningCount: 0,
+        completionRate: 0,
+        todayStatus: "none" as const,
         entryDays: 0,
         entryRate: 0,
         streak: 0,

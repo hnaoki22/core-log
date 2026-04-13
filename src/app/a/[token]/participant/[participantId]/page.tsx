@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getLogsByParticipant, getMissionsByParticipant, getParticipantByNameCrossTenant, NotionLogEntry, DEFAULT_TENANT_ID } from "@/lib/supabase";
 import { getManagerByToken } from "@/lib/participant-db";
 import { formatTimeJST, formatFullDateTimeJST } from "@/lib/date-utils";
+import { hasMorning, hasEvening, getDayStatus, computeParticipantStats } from "@/lib/stats";
 
 type Params = {
   params: {
@@ -63,10 +64,11 @@ export default async function AdminParticipantPage({ params }: Params) {
 
   const formatTime = formatTimeJST;
 
-  // Stats
-  const totalLogs = logs.length;
-  const logsWithMorning = logs.filter((l) => l.morningIntent).length;
-  const logsWithEvening = logs.filter((l) => l.eveningInsight).length;
+  // Stats — use the same completion logic as the dashboard
+  const todayJST = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" });
+  const stats = computeParticipantStats(logs, todayJST);
+  const logsWithMorning = logs.filter((l) => hasMorning(l)).length;
+  const logsWithEvening = logs.filter((l) => hasEvening(l)).length;
 
   return (
     <div className="min-h-screen bg-[#F5F0EB]">
@@ -104,18 +106,22 @@ export default async function AdminParticipantPage({ params }: Params) {
               サマリー
             </h2>
           </div>
-          <div className="grid grid-cols-3 divide-x divide-[#EFE8DD]">
+          <div className="grid grid-cols-4 divide-x divide-[#EFE8DD]">
             <div className="p-4 text-center">
-              <div className="text-2xl font-bold text-[#1A1A2E]">{totalLogs}</div>
-              <div className="text-[10px] text-[#8B8489] mt-1">総ログ数</div>
+              <div className="text-2xl font-bold text-[#1A1A2E]">{stats.completeDays}</div>
+              <div className="text-[10px] text-[#8B8489] mt-1">完了日数</div>
             </div>
             <div className="p-4 text-center">
               <div className="text-2xl font-bold text-[#1A1A2E]">{logsWithMorning}</div>
-              <div className="text-[10px] text-[#8B8489] mt-1">朝の記入</div>
+              <div className="text-[10px] text-[#8B8489] mt-1">朝</div>
             </div>
             <div className="p-4 text-center">
               <div className="text-2xl font-bold text-[#1A1A2E]">{logsWithEvening}</div>
-              <div className="text-[10px] text-[#8B8489] mt-1">夕の記入</div>
+              <div className="text-[10px] text-[#8B8489] mt-1">夕</div>
+            </div>
+            <div className="p-4 text-center">
+              <div className="text-2xl font-bold text-[#1A1A2E]">{stats.completionRate}%</div>
+              <div className="text-[10px] text-[#8B8489] mt-1">完了率</div>
             </div>
           </div>
         </section>
@@ -163,11 +169,16 @@ export default async function AdminParticipantPage({ params }: Params) {
             </div>
           ) : (
             <div className="divide-y divide-[#EFE8DD]">
-              {logs.map((entry: NotionLogEntry) => (
+              {logs.map((entry: NotionLogEntry) => {
+                const dayStatus = getDayStatus(entry);
+                const statusIcon = dayStatus === "complete" ? "◎" : (dayStatus === "morning_only" || dayStatus === "evening_only") ? "△" : "ー";
+                const statusColor = dayStatus === "complete" ? "text-emerald-500" : (dayStatus === "morning_only" || dayStatus === "evening_only") ? "text-amber-500" : "text-gray-300";
+                return (
                 <div key={entry.id} className="p-4">
                   {/* Date & Energy */}
                   <div className="flex justify-between items-center mb-2.5">
-                    <span className="text-sm font-medium text-[#1A1A2E]">
+                    <span className="text-sm font-medium text-[#1A1A2E] flex items-center gap-1.5">
+                      <span className={`text-base font-bold ${statusColor}`}>{statusIcon}</span>
                       {entry.datetime
                         ? formatFullDateTimeJST(entry.datetime)
                         : entry.date}
@@ -247,7 +258,8 @@ export default async function AdminParticipantPage({ params }: Params) {
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>

@@ -7,7 +7,7 @@ import {
   getManagerByToken,
   getParticipantsForManager,
 } from "@/lib/participant-db";
-import { computeParticipantStats, isLogSubmitted } from "@/lib/stats";
+import { computeParticipantStats } from "@/lib/stats";
 import { getTodayJST } from "@/lib/date-utils";
 
 export async function GET(request: NextRequest) {
@@ -37,17 +37,21 @@ export async function GET(request: NextRequest) {
       const logs = allLogsMap.get(p.name) || [];
       const stats = computeParticipantStats(logs, todayJST);
       const latestLog = logs[0] || null;
-      const hasLogToday = logs.some((l) => l.date === todayJST && isLogSubmitted(l));
 
       return {
         name: p.name,
         department: p.department,
         dojoPhase: p.dojoPhase,
+        completeDays: stats.completeDays,
+        morningCount: stats.morningCount,
+        eveningCount: stats.eveningCount,
+        completionRate: stats.completionRate,
+        todayStatus: stats.todayStatus,
         entryDays: stats.entryDays,
-        entryRate: stats.entryRate,
+        entryRate: stats.completionRate,
         streak: stats.streak,
         fbCount: stats.fbCount,
-        todayHasLog: hasLogToday,
+        todayHasLog: stats.todayStatus !== "none",
         latestLog: latestLog
           ? {
               date: latestLog.date,
@@ -64,6 +68,11 @@ export async function GET(request: NextRequest) {
         name: p.name,
         department: p.department,
         dojoPhase: p.dojoPhase,
+        completeDays: 0,
+        morningCount: 0,
+        eveningCount: 0,
+        completionRate: 0,
+        todayStatus: "none" as const,
         entryDays: 0,
         entryRate: 0,
         streak: 0,
