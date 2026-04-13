@@ -515,6 +515,22 @@ export async function getParticipantByNameFromSupabase(
   return rowToParticipant(data);
 }
 
+// Cross-tenant: find participant by name without tenant filter (for admin views)
+export async function getParticipantByNameCrossTenant(
+  name: string
+): Promise<(NotionParticipant & { tenantId: string }) | null> {
+  const { data, error } = await getClient()
+    .from("participants")
+    .select("*")
+    .eq("name", name)
+    .maybeSingle();
+  if (error) {
+    logger.error("Cross-tenant participant lookup failed", { error: error.message, name });
+  }
+  if (!data) return null;
+  return { ...rowToParticipant(data), tenantId: data.tenant_id };
+}
+
 export async function getParticipantByEmailFromSupabase(
   email: string,
   tenantId: string

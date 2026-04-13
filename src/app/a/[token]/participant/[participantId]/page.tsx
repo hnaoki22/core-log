@@ -2,7 +2,7 @@
 // Shows full log history for a single participant (read-only from admin perspective)
 
 import Link from "next/link";
-import { getLogsByParticipant, getMissionsByParticipant, NotionLogEntry, DEFAULT_TENANT_ID } from "@/lib/supabase";
+import { getLogsByParticipant, getMissionsByParticipant, getParticipantByNameCrossTenant, NotionLogEntry, DEFAULT_TENANT_ID } from "@/lib/supabase";
 import { getManagerByToken } from "@/lib/participant-db";
 
 type Params = {
@@ -35,9 +35,20 @@ export default async function AdminParticipantPage({ params }: Params) {
   let missions: any[] = [];
 
   try {
-    // Fetch manager to get tenantId
-    const manager = await getManagerByToken(token);
-    const tenantId = manager?.tenantId || DEFAULT_TENANT_ID;
+    // Admin views participants across tenants, so we must resolve
+    // the participant's own tenantId — not the admin's tenantId.
+    // First try cross-tenant lookup by participant name.
+    const participant = await getParticipantByNameCrossTenant(participantName);
+    let tenantId: string;
+
+    if (participant?.tenantId) {
+      // Use the participant's actual tenant
+      tenantId = participant.tenantId;
+    } else {
+      // Fallback: use the admin/manager's tenant
+      const manager = await getManagerByToken(token);
+      tenantId = manager?.tenantId || DEFAULT_TENANT_ID;
+    }
 
     const [fetchedLogs, fetchedMissions] = await Promise.all([
       getLogsByParticipant(participantName, tenantId),
