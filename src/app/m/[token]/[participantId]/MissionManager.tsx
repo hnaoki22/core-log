@@ -46,6 +46,17 @@ export default function MissionManager({ token, participantName, initialMissions
   const [commentText, setCommentText] = useState<Record<string, string>>({});
   const [sendingComment, setSendingComment] = useState<Record<string, boolean>>({});
 
+  // Edit mission state
+  const [editingMission, setEditingMission] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editPurpose, setEditPurpose] = useState("");
+  const [editDeadline, setEditDeadline] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Edit comment state
+  const [editingComment, setEditingComment] = useState<string | null>(null);
+  const [editCommentText, setEditCommentText] = useState("");
+
   // Close/reopen state
   const [closingMission, setClosingMission] = useState<string | null>(null);
   const [closeReview, setCloseReview] = useState("");
@@ -90,7 +101,7 @@ export default function MissionManager({ token, participantName, initialMissions
 
       if (res.ok) {
         // Refresh missions
-        const refreshRes = await fetch(`/api/mission?participantName=${encodeURIComponent(participantName)}`);
+        const refreshRes = await fetch(`/api/mission?participantName=${encodeURIComponent(participantName)}&token=${encodeURIComponent(token)}`);
         if (refreshRes.ok) {
           const data = await refreshRes.json();
           setMissions(data.missions);
@@ -158,6 +169,77 @@ export default function MissionManager({ token, participantName, initialMissions
       // silently fail
     } finally {
       setSendingComment((prev) => ({ ...prev, [missionId]: false }));
+    }
+  };
+
+  const startEditing = (mission: Mission) => {
+    setEditingMission(mission.id);
+    setEditTitle(mission.title);
+    setEditPurpose(mission.purpose || "");
+    setEditDeadline(mission.deadline || "");
+  };
+
+  const handleEditMission = async (missionId: string) => {
+    if (!editTitle.trim()) return;
+    setSavingEdit(true);
+    try {
+      const res = await fetch("/api/mission", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token,
+          missionId,
+          title: editTitle.trim(),
+          purpose: editPurpose.trim(),
+          deadline: editDeadline,
+        }),
+      });
+      if (res.ok) {
+        setMissions((prev) =>
+          prev.map((m) =>
+            m.id === missionId
+              ? { ...m, title: editTitle.trim(), purpose: editPurpose.trim(), deadline: editDeadline }
+              : m
+          )
+        );
+        setEditingMission(null);
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleEditComment = async (missionId: string, commentId: string, newBody: string) => {
+    try {
+      const res = await fetch("/api/mission/comments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, commentId, body: newBody }),
+      });
+      if (res.ok) {
+        await fetchComments(missionId);
+        setEditingComment(null);
+      }
+    } catch {
+      // silently fail
+    }
+  };
+
+  const handleDeleteComment = async (missionId: string, commentId: string) => {
+    if (!confirm("このコメントを削除しますか？")) return;
+    try {
+      const res = await fetch("/api/mission/comments", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, commentId }),
+      });
+      if (res.ok) {
+        await fetchComments(missionId);
+      }
+    } catch {
+      // silently fail
     }
   };
 
@@ -306,6 +388,62 @@ export default function MissionManager({ token, participantName, initialMissions
                     </div>
                   )}
 
+                  {/* Edit Mission Button */}
+                  {editingMission !== mission.id ? (
+                    <button
+                      onClick={() => startEditing(mission)}
+                      className="text-xs text-blue-600 hover:text-blue-700 underline"
+                    >
+                      編集
+                    </button>
+                  ) : (
+                    <div className="bg-[#F5F0EB] p-3 rounded-lg space-y-3">
+                      <h3 className="text-sm font-semibold text-[#1A1A2E]">ミッションを編集</h3>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">ミッション名 *</label>
+                        <input
+                          type="text"
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          className="w-full text-sm border border-gray-200 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-[#1A1A2E] bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">背景・目的</label>
+                        <textarea
+                          value={editPurpose}
+                          onChange={(e) => setEditPurpose(e.target.value)}
+                          className="w-full text-sm border border-gray-200 rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#1A1A2E] bg-white"
+                          rows={3}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">達成期限</label>
+                        <input
+                          type="date"
+                          value={editDeadline}
+                          onChange={(e) => setEditDeadline(e.target.value)}
+                          className="text-sm border border-gray-200 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-[#1A1A2E] bg-white"
+                        />
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => setEditingMission(null)}
+                          className="text-xs text-gray-500 hover:text-gray-700 px-3 py-1.5"
+                        >
+                          キャンセル
+                        </button>
+                        <button
+                          onClick={() => handleEditMission(mission.id)}
+                          disabled={savingEdit || !editTitle.trim()}
+                          className="text-xs bg-[#1A1A2E] text-white rounded-lg px-4 py-1.5 hover:bg-[#141423] disabled:opacity-50"
+                        >
+                          {savingEdit ? "保存中..." : "保存"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Close/Reopen Actions */}
                   <div className="flex gap-2">
                     {mission.status !== "完了" && mission.status !== "completed" ? (
@@ -355,12 +493,12 @@ export default function MissionManager({ token, participantName, initialMissions
 
                   {/* Comments / Chat */}
                   <div className="border-t border-gray-100 pt-3">
-                    <h4 className="text-xs font-semibold text-gray-400 mb-2">💬 コメント</h4>
+                    <h4 className="text-xs font-semibold text-gray-400 mb-2">\ud83d\udcac コメント</h4>
 
                     {isLoadingComments ? (
-                      <div className="text-xs text-gray-400 text-center py-2">読み込み中...</div>
+                      <div className="text-xs text-gray-400 text-center py-2">\u8aad\u307f\u8fbc\u307f\u4e2d...</div>
                     ) : missionComments.length === 0 ? (
-                      <div className="text-xs text-gray-300 text-center py-2">まだコメントはありません</div>
+                      <div className="text-xs text-gray-300 text-center py-2">\u307e\u3060\u30b3\u30e1\u30f3\u30c8\u306f\u3042\u308a\u307e\u305b\u3093</div>
                     ) : (
                       <div className="space-y-2 max-h-60 overflow-y-auto mb-3">
                         {missionComments.map((c) => (
@@ -374,11 +512,61 @@ export default function MissionManager({ token, participantName, initialMissions
                           >
                             <div className="flex items-center gap-1 mb-1">
                               <span className={`font-semibold ${c.authorRole === "manager" ? "text-blue-700" : "text-[#1A1A2E]"}`}>
-                                {c.authorRole === "manager" ? "👔" : "👤"} {c.authorName}
+                                {c.authorRole === "manager" ? "\ud83d\udc54" : "\ud83d\udc64"} {c.authorName}
                               </span>
                               <span className="text-gray-300 text-[10px]">{formatCommentTime(c.createdAt)}</span>
+                              {c.authorRole === "manager" && (
+                                <div className="flex gap-1 ml-auto">
+                                  <button
+                                    onClick={() => {
+                                      setEditingComment(c.id);
+                                      setEditCommentText(c.body);
+                                    }}
+                                    className="text-gray-400 hover:text-blue-600 text-[10px]"
+                                  >
+                                    編集
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteComment(mission.id, c.id)}
+                                    className="text-gray-400 hover:text-red-600 text-[10px]"
+                                  >
+                                    削除
+                                  </button>
+                                </div>
+                              )}
                             </div>
-                            <p className="text-gray-700">{c.body}</p>
+                            {editingComment === c.id ? (
+                              <div className="space-y-1">
+                                <textarea
+                                  value={editCommentText}
+                                  onChange={(e) => setEditCommentText(e.target.value)}
+                                  className="w-full text-xs border border-gray-200 rounded-lg p-1.5 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                                  rows={2}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                                      e.preventDefault();
+                                      handleEditComment(mission.id, c.id, editCommentText);
+                                    }
+                                  }}
+                                />
+                                <div className="flex gap-1 justify-end">
+                                  <button
+                                    onClick={() => setEditingComment(null)}
+                                    className="text-xs text-gray-500 px-2 py-0.5"
+                                  >
+                                    キャンセル
+                                  </button>
+                                  <button
+                                    onClick={() => handleEditComment(mission.id, c.id, editCommentText)}
+                                    className="text-xs bg-blue-600 text-white rounded px-2 py-0.5 hover:bg-blue-700"
+                                  >
+                                    保存
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-gray-700">{c.body}</p>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -393,7 +581,7 @@ export default function MissionManager({ token, participantName, initialMissions
                         placeholder="コメントを入力..."
                         className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1A1A2E] bg-white"
                         onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
+                          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                             e.preventDefault();
                             handleSendComment(mission.id);
                           }
