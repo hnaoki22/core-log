@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   createMission,
   updateMissionStatus,
+  updateMissionFields,
   getMissionsByParticipant,
   DEFAULT_TENANT_ID,
 } from "@/lib/supabase";
@@ -16,13 +17,27 @@ import { sanitizeInput } from "@/lib/sanitize";
 
 export async function GET(request: NextRequest) {
   const participantName = request.nextUrl.searchParams.get("participantName");
+  const token = request.nextUrl.searchParams.get("token");
 
   if (!participantName) {
     return NextResponse.json({ error: "participantName required" }, { status: 400 });
   }
 
   try {
-    const tenantId = DEFAULT_TENANT_ID;
+    // Resolve tenant dynamically from token (manager or participant)
+    let tenantId = DEFAULT_TENANT_ID;
+    if (token) {
+      const manager = await getManagerByToken(token);
+      if (manager?.tenantId) {
+        tenantId = manager.tenantId;
+      } else {
+        const participant = await getParticipantByToken(token);
+        if (participant?.tenantId) {
+          tenantId = participant.tenantId;
+        }
+      }
+    }
+
     const missions = await getMissionsByParticipant(participantName, tenantId);
     return NextResponse.json({ missions });
   } catch (error) {
@@ -65,14 +80,14 @@ export async function POST(request: NextRequest) {
     const participantId = targetParticipantObj?.id || "";
 
     const setDate = getTodayJST();
-    const createdBy = manager ? "上司設定" : "自己設定";
+    const createdBy = manager ? "ä¸å¸è¨­å®" : "èªå·±è¨­å®";
     const missionId = await createMission(
       effectiveName,
       sanitizedTitle,
       sanitizedPurpose,
       deadline || "",
       setDate,
-      createdBy as "上司設定" | "自己設定",
+      createdBy as "ä¸å¸è¨­å®" | "èªå·±è¨­å®",
       tenantId,
       participantId
     );
@@ -84,8 +99,8 @@ export async function POST(request: NextRequest) {
     // Notify about new mission (non-blocking)
     try {
       if (manager) {
-        // Manager created → notify participant
-        const targetParticipant = await getParticipantByName(effectiveName);
+        // Manager created â notify participant
+        const targetParticipant = await getParticipantByName(effectiveName, tenantId);
         if (targetParticipant?.email && !targetParticipant.email.includes("example.com")) {
           sendNotificationEmail({
             to: targetParticipant.email,
@@ -97,7 +112,7 @@ export async function POST(request: NextRequest) {
           }).catch(console.error);
         }
       }
-      // Participant created → no notification needed for now
+      // Participant created â no notification needed for now
     } catch (notifyError) {
       console.error("Mission notification error (non-critical):", notifyError);
     }
@@ -112,11 +127,11 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { token, missionId, status, finalReview } = body;
+    const { token, missionId, status, finalReview, title, purpose, deadline } = body;
 
-    if (!token || !missionId || !status) {
+    if (!token || !missionId) {
       return NextResponse.json(
-        { error: "token, missionId, status required" },
+        { error: "token, missionId required" },
         { status: 400 }
       );
     }
@@ -126,6 +141,26 @@ export async function PATCH(request: NextRequest) {
     const participant = !manager ? await getParticipantByToken(token) : null;
     if (!manager && !participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
+    // Field edit (title/purpose/deadline)
+    if (title !== undefined) {
+      const sanitizedTitle = sanitizeInput(title);
+      const sanitizedPurpose = purpose !== undefined ? sanitizeInput(purpose) : undefined;
+      const success = await updateMissionFields(missionId, {
+        title: sanitizedTitle,
+        purpose: sanitizedPurpose,
+        deadline,
+      });
+      if (!success) {
+        return NextResponse.json({ error: "Failed to update mission" }, { status: 500 });
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    // Status change
+    if (!status) {
+      return NextResponse.json({ error: "status or title required" }, { status: 400 });
     }
 
     const success = await updateMissionStatus(missionId, status, finalReview);
