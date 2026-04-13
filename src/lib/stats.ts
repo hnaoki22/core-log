@@ -17,8 +17,8 @@ export function computeParticipantStats(
   logs: NotionLogEntry[],
   todayJST: string
 ): ParticipantStats {
-  // Entry days: count logs with morning intent
-  const entryLogs = logs.filter((l) => l.morningIntent);
+  // Entry days: count logs with morning intent OR evening insight
+  const entryLogs = logs.filter((l) => l.morningIntent || l.eveningInsight);
   const entryDays = entryLogs.length;
 
   // FB count: logs with HM feedback
