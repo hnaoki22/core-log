@@ -71,6 +71,10 @@ export async function middleware(request: NextRequest) {
       // Check if session is valid (async — uses Web Crypto API for HMAC)
       const sessionValid = await isSessionValid(token, cookieHeader);
       if (!sessionValid) {
+        // Log for debugging session issues (cookie absent vs invalid)
+        const cookieName = getSessionCookieName(token);
+        const hasCookie = cookieHeader?.includes(cookieName) ?? false;
+        console.warn(`[OTP] Session invalid for token=${token.slice(0, 6)}... hasCookie=${hasCookie} referer=${request.headers.get("referer") || "none"}`);
         // Redirect to verification page
         const verifyUrl = new URL(`/verify/${token}`, request.url);
         return NextResponse.redirect(verifyUrl);
@@ -101,7 +105,7 @@ export async function middleware(request: NextRequest) {
           value: cookieValue,
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          sameSite: "strict",
+          sameSite: "lax",
           maxAge: SESSION_MAX_AGE,
           path: "/",
         });

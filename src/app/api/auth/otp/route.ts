@@ -208,7 +208,7 @@ async function handleVerifyOTP(token: string, code: string): Promise<NextRespons
     value: signedValue,
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: "lax",
     maxAge: SESSION_MAX_AGE, // 30 days (sliding — renewed on each visit via middleware)
     path: "/",
   });
