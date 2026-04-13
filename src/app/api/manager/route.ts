@@ -7,7 +7,7 @@ import {
   getManagerByToken,
   getParticipantsForManager,
 } from "@/lib/participant-db";
-import { computeParticipantStats } from "@/lib/stats";
+import { computeParticipantStats, isLogSubmitted } from "@/lib/stats";
 import { getTodayJST } from "@/lib/date-utils";
 
 export async function GET(request: NextRequest) {
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       const logs = allLogsMap.get(p.name) || [];
       const stats = computeParticipantStats(logs, todayJST);
       const latestLog = logs[0] || null;
-      const hasLogToday = logs.some((l) => l.date === todayJST && (l.morningIntent || l.eveningInsight));
+      const hasLogToday = logs.some((l) => l.date === todayJST && isLogSubmitted(l));
 
       return {
         name: p.name,

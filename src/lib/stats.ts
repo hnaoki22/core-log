@@ -11,14 +11,28 @@ export type ParticipantStats = {
 };
 
 /**
+ * Determine if a log entry counts as "submitted" by the participant.
+ * A log is submitted if it has text content (morning/evening) OR
+ * a non-empty status (indicating the participant interacted with the form).
+ */
+export function isLogSubmitted(log: NotionLogEntry): boolean {
+  return !!(
+    log.morningIntent ||
+    log.eveningInsight ||
+    (log.status && log.status !== "empty") ||
+    log.energy
+  );
+}
+
+/**
  * Compute participant statistics from Notion log entries
  */
 export function computeParticipantStats(
   logs: NotionLogEntry[],
   todayJST: string
 ): ParticipantStats {
-  // Entry days: count logs with morning intent OR evening insight
-  const entryLogs = logs.filter((l) => l.morningIntent || l.eveningInsight);
+  // Entry days: count logs where participant actually submitted something
+  const entryLogs = logs.filter(isLogSubmitted);
   const entryDays = entryLogs.length;
 
   // FB count: logs with HM feedback

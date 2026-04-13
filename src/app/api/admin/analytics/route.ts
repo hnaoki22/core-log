@@ -26,6 +26,8 @@ export async function GET(request: NextRequest) {
       date: string;
       energy: string | null;
       morningIntent: string;
+      eveningInsight: string | null;
+      status: string;
       managerComment: string | null;
       hmFeedback: string | null;
     }[];
@@ -40,6 +42,8 @@ export async function GET(request: NextRequest) {
           date: l.date,
           energy: l.energy,
           morningIntent: l.morningIntent,
+          eveningInsight: l.eveningInsight,
+          status: l.status,
           managerComment: l.managerComment,
           hmFeedback: l.hmFeedback,
         })),
@@ -65,7 +69,7 @@ export async function GET(request: NextRequest) {
   // 3. Per-participant weekly energy trend (last 4 weeks)
   const participantTrends = allParticipantLogs.map((p) => {
     const weeklyEnergy = getWeeklyEnergyAvg(p.logs, todayJST, 4);
-    const totalEntries = p.logs.filter((l) => l.morningIntent).length;
+    const totalEntries = p.logs.filter((l) => l.morningIntent || l.eveningInsight || (l.status && l.status !== "empty") || l.energy).length;
     const last7 = p.logs.filter((l) => {
       const diff = daysBetween(l.date, todayJST);
       return diff >= 0 && diff < 7;
@@ -133,7 +137,7 @@ function subtractWeeks(dateStr: string, weeks: number): string {
 function calculateWeeklyTrend(
   participantLogs: {
     name: string;
-    logs: { date: string; morningIntent: string }[];
+    logs: { date: string; morningIntent: string; eveningInsight: string | null; status: string; energy: string | null }[];
   }[],
   today: string,
   weeks: number
@@ -156,7 +160,7 @@ function calculateWeeklyTrend(
     for (const p of participantLogs) {
       // Count business days this participant had entries
       const weekEntries = p.logs.filter(
-        (l) => l.date >= weekStart && l.date < weekEnd && l.morningIntent
+        (l) => l.date >= weekStart && l.date < weekEnd && (l.morningIntent || l.eveningInsight || (l.status && l.status !== "empty") || l.energy)
       );
       totalEntries += weekEntries.length;
       totalPossible += 5; // 5 business days per week per participant
