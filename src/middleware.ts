@@ -1,4 +1,4 @@
-/**
+/const pathname**
  * Next.js Middleware
  * - Adds security headers to all responses
  * - Logs API requests with structured JSON
@@ -48,6 +48,26 @@ function logApiRequest(
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+
+    // ===== Domain Redirect =====
+    // vercel.appドメインからカスタムドメインへ308永久リダイレクト
+    // ただしVercel Cronからのリクエスト（/api/cron/*）はリダイレクトしない
+    const host = request.headers.get("host") || "";
+    const customDomain = process.env.NEXT_PUBLIC_APP_URL
+      ? new URL(process.env.NEXT_PUBLIC_APP_URL).host
+          : null;
+
+    if (
+          customDomain &&
+          host.includes("vercel.app") &&
+          !pathname.startsWith("/api/cron/")
+        ) {
+          const redirectUrl = new URL(request.url);
+          redirectUrl.host = customDomain;
+          redirectUrl.protocol = "https:";
+          redirectUrl.port = "";
+          return NextResponse.redirect(redirectUrl, 308);
+    }
 
   // OTP session verification for protected routes
   // Check feature flag from admin dashboard (Supabase ai_settings)
