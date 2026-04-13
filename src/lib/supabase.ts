@@ -955,6 +955,45 @@ export async function addMissionComment(
   return !error;
 }
 
+export async function updateMissionComment(
+  commentId: string,
+  newBody: string
+): Promise<boolean> {
+  const { error, data } = await getClient()
+    .from("mission_comments")
+    .update({ body: newBody })
+    .eq("id", commentId)
+    .select("id");
+  if (error) {
+    logger.error("Mission comment update failed", { error: error.message, commentId });
+    return false;
+  }
+  if (!data || data.length === 0) {
+    logger.warn("Mission comment update matched 0 rows", { commentId });
+    return false;
+  }
+  return true;
+}
+
+export async function deleteMissionComment(
+  commentId: string
+): Promise<boolean> {
+  const { error, data } = await getClient()
+    .from("mission_comments")
+    .delete()
+    .eq("id", commentId)
+    .select("id");
+  if (error) {
+    logger.error("Mission comment delete failed", { error: error.message, commentId });
+    return false;
+  }
+  if (!data || data.length === 0) {
+    logger.warn("Mission comment delete matched 0 rows", { commentId });
+    return false;
+  }
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // FEEDBACK QUERIES
 // ---------------------------------------------------------------------------
