@@ -1,4 +1,4 @@
-/const pathname**
+/**
  * Next.js Middleware
  * - Adds security headers to all responses
  * - Logs API requests with structured JSON
