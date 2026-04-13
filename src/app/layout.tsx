@@ -9,7 +9,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "CORE Log - リーダーシップ開発",
+  title: "CORE Log",
   description: "CORE Log - 日々の気づきを記録し、成長を加速させる",
   icons: {
     icon: "/favicon.ico",
