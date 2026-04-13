@@ -920,8 +920,8 @@ export async function updateMissionFields(
   const update: Record<string, unknown> = {};
   if (fields.title !== undefined) update.title = fields.title;
   if (fields.purpose !== undefined) update.purpose = fields.purpose;
-  if (fields.deadline !== undefined) update.deadline = fields.deadline;
-  if (Object.keys(update).length === 0) return true;
+  if (fields.deadline !== undefined) update.deadline = fields.deadline || null;
+  if (Object.keys(update).length === 0) return false;
   const { error, data: updated } = await getClient()
     .from("missions")
     .update(update)
@@ -933,6 +933,36 @@ export async function updateMissionFields(
   }
   if (!updated || updated.length === 0) {
     logger.warn("Mission field update matched 0 rows", { missionId });
+    return false;
+  }
+  return true;
+}
+
+export async function updateMissionComment(
+  commentId: string,
+  newBody: string
+): Promise<boolean> {
+  const { error, data: updated } = await getClient()
+    .from("mission_comments")
+    .update({ body: newBody })
+    .eq("id", commentId)
+    .select("id");
+  if (error) {
+    logger.error("Comment update failed", { error: error.message, commentId });
+    return false;
+  }
+  return !!(updated && updated.length > 0);
+}
+
+export async function deleteMissionComment(
+  commentId: string
+): Promise<boolean> {
+  const { error } = await getClient()
+    .from("mission_comments")
+    .delete()
+    .eq("id", commentId);
+  if (error) {
+    logger.error("Comment delete failed", { error: error.message, commentId });
     return false;
   }
   return true;
@@ -953,45 +983,6 @@ export async function addMissionComment(
       body: commentText,
     });
   return !error;
-}
-
-export async function updateMissionComment(
-  commentId: string,
-  newBody: string
-): Promise<boolean> {
-  const { error, data } = await getClient()
-    .from("mission_comments")
-    .update({ body: newBody })
-    .eq("id", commentId)
-    .select("id");
-  if (error) {
-    logger.error("Mission comment update failed", { error: error.message, commentId });
-    return false;
-  }
-  if (!data || data.length === 0) {
-    logger.warn("Mission comment update matched 0 rows", { commentId });
-    return false;
-  }
-  return true;
-}
-
-export async function deleteMissionComment(
-  commentId: string
-): Promise<boolean> {
-  const { error, data } = await getClient()
-    .from("mission_comments")
-    .delete()
-    .eq("id", commentId)
-    .select("id");
-  if (error) {
-    logger.error("Mission comment delete failed", { error: error.message, commentId });
-    return false;
-  }
-  if (!data || data.length === 0) {
-    logger.warn("Mission comment delete matched 0 rows", { commentId });
-    return false;
-  }
-  return true;
 }
 
 // ---------------------------------------------------------------------------

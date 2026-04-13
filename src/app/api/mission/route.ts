@@ -80,14 +80,14 @@ export async function POST(request: NextRequest) {
     const participantId = targetParticipantObj?.id || "";
 
     const setDate = getTodayJST();
-    const createdBy = manager ? "ä¸å¸è¨­å®" : "èªå·±è¨­å®";
+    const createdBy = manager ? "上司設定" : "自己設定";
     const missionId = await createMission(
       effectiveName,
       sanitizedTitle,
       sanitizedPurpose,
       deadline || "",
       setDate,
-      createdBy as "ä¸å¸è¨­å®" | "èªå·±è¨­å®",
+      createdBy as "上司設定" | "自己設定",
       tenantId,
       participantId
     );
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
     // Notify about new mission (non-blocking)
     try {
       if (manager) {
-        // Manager created â notify participant
+        // Manager created → notify participant
         const targetParticipant = await getParticipantByName(effectiveName, tenantId);
         if (targetParticipant?.email && !targetParticipant.email.includes("example.com")) {
           sendNotificationEmail({
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
           }).catch(console.error);
         }
       }
-      // Participant created â no notification needed for now
+      // Participant created → no notification needed for now
     } catch (notifyError) {
       console.error("Mission notification error (non-critical):", notifyError);
     }
