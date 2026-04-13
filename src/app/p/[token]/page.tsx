@@ -1,21 +1,14 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { getTodayJST, getCurrentHourJST } from "@/lib/date-utils";
+import { getTodayJST, getCurrentHourJST, formatDateTimeJST } from "@/lib/date-utils";
 import { BottomNav } from "@/components/BottomNav";
 import { useFeatures } from "@/lib/use-features";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 
-/** Format datetime string to "2026/6/10 08:30" */
-function formatDateTime(datetime: string | undefined, date: string): string {
-  if (datetime && datetime.includes("T")) {
-    const d = new Date(datetime);
-    return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-  }
-  const d = new Date(date);
-  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
-}
+/** Format datetime string to "2026/6/10 08:30" in JST */
+const formatDateTime = formatDateTimeJST;
 
 type LogEntry = {
   id: string;

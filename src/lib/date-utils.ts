@@ -74,3 +74,58 @@ export function isProgramNotStarted(startDate: string): boolean {
   startJST.setHours(0, 0, 0, 0);
   return nowJST.getTime() < startJST.getTime();
 }
+
+/**
+ * Convert an ISO timestamp to a JST Date object.
+ * Works correctly regardless of server/browser timezone.
+ */
+function toJST(d: Date): Date {
+  return new Date(d.getTime() + 9 * 60 * 60 * 1000);
+}
+
+/**
+ * Format an ISO datetime string to "YYYY/M/D HH:mm" in JST.
+ * If datetime is missing/invalid, falls back to formatting just the date.
+ */
+export function formatDateTimeJST(datetime: string | undefined, date: string): string {
+  if (datetime && datetime.includes("T")) {
+    const jst = toJST(new Date(datetime));
+    return `${jst.getUTCFullYear()}/${jst.getUTCMonth() + 1}/${jst.getUTCDate()} ${jst.getUTCHours().toString().padStart(2, "0")}:${jst.getUTCMinutes().toString().padStart(2, "0")}`;
+  }
+  // date-only string (YYYY-MM-DD) — just format the date portion
+  const parts = date.split("-");
+  if (parts.length === 3) {
+    return `${parseInt(parts[0])}/${parseInt(parts[1])}/${parseInt(parts[2])}`;
+  }
+  return date;
+}
+
+/**
+ * Format an ISO timestamp to "HH:mm" in JST.
+ * Returns empty string if input is null/undefined/invalid.
+ */
+export function formatTimeJST(isoStr: string | null | undefined): string {
+  if (!isoStr) return "";
+  try {
+    const jst = toJST(new Date(isoStr));
+    const h = jst.getUTCHours().toString().padStart(2, "0");
+    const m = jst.getUTCMinutes().toString().padStart(2, "0");
+    return `${h}:${m}`;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Format an ISO timestamp to "YYYY/M/D HH:mm" in JST (full datetime).
+ * Returns empty string if input is null/undefined/invalid.
+ */
+export function formatFullDateTimeJST(isoStr: string | null | undefined): string {
+  if (!isoStr) return "";
+  try {
+    const jst = toJST(new Date(isoStr));
+    return `${jst.getUTCFullYear()}/${jst.getUTCMonth() + 1}/${jst.getUTCDate()} ${jst.getUTCHours().toString().padStart(2, "0")}:${jst.getUTCMinutes().toString().padStart(2, "0")}`;
+  } catch {
+    return "";
+  }
+}

@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { getLogsByParticipant, getMissionsByParticipant, getParticipantByNameCrossTenant, NotionLogEntry, DEFAULT_TENANT_ID } from "@/lib/supabase";
 import { getManagerByToken } from "@/lib/participant-db";
+import { formatTimeJST, formatFullDateTimeJST } from "@/lib/date-utils";
 
 type Params = {
   params: {
@@ -60,17 +61,7 @@ export default async function AdminParticipantPage({ params }: Params) {
     console.error("Failed to fetch data:", e);
   }
 
-  function formatTime(isoStr: string | null | undefined): string {
-    if (!isoStr) return "";
-    try {
-      const d = new Date(isoStr);
-      const h = d.getUTCHours().toString().padStart(2, "0");
-      const m = d.getUTCMinutes().toString().padStart(2, "0");
-      return `${h}:${m}`;
-    } catch {
-      return "";
-    }
-  }
+  const formatTime = formatTimeJST;
 
   // Stats
   const totalLogs = logs.length;
@@ -178,16 +169,7 @@ export default async function AdminParticipantPage({ params }: Params) {
                   <div className="flex justify-between items-center mb-2.5">
                     <span className="text-sm font-medium text-[#1A1A2E]">
                       {entry.datetime
-                        ? (() => {
-                            const d = new Date(entry.datetime);
-                            return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${d
-                              .getHours()
-                              .toString()
-                              .padStart(2, "0")}:${d
-                              .getMinutes()
-                              .toString()
-                              .padStart(2, "0")}`;
-                          })()
+                        ? formatFullDateTimeJST(entry.datetime)
                         : entry.date}
                       （{entry.dayOfWeek}）
                     </span>

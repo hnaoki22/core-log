@@ -2,17 +2,11 @@
 
 import { useParams } from "next/navigation";
 import { BottomNav } from "@/components/BottomNav";
+import { formatDateTimeJST, formatTimeJST } from "@/lib/date-utils";
 import { useState, useEffect } from "react";
 
-/** Format datetime string to "2026/6/10 08:30" */
-function formatDateTime(datetime: string | undefined, date: string): string {
-  if (datetime && datetime.includes("T")) {
-    const d = new Date(datetime);
-    return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-  }
-  const d = new Date(date);
-  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
-}
+/** Format datetime string to "2026/6/10 08:30" in JST */
+const formatDateTime = formatDateTimeJST;
 
 type LogEntry = {
   id: string;
@@ -46,15 +40,8 @@ const energyLabel: Record<string, string> = {
   low: "低調",
 };
 
-function formatTime(isoStr: string | null | undefined): string {
-  if (!isoStr) return "";
-  try {
-    const d = new Date(isoStr);
-    const h = d.getUTCHours().toString().padStart(2, "0");
-    const m = d.getUTCMinutes().toString().padStart(2, "0");
-    return `${h}:${m}`;
-  } catch { return ""; }
-}
+/** Format time in JST */
+const formatTime = formatTimeJST;
 
 export default function LogsPage() {
   const params = useParams();
