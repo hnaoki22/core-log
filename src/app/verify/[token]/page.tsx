@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useState, useRef } from "react";
 
 type Step = "send" | "verify";
@@ -15,7 +15,6 @@ interface OTPResponse {
 
 export default function OTPVerificationPage() {
   const params = useParams();
-  const router = useRouter();
   const token = params.token as string;
 
   const [step, setStep] = useState<Step>("send");
@@ -49,7 +48,8 @@ export default function OTPVerificationPage() {
         if (data.verified) {
           // OTP disabled (dev mode) - redirect immediately
           const redirectPath = await determineRedirectPath();
-          router.push(redirectPath);
+          // Use full page navigation to ensure Set-Cookie headers are fully processed
+          window.location.href = redirectPath;
           return;
         }
 
@@ -97,8 +97,9 @@ export default function OTPVerificationPage() {
 
       if (data.success && data.verified) {
         // Redirect to appropriate page
+        // Use full page navigation to ensure Set-Cookie headers are fully processed
         const redirectPath = await determineRedirectPath();
-        router.push(redirectPath);
+        window.location.href = redirectPath;
       } else {
         setRemainingAttempts(data.remainingAttempts || 0);
         setError(data.error || "Invalid code");
