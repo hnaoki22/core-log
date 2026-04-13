@@ -913,6 +913,31 @@ export async function updateMissionStatus(
   return true;
 }
 
+export async function updateMissionFields(
+  missionId: string,
+  fields: { title?: string; purpose?: string; deadline?: string }
+): Promise<boolean> {
+  const update: Record<string, unknown> = {};
+  if (fields.title !== undefined) update.title = fields.title;
+  if (fields.purpose !== undefined) update.purpose = fields.purpose;
+  if (fields.deadline !== undefined) update.deadline = fields.deadline;
+  if (Object.keys(update).length === 0) return true;
+  const { error, data: updated } = await getClient()
+    .from("missions")
+    .update(update)
+    .eq("id", missionId)
+    .select("id");
+  if (error) {
+    logger.error("Mission field update failed", { error: error.message, missionId });
+    return false;
+  }
+  if (!updated || updated.length === 0) {
+    logger.warn("Mission field update matched 0 rows", { missionId });
+    return false;
+  }
+  return true;
+}
+
 export async function addMissionComment(
   missionId: string,
   authorName: string,
