@@ -35,10 +35,11 @@ export async function GET(req: NextRequest) {
   const manager = await getManagerByToken(token);
   const isAdmin = await isAdminToken(token);
   if ((manager || isAdmin) && participantName) {
+    const tenantId = manager?.tenantId || DEFAULT_TENANT_ID;
     const includeLogs = req.nextUrl.searchParams.get("includeLogs") === "true";
-    const feedback = await getFeedbackByParticipant(participantName, DEFAULT_TENANT_ID);
+    const feedback = await getFeedbackByParticipant(participantName, tenantId);
     if (includeLogs) {
-      const allLogs = await getLogsByParticipant(participantName, DEFAULT_TENANT_ID);
+      const allLogs = await getLogsByParticipant(participantName, tenantId);
       // Return only last 7 days of logs
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
     }
 
     const authorName = manager?.name || "Human Mature";
-    const feedbackType = type || (isAdmin ? "HMフィードバック" : "上司コメント");
+    const feedbackType = type || (isAdmin ? "HMãã£ã¼ãããã¯" : "ä¸å¸ã³ã¡ã³ã");
     const tenantId = manager?.tenantId || DEFAULT_TENANT_ID;
 
     let result;
@@ -103,7 +104,7 @@ export async function POST(req: NextRequest) {
     // Send email notification to participant (non-blocking)
     try {
       // Search all participants to find the one with matching name
-      const targetParticipant = await getParticipantByName(participantName);
+      const targetParticipant = await getParticipantByName(participantName, tenantId);
 
       if (targetParticipant?.email && !targetParticipant.email.includes("example.com") && targetParticipant.emailEnabled) {
         sendNotificationEmail({
