@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllParticipants, getManagerByToken } from "@/lib/participant-db";
 import { DEFAULT_TENANT_ID, getLogsByParticipant } from "@/lib/supabase";
+import { getDayOfWeekJPShort } from "@/lib/date-utils";
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
@@ -50,9 +51,8 @@ export async function GET(request: NextRequest) {
         // Calculate day of week if not provided
         let dayOfWeek = log.dayOfWeek || "";
         if (!dayOfWeek && log.date) {
-          const d = new Date(log.date + "T00:00:00");
-          const days = ["日", "月", "火", "水", "木", "金", "土"];
-          dayOfWeek = days[d.getDay()] || "";
+          const d = new Date(log.date + "T00:00:00Z");
+          dayOfWeek = getDayOfWeekJPShort(d);
         }
 
         const energy = log.energy || "";
