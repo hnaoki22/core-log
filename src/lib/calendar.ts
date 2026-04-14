@@ -124,5 +124,6 @@ export function isBusinessDay(dateOrStr?: Date | string): boolean {
 const DOW_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 
 export function getDayOfWeekJP(date: Date): string {
-  return DOW_LABELS[date.getUTCDay()];
+  // Compute weekday in JST (Asia/Tokyo) to avoid UTC-server mismatch.
+  return DOW_LABELS[new Date(date.getTime() + 9 * 60 * 60 * 1000).getUTCDay()];
 }
