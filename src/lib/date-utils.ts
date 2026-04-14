@@ -129,3 +129,58 @@ export function formatFullDateTimeJST(isoStr: string | null | undefined): string
     return "";
   }
 }
+
+
+/**
+ * Japanese weekday labels (short and full).
+ * Used by the JST-aware helpers below.
+ */
+const WEEKDAYS_JP_SHORT = ["日", "月", "火", "水", "木", "金", "土"];
+const WEEKDAYS_JP_FULL = [
+  "日曜日",
+  "月曜日",
+  "火曜日",
+  "水曜日",
+  "木曜日",
+  "金曜日",
+  "土曜日",
+];
+
+/**
+ * Get the day-of-week index (0=Sunday, 6=Saturday) in JST for a given Date.
+ * This avoids the common bug where Date#getDay() returns the host/UTC timezone
+ * weekday instead of the JST weekday on servers (e.g. Vercel) running in UTC.
+ */
+export function getDayOfWeekJST(d: Date): number {
+  return toJST(d).getUTCDay();
+}
+
+/**
+ * Short Japanese weekday label (e.g. "火") computed in JST.
+ */
+export function getDayOfWeekJPShort(d: Date): string {
+  return WEEKDAYS_JP_SHORT[getDayOfWeekJST(d)] || "";
+}
+
+/**
+ * Full Japanese weekday label (e.g. "火曜日") computed in JST.
+ */
+export function getDayOfWeekJPFull(d: Date): string {
+  return WEEKDAYS_JP_FULL[getDayOfWeekJST(d)] || "";
+}
+
+/**
+ * Format an ISO timestamp to "YYYY/M/D HH:mm（曜）" in JST with short JP weekday.
+ * Returns empty string if input is null/undefined/invalid.
+ */
+export function formatFullDateTimeWithWeekdayJST(isoStr: string | null | undefined): string {
+  if (!isoStr) return "";
+  try {
+    const d = new Date(isoStr);
+    const jst = toJST(d);
+    const dow = getDayOfWeekJPShort(d);
+    return `${jst.getUTCFullYear()}/${jst.getUTCMonth() + 1}/${jst.getUTCDate()} ${jst.getUTCHours().toString().padStart(2, "0")}:${jst.getUTCMinutes().toString().padStart(2, "0")}（${dow}）`;
+  } catch {
+    return "";
+  }
+}
