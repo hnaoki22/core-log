@@ -5,6 +5,7 @@
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "./logger";
+import { getDayOfWeekJPShort } from "./date-utils";
 
 // ---------------------------------------------------------------------------
 // Default tenant ID configuration
@@ -118,7 +119,6 @@ export type NotionFeedback = {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-const WEEKDAYS_JP = ["日", "月", "火", "水", "木", "金", "土"];
 
 function toDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -141,7 +141,7 @@ function rowToLog(r: any): NotionLogEntry {
     id: r.id,
     date: r.date,
     datetime: r.datetime || r.date,
-    dayOfWeek: WEEKDAYS_JP[d.getDay()] || "",
+    dayOfWeek: getDayOfWeekJPShort(d) || "",
     dayNum: r.day_num ?? d.getDate(),
     participantName: r.participant_name,
     morningIntent: r.morning_intent || "",
@@ -347,7 +347,7 @@ export async function createMorningEntry(
       participant_name: participantName,
       date,
       datetime: now.toISOString(),
-      day_of_week: WEEKDAYS_JP[d.getDay()] || "",
+      day_of_week: getDayOfWeekJPShort(d) || "",
       day_num: d.getDate(),
       morning_intent: morningIntent,
       energy: energy || null,
@@ -417,7 +417,7 @@ export async function createEveningOnlyEntry(
       participant_name: participantName,
       date,
       datetime: now.toISOString(),
-      day_of_week: WEEKDAYS_JP[d.getDay()] || "",
+      day_of_week: getDayOfWeekJPShort(d) || "",
       day_num: d.getDate(),
       evening_insight: eveningInsight,
       energy: energy || null,
