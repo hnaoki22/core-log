@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
         eveningCount: stats.eveningCount,
         completionRate: stats.completionRate,
         todayStatus: stats.todayStatus,
+        businessDaysElapsed: stats.businessDaysElapsed,
         // Legacy fields (kept for backward compat)
         entryDays: stats.entryDays,
         entryRate: stats.completionRate, // now uses completion rate
@@ -106,6 +107,7 @@ export async function GET(request: NextRequest) {
         eveningCount: 0,
         completionRate: 0,
         todayStatus: "none" as const,
+        businessDaysElapsed: 0,
         entryDays: 0,
         entryRate: 0,
         streak: 0,

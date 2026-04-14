@@ -21,7 +21,21 @@ export type ParticipantStats = {
   fbCount: number;
   /** Today's status: "complete" | "morning_only" | "evening_only" | "none" */
   todayStatus: "complete" | "morning_only" | "evening_only" | "none";
+  /** Business days elapsed since first submission (inclusive of today). 0 if no submissions. */
+  businessDaysElapsed: number;
 };
+
+// ===== Time-of-day boundary for completion rate =====
+// Before 13:00 JST: today's evening slot hasn't "opened" yet, so the denominator for today
+// starts at 0.5 (morning only). At/after 13:00 JST, denominator becomes 1.0 (both slots).
+// To avoid completion rate exceeding 100% when a user writes evening before 13:00, we use
+// max(time-based minimum, actual submitted weight) as the per-day denominator.
+const EVENING_OPEN_HOUR_JST = 13;
+
+function getCurrentJSTHour(): number {
+  const jstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  return jstNow.getUTCHours();
+}
 
 /**
  * Check if morning was submitted for a log entry.
@@ -111,22 +125,56 @@ export function computeParticipantStats(
   // FB count: logs with HM feedback
   const fbCount = logs.filter((l) => l.hmFeedback).length;
 
-  // Completion rate: weighted average
-  // complete day = 1.0, partial day = 0.5, missing day = 0.0
+  // ===== Completion rate (time-aware, monotonic denominator) =====
+  //
+  // Per-day weight:
+  //   numerator (score)   = 1.0 if both morning+evening, 0.5 if one, 0 if none
+  //   denominator (cap)   = 1.0 for past business days
+  //                       = today: max(time-based minimum, numerator)
+  //                         where time-based minimum = 0.5 before 13:00 JST, 1.0 after
+  //
+  // This ensures:
+  //   - Before 13:00 JST: morning-only is 100% (evening hasn't "opened" yet)
+  //   - Early evening writers never exceed 100% (denominator lifts to match numerator)
+  //   - After 13:00 JST: missing evening correctly pulls the rate down
   let completionRate = 0;
+  let businessDaysElapsed = 0;
   if (submittedLogs.length > 0) {
     const dates = submittedLogs.map((l) => l.date).filter(Boolean).sort();
     const firstDate = dates[0];
-    const businessDays = countBusinessDays(firstDate, todayJST);
+    const logByDate = new Map<string, NotionLogEntry>();
+    for (const log of submittedLogs) {
+      logByDate.set(log.date, log);
+    }
 
-    // Weighted score: complete days count as 1.0, partial days as 0.5
-    const partialDays = entryDays - completeDays;
-    const weightedScore = completeDays * 1.0 + partialDays * 0.5;
+    const jstHour = getCurrentJSTHour();
+    const todayTimeMin = jstHour < EVENING_OPEN_HOUR_JST ? 0.5 : 1.0;
 
-    completionRate = Math.min(
-      100,
-      Math.round((weightedScore / Math.max(1, businessDays)) * 100)
-    );
+    let totalScore = 0;
+    let totalDenom = 0;
+    let d = firstDate;
+    for (let i = 0; i < 1000 && d <= todayJST; i++) {
+      const dow = getDayOfWeek(d);
+      if (dow !== 0 && dow !== 6) {
+        businessDaysElapsed++;
+        const log = logByDate.get(d);
+        let dayScore = 0;
+        if (log) {
+          const m = hasMorning(log);
+          const e = hasEvening(log);
+          if (m && e) dayScore = 1.0;
+          else if (m || e) dayScore = 0.5;
+        }
+        const dayDenom = d === todayJST ? Math.max(todayTimeMin, dayScore) : 1.0;
+        totalScore += dayScore;
+        totalDenom += dayDenom;
+      }
+      d = addOneDay(d);
+    }
+
+    if (totalDenom > 0) {
+      completionRate = Math.min(100, Math.round((totalScore / totalDenom) * 100));
+    }
   }
 
   // Streak: consecutive business days with BOTH morning+evening from today
@@ -155,21 +203,11 @@ export function computeParticipantStats(
     streak,
     fbCount,
     todayStatus,
+    businessDaysElapsed,
   };
 }
 
 // ===== Date helpers (JST-safe) =====
-
-function countBusinessDays(fromDate: string, toDate: string): number {
-  let count = 0;
-  let d = fromDate;
-  for (let i = 0; i < 1000 && d <= toDate; i++) {
-    const dow = getDayOfWeek(d);
-    if (dow !== 0 && dow !== 6) count++;
-    d = addOneDay(d);
-  }
-  return count;
-}
 
 function getDayOfWeek(dateStr: string): number {
   return new Date(dateStr + "T12:00:00+09:00").getUTCDay();

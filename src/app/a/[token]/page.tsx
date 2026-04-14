@@ -16,6 +16,7 @@ type ParticipantData = {
   eveningCount: number;
   completionRate: number;
   todayStatus: "complete" | "morning_only" | "evening_only" | "none";
+  businessDaysElapsed?: number;
   // Legacy fields
   entryDays: number;
   entryRate: number;
@@ -499,8 +500,11 @@ export default function AdminDashboard() {
   // Today's status breakdown: ◎ complete, △ partial, ー none
   const todayComplete = participants.filter((p) => p.todayStatus === "complete").length;
   const todayPartial = participants.filter((p) => p.todayStatus === "morning_only" || p.todayStatus === "evening_only").length;
-  const getStatusBadge = (rate: number, streak: number, entryDays: number) => {
+  const getStatusBadge = (rate: number, streak: number, entryDays: number, businessDaysElapsed: number) => {
     if (entryDays === 0) return { color: "bg-gray-300", label: "未開始" };
+    // Grace period: under 3 business days of history, labels are statistically unreliable.
+    // A single missed slot can dominate the rate early on, so we hide the label entirely.
+    if (businessDaysElapsed < 3) return { color: "bg-gray-300", label: "計測中" };
     if (streak > 0 && rate >= 80) return { color: "bg-emerald-500", label: "順調" };
     if (rate >= 50) return { color: "bg-amber-500", label: "やや停滞" };
     return { color: "bg-red-500", label: "要フォロー" };
@@ -763,7 +767,7 @@ export default function AdminDashboard() {
           <div className="divide-y divide-[#EFE8DD]">
             {participants.map((p) => {
               const cRate = p.completionRate ?? p.entryRate;
-              const status = getStatusBadge(cRate, p.streak, p.entryDays);
+              const status = getStatusBadge(cRate, p.streak, p.entryDays, p.businessDaysElapsed ?? 0);
               const todayIcon = p.todayStatus === "complete" ? "◎"
                 : (p.todayStatus === "morning_only" || p.todayStatus === "evening_only") ? "△" : "";
               const todayColor = p.todayStatus === "complete" ? "text-emerald-600"
