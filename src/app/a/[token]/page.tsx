@@ -28,6 +28,7 @@ type ParticipantData = {
   latestLog: {
     date: string;
     morningIntent: string;
+    eveningInsight: string | null;
     status: string;
     energy: string | null;
   } | null;
@@ -794,9 +795,9 @@ export default function AdminDashboard() {
                         <span className="text-[#A09898]">朝<strong className="text-[#1A1A2E]">{p.morningCount ?? "?"}</strong> 夕<strong className="text-[#1A1A2E]">{p.eveningCount ?? "?"}</strong></span>
                         <span>FB: <strong className="text-[#1A1A2E]">{p.fbCount}回</strong></span>
                       </div>
-                      {p.latestLog && p.latestLog.morningIntent && (
+                      {p.latestLog && (p.latestLog.morningIntent || p.latestLog.eveningInsight) && (
                         <div className="mt-2 ml-4 text-xs text-[#5B5560] bg-[#F5F0EB] rounded-xl p-2 border border-[#EFE8DD]">
-                          <span className="text-[#8B8489]">最新 ({p.latestLog.date}):</span> {p.latestLog.morningIntent}
+                          <span className="text-[#8B8489]">最新 ({p.latestLog.date}):</span> {p.latestLog.morningIntent || p.latestLog.eveningInsight}
                         </div>
                       )}
                     </div>
