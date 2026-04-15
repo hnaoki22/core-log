@@ -17,6 +17,7 @@ type ParticipantData = {
   latestLog: {
     date: string;
     morningIntent: string;
+    eveningInsight: string | null;
     status: string;
     energy: string | null;
   } | null;
@@ -311,10 +312,10 @@ export default function ManagerHome() {
                       </div>
 
                       {/* Latest Log */}
-                      {participant.latestLog && participant.latestLog.morningIntent && (
+                      {participant.latestLog && (participant.latestLog.morningIntent || participant.latestLog.eveningInsight) && (
                         <div className="mb-3 p-2.5 bg-[#F5F0EB] rounded-xl border border-[#EFE8DD]">
                           <p className="text-[10px] text-[#8B8489] mb-0.5">最新 ({participant.latestLog.date})</p>
-                          <p className="text-xs text-[#2C2C4A] line-clamp-2 leading-relaxed">{participant.latestLog.morningIntent}</p>
+                          <p className="text-xs text-[#2C2C4A] line-clamp-2 leading-relaxed">{participant.latestLog.morningIntent || participant.latestLog.eveningInsight}</p>
                         </div>
                       )}
 
