@@ -2,10 +2,11 @@
 // Returns analytics data for admin dashboard
 
 import { NextRequest, NextResponse } from "next/server";
-import { DEFAULT_TENANT_ID, getLogsByParticipant } from "@/lib/supabase";
+import { getAllLogsForTenant } from "@/lib/supabase";
 import { getAllParticipants, getManagerByToken } from "@/lib/participant-db";
 import { getTodayJST } from "@/lib/date-utils";
 import { hasMorning, hasEvening, isLogSubmitted } from "@/lib/stats";
+import { resolveAdminTenantContext } from "@/lib/tenant-context";
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
@@ -16,8 +17,12 @@ export async function GET(request: NextRequest) {
   if (!manager || (!manager.isAdmin && manager.role !== "observer"))
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
-  const tenantId = manager.tenantId || DEFAULT_TENANT_ID;
-  const participants = await getAllParticipants(tenantId);
+  const ctx = await resolveAdminTenantContext(request, manager);
+  // Batch-fetch: 2 queries total (supports 全テナント when ctx.tenantId is null)
+  const [participants, logsByName] = await Promise.all([
+    getAllParticipants(ctx.tenantId),
+    getAllLogsForTenant(ctx.tenantId ?? undefined),
+  ]);
   const todayJST = getTodayJST();
 
   // Collect all logs
@@ -32,27 +37,21 @@ export async function GET(request: NextRequest) {
       managerComment: string | null;
       hmFeedback: string | null;
     }[];
-  }[] = [];
-
-  for (const p of participants) {
-    try {
-      const logs = await getLogsByParticipant(p.name, tenantId);
-      allParticipantLogs.push({
-        name: p.name,
-        logs: logs.map((l) => ({
-          date: l.date,
-          energy: l.energy,
-          morningIntent: l.morningIntent,
-          eveningInsight: l.eveningInsight,
-          status: l.status,
-          managerComment: l.managerComment,
-          hmFeedback: l.hmFeedback,
-        })),
-      });
-    } catch {
-      allParticipantLogs.push({ name: p.name, logs: [] });
-    }
-  }
+  }[] = participants.map((p) => {
+    const logs = logsByName.get(p.name) || [];
+    return {
+      name: p.name,
+      logs: logs.map((l) => ({
+        date: l.date,
+        energy: l.energy,
+        morningIntent: l.morningIntent,
+        eveningInsight: l.eveningInsight,
+        status: l.status,
+        managerComment: l.managerComment,
+        hmFeedback: l.hmFeedback,
+      })),
+    };
+  });
 
   // 1. Weekly entry rate trend (last 8 weeks)
   const weeklyTrend = calculateWeeklyTrend(allParticipantLogs, todayJST, 8);

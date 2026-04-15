@@ -3,7 +3,21 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getManagerByToken } from "@/lib/participant-db";
-import { DEFAULT_TENANT_ID, getAiSystemPrompt as getAiSystemPromptFromSupabase, updateAiSystemPrompt as updateAiSystemPromptFromSupabase } from "@/lib/supabase";
+import { DEFAULT_TENANT_ID, getAiSystemPrompt as getAiSystemPromptFromSupabase, updateAiSystemPrompt as updateAiSystemPromptFromSupabase, getTenantBySlug } from "@/lib/supabase";
+
+// Resolve target tenant for per-tenant admin settings.
+// 全テナント mode is ambiguous for settings ops → fall back to admin's home tenant.
+async function resolveSettingsTenantId(
+  request: NextRequest,
+  manager: { tenantId?: string | null; isAdmin?: boolean }
+): Promise<string> {
+  const slug = request.nextUrl.searchParams.get("tenant");
+  if (manager.isAdmin && slug) {
+    const t = await getTenantBySlug(slug);
+    if (t) return t.id;
+  }
+  return manager.tenantId || DEFAULT_TENANT_ID;
+}
 
 const DEFAULT_SYSTEM_PROMPT = `あなたは「Human Mature」という戦略・組織開発コンサルティング会社のシニアコンサルタントです。
 クライアント企業の参加者に対して、週次のフィードバック（CORE Logフィードバック）を作成します。
@@ -31,7 +45,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const prompt = await getAiSystemPromptFromSupabase(manager.tenantId || DEFAULT_TENANT_ID);
+    const tenantId = await resolveSettingsTenantId(request, manager);
+    const prompt = await getAiSystemPromptFromSupabase(tenantId);
     return NextResponse.json({
       systemPrompt: prompt || DEFAULT_SYSTEM_PROMPT,
       isDefault: !prompt,
@@ -62,7 +77,8 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "プロンプトが空です" }, { status: 400 });
     }
 
-    const success = await updateAiSystemPromptFromSupabase(manager.tenantId || DEFAULT_TENANT_ID, systemPrompt.trim());
+    const tenantId = await resolveSettingsTenantId(request, manager);
+    const success = await updateAiSystemPromptFromSupabase(tenantId, systemPrompt.trim());
     if (success) {
       return NextResponse.json({ success: true });
     } else {

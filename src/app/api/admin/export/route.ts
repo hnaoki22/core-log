@@ -1,10 +1,14 @@
-// GET /api/admin/export?token=xxx
-// Exports all participants and their logs as CSV
+// GET /api/admin/export?token=xxx&tenant=<slug>
+// Exports all participants and their logs as CSV.
+// - No ?tenant= and admin: exports across ALL tenants.
+// - With ?tenant=<slug> and admin: exports that specific tenant.
+// - Non-admin observer: locked to own tenant.
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAllParticipants, getManagerByToken } from "@/lib/participant-db";
-import { DEFAULT_TENANT_ID, getLogsByParticipant } from "@/lib/supabase";
+import { getAllLogsForTenant } from "@/lib/supabase";
 import { getDayOfWeekJPShort } from "@/lib/date-utils";
+import { resolveAdminTenantContext } from "@/lib/tenant-context";
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
@@ -19,17 +23,22 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const tenantId = manager.tenantId || DEFAULT_TENANT_ID;
-    // Get all participants
-    const participants = await getAllParticipants(tenantId);
+    const ctx = await resolveAdminTenantContext(request, manager);
 
-    // Collect all logs for all participants
+    // Batch-fetch participants and all their logs in 2 queries (not N+1)
+    // When ctx.tenantId is null, both fetch across every tenant.
+    const [participants, logsByName] = await Promise.all([
+      getAllParticipants(ctx.tenantId),
+      getAllLogsForTenant(ctx.tenantId ?? undefined),
+    ]);
+
     const csvRows: string[] = [];
 
-    // CSV Header
+    // CSV Header — add テナント column only when cross-tenant, to keep single-tenant exports stable
     const headers = [
       "日付",
       "曜日",
+      ...(ctx.isAllTenants ? ["テナント"] : []),
       "参加者名",
       "部署",
       "朝の意図",
@@ -41,14 +50,10 @@ export async function GET(request: NextRequest) {
     ];
     csvRows.push(headers.join(","));
 
-    // Fetch logs for each participant
     for (const participant of participants) {
-      // Supabase mode: fetch from API
-      const logs = await getLogsByParticipant(participant.name, tenantId);
+      const logs = logsByName.get(participant.name) || [];
 
-      // Convert logs to CSV rows
       for (const log of logs) {
-        // Calculate day of week if not provided
         let dayOfWeek = log.dayOfWeek || "";
         if (!dayOfWeek && log.date) {
           const d = new Date(log.date + "T00:00:00Z");
@@ -61,10 +66,12 @@ export async function GET(request: NextRequest) {
         const managerComment = ((log as Record<string, unknown>).managerComment as string || "").replace(/"/g, '""');
         const morningIntent = (log.morningIntent || "").replace(/"/g, '""');
         const eveningInsight = (log.eveningInsight || "").replace(/"/g, '""');
+        const tenantLabel = (participant.tenantId || "").replace(/"/g, '""');
 
         const row = [
           log.date,
           dayOfWeek,
+          ...(ctx.isAllTenants ? [`"${tenantLabel}"`] : []),
           participant.name,
           participant.department,
           `"${morningIntent}"`,
@@ -82,11 +89,14 @@ export async function GET(request: NextRequest) {
     const bom = "\uFEFF";
     const csvContent = bom + csvRows.join("\n");
 
-    // Return as CSV file
+    const filenameSuffix = ctx.isAllTenants
+      ? "all-tenants"
+      : ctx.requestedSlug || "tenant";
+
     const response = new NextResponse(csvContent, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": "attachment; filename=core-log-export.csv",
+        "Content-Disposition": `attachment; filename=core-log-export-${filenameSuffix}.csv`,
       },
     });
 

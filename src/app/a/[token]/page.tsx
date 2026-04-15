@@ -153,7 +153,8 @@ export default function AdminDashboard() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      window.open(`/api/admin/export?token=${token}`, "_blank");
+      const tenantParam = selectedTenantSlug ? `&tenant=${selectedTenantSlug}` : "";
+      window.open(`/api/admin/export?token=${token}${tenantParam}`, "_blank");
     } catch (error) {
       console.error("Export error:", error);
       alert("エクスポートに失敗しました");
@@ -166,7 +167,8 @@ export default function AdminDashboard() {
     setEditingParticipant(p);
     // Fetch full participant data including email, startDate, endDate
     try {
-      const res = await fetch(`/api/admin/members?token=${token}`);
+      const tenantParam = selectedTenantSlug ? `&tenant=${selectedTenantSlug}` : "";
+      const res = await fetch(`/api/admin/members?token=${token}${tenantParam}`);
       const d = await res.json();
       const managers = d.managers || [];
       setManagerOptions(managers);
@@ -281,12 +283,13 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (showAddParticipant) {
-      fetch(`/api/admin/members?token=${token}`)
+      const tenantParam = selectedTenantSlug ? `&tenant=${selectedTenantSlug}` : "";
+      fetch(`/api/admin/members?token=${token}${tenantParam}`)
         .then((r) => r.json())
         .then((d) => setManagerOptions(d.managers || []))
         .catch(() => setManagerOptions([]));
     }
-  }, [showAddParticipant, token]);
+  }, [showAddParticipant, token, selectedTenantSlug]);
 
   const handleAddParticipant = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -294,7 +297,8 @@ export default function AdminDashboard() {
     const form = e.currentTarget;
     const formData = new FormData(form);
     try {
-      const res = await fetch("/api/admin/members", {
+      const tenantParam = selectedTenantSlug ? `?tenant=${selectedTenantSlug}` : "";
+      const res = await fetch(`/api/admin/members${tenantParam}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -323,7 +327,8 @@ export default function AdminDashboard() {
     const form = e.currentTarget;
     const formData = new FormData(form);
     try {
-      const res = await fetch("/api/admin/members", {
+      const tenantParam = selectedTenantSlug ? `?tenant=${selectedTenantSlug}` : "";
+      const res = await fetch(`/api/admin/members${tenantParam}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -410,7 +415,8 @@ export default function AdminDashboard() {
     setPromptLoading(true);
     setPromptSaved(false);
     try {
-      const res = await fetch(`/api/admin/ai-settings?token=${token}`);
+      const tenantParam = selectedTenantSlug ? `&tenant=${selectedTenantSlug}` : "";
+      const res = await fetch(`/api/admin/ai-settings?token=${token}${tenantParam}`);
       if (res.ok) {
         const d = await res.json();
         setPromptText(d.systemPrompt || "");
@@ -425,7 +431,8 @@ export default function AdminDashboard() {
   const handleSavePrompt = async () => {
     setPromptSaving(true);
     try {
-      const res = await fetch("/api/admin/ai-settings", {
+      const tenantParam = selectedTenantSlug ? `?tenant=${selectedTenantSlug}` : "";
+      const res = await fetch(`/api/admin/ai-settings${tenantParam}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, systemPrompt: promptText }),
@@ -446,10 +453,11 @@ export default function AdminDashboard() {
 
   const openAnalytics = async () => {
     setShowAnalytics(true);
-    if (analyticsData) return; // Already loaded
+    // Always re-fetch — analytics depends on selected tenant
     setAnalyticsLoading(true);
     try {
-      const res = await fetch(`/api/admin/analytics?token=${token}`);
+      const tenantParam = selectedTenantSlug ? `&tenant=${selectedTenantSlug}` : "";
+      const res = await fetch(`/api/admin/analytics?token=${token}${tenantParam}`);
       if (res.ok) setAnalyticsData(await res.json());
     } catch {
       // silently fail

@@ -9,7 +9,9 @@ import {
   createManagerInSupabase as createManager,
   getAllManagersFromSupabase as getAllManagers,
   getManagerByTokenFromSupabase as getManagerByTokenSupabase,
+  getTenantBySlug,
 } from "@/lib/supabase";
+import { resolveAdminTenantContext } from "@/lib/tenant-context";
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,7 +26,21 @@ export async function POST(request: NextRequest) {
     if (!manager) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
-    const tenantId = manager.tenantId || DEFAULT_TENANT_ID;
+
+    // For create operations, require a specific target tenant.
+    // Admin with ?tenant=slug → that tenant. Otherwise admin's home tenant.
+    // If admin is in 全テナント mode, reject (ambiguous target).
+    const tenantSlug = request.nextUrl.searchParams.get("tenant");
+    let tenantId = manager.tenantId || DEFAULT_TENANT_ID;
+    if (manager.isAdmin && tenantSlug) {
+      const t = await getTenantBySlug(tenantSlug);
+      if (t) tenantId = t.id;
+    } else if (manager.isAdmin && !tenantSlug && !manager.tenantId) {
+      return NextResponse.json(
+        { error: "作成先テナントを指定してください（全テナント状態では作成できません）" },
+        { status: 400 }
+      );
+    }
 
     if (type === "participant") {
       const { name, email, department, dojoPhase, managerId } = data;
@@ -102,10 +118,11 @@ export async function GET(request: NextRequest) {
   if (!manager) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
-  const tenantId = manager.tenantId || DEFAULT_TENANT_ID;
+  const ctx = await resolveAdminTenantContext(request, manager);
 
   try {
-    const managers = await getAllManagers(tenantId);
+    // For the dropdown, tenantId=null (全テナント) returns managers from all tenants
+    const managers = await getAllManagers(ctx.tenantId ?? undefined);
     return NextResponse.json({
       managers: managers.map((m) => ({
         id: m.id,
