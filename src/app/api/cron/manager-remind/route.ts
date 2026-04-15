@@ -95,11 +95,11 @@ export async function GET(request: NextRequest) {
             const diff = daysBetween(l.date, todayStr);
             return diff >= 0 && diff < 7;
           });
-          const entryDays = weekLogs.filter((l) => l.morningIntent).length;
+          const entryDays = weekLogs.filter((l) => l.morningIntent || l.eveningInsight).length;
 
           // Calculate streak
           let streak = 0;
-          const entryDates = new Set(logs.filter((l) => l.morningIntent).map((l) => l.date));
+          const entryDates = new Set(logs.filter((l) => l.morningIntent || l.eveningInsight).map((l) => l.date));
           let checkDate = todayStr;
           for (let i = 0; i < 30; i++) {
             if (entryDates.has(checkDate)) {
