@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
           ? {
               date: latestLog.date,
               morningIntent: latestLog.morningIntent,
+            eveningInsight: latestLog.eveningInsight,
               status: latestLog.status,
               energy: latestLog.energy,
             }
