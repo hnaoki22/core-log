@@ -6,6 +6,7 @@ import { getLogsByParticipant, getMissionsByParticipant, getParticipantByNameCro
 import { getManagerByToken } from "@/lib/participant-db";
 import { formatTimeJST, formatFullDateTimeJST } from "@/lib/date-utils";
 import CommentForm from "./CommentForm";
+import ReactionStamps from "./ReactionStamps";
 import MissionManager from "./MissionManager";
 
 type Params = {
@@ -138,6 +139,11 @@ export default async function ParticipantDetailPage({ params }: Params) {
                       <p className="text-xs text-[#2C2C4A] mt-0.5 leading-relaxed">{entry.hmFeedback}</p>
                     </div>
                   )}
+                  <ReactionStamps
+                    token={token}
+                    entryId={entry.id}
+                    existingReaction={entry.managerReaction}
+                  />
                   <CommentForm
                     token={token}
                     entryId={entry.id}

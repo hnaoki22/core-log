@@ -22,6 +22,7 @@ type LogEntry = {
   hmFeedback?: string | null;
   managerComment?: string | null;
   managerCommentTime?: string | null;
+  managerReaction?: string | null;
   morningTime?: string | null;
   eveningTime?: string | null;
 };
@@ -179,6 +180,20 @@ export default function LogsPage() {
                         <div className="flex items-center gap-2">
                           <span className="text-base leading-none">{energyEmoji[log.energy]}</span>
                           <span className="text-xs text-[#5B5560]">{energyLabel[log.energy]}</span>
+                        </div>
+                      )}
+
+                      {log.managerReaction && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] text-[#8B8489] mr-0.5">上司リアクション</span>
+                          {log.managerReaction.split(",").filter(Boolean).map((emoji, i) => (
+                            <span
+                              key={`${emoji}-${i}`}
+                              className="inline-flex items-center px-1.5 py-0.5 bg-indigo-50 border border-indigo-200 rounded-full text-sm"
+                            >
+                              {emoji}
+                            </span>
+                          ))}
                         </div>
                       )}
 

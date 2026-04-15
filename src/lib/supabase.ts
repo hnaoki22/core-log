@@ -52,6 +52,7 @@ export type NotionLogEntry = {
   hmFeedback: string | null;
   managerComment: string | null;
   managerCommentTime: string | null;
+  managerReaction: string | null;
   morningTime: string | null;
   eveningTime: string | null;
   dojoPhase: string;
@@ -152,6 +153,7 @@ function rowToLog(r: any): NotionLogEntry {
     hmFeedback: r.hm_feedback || null,
     managerComment: r.manager_comment || null,
     managerCommentTime: r.manager_comment_time || null,
+    managerReaction: r.manager_reaction || null,
     morningTime: r.morning_time || null,
     eveningTime: r.evening_time || null,
     dojoPhase: r.dojo_phase || "",
@@ -462,6 +464,50 @@ export async function addManagerComment(
     return false;
   }
   return true;
+}
+
+export async function toggleManagerReaction(
+  logId: string,
+  emoji: string
+): Promise<{ success: boolean; reactions: string | null }> {
+  // 1. Read current reactions
+  const { data: row, error: readErr } = await getClient()
+    .from("logs")
+    .select("manager_reaction")
+    .eq("id", logId)
+    .single();
+  if (readErr || !row) {
+    logger.error("Read failed for reaction toggle", { error: readErr?.message, logId });
+    return { success: false, reactions: null };
+  }
+
+  // 2. Parse current reactions (comma-separated)
+  const current: string[] = row.manager_reaction
+    ? row.manager_reaction.split(",").filter(Boolean)
+    : [];
+  const idx = current.indexOf(emoji);
+  if (idx >= 0) {
+    current.splice(idx, 1); // remove
+  } else {
+    current.push(emoji); // add
+  }
+  const newValue = current.length > 0 ? current.join(",") : null;
+
+  // 3. Write back
+  const { error: writeErr, data: updated } = await getClient()
+    .from("logs")
+    .update({ manager_reaction: newValue })
+    .eq("id", logId)
+    .select("id");
+  if (writeErr) {
+    logger.error("Update failed for reaction", { error: writeErr.message, logId });
+    return { success: false, reactions: null };
+  }
+  if (!updated || updated.length === 0) {
+    logger.warn("Reaction update matched 0 rows", { logId });
+    return { success: false, reactions: null };
+  }
+  return { success: true, reactions: newValue };
 }
 
 // ---------------------------------------------------------------------------
