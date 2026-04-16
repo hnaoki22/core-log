@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createMorningEntry, createEveningOnlyEntry, updateEveningEntry, hasLoggedToday, DEFAULT_TENANT_ID } from "@/lib/supabase";
 import { getParticipantByToken, getManagerById } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
-import { isProgramEnded, isProgramNotStarted, getCurrentHourJST } from "@/lib/date-utils";
+import { isProgramEnded, isProgramNotStarted, getCurrentHourJST, isGracePeriod } from "@/lib/date-utils";
 import { sanitizeInput } from "@/lib/sanitize";
 import { logger } from "@/lib/logger";
 
@@ -43,8 +43,9 @@ export async function POST(request: NextRequest) {
       const { participantName, date, morningIntent, energy, dojoPhase, weekNum } = body;
 
       // 朝の記入は12:00（正午）まで
+      // 深夜0:00〜3:59はグレースピリオド（前日扱い）なので朝の記入は不可
       const hour = getCurrentHourJST();
-      if (hour >= 12) {
+      if (hour >= 12 || isGracePeriod()) {
         return NextResponse.json(
           { error: "朝の意図設定は12:00までです。夕方の振り返りをご記入ください。", morningClosed: true },
           { status: 403 }

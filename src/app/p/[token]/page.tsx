@@ -117,6 +117,7 @@ export default function ParticipantHome() {
 
   const getGreeting = () => {
     const hour = getCurrentHourJST();
+    if (hour < 4) return "お疲れさまです";   // 深夜帯
     if (hour < 12) return "おはようございます";
     if (hour < 18) return "こんにちは";
     return "お疲れさまです";

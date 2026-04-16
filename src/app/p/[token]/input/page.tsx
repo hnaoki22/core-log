@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { getTodayJST, getCurrentHourJST } from "@/lib/date-utils";
+import { getTodayJST, getCurrentHourJST, isGracePeriod } from "@/lib/date-utils";
 import { useState, useEffect, useRef } from "react";
 import { useFeatures } from "@/lib/use-features";
 import { StructuredInput } from "@/components/features/StructuredInput";
@@ -94,6 +94,7 @@ export default function InputPage() {
           const logs = data.logs || [];
           const todayEntry = logs.find((log: TodayLog & { date: string }) => log.date === today);
           const hour = getCurrentHourJST();
+          const inGracePeriod = isGracePeriod();
           if (todayEntry && todayEntry.morningIntent) {
             setTodayLog(todayEntry);
             if (todayEntry.status === "complete" || todayEntry.status === "fb_done") {
@@ -101,8 +102,9 @@ export default function InputPage() {
             } else {
               setIsMorning(false);
             }
-          } else if (hour >= 12) {
-            // 12:00以降で朝未記入 → 朝はクローズ、夕方の振り返りを表示
+          } else if (hour >= 12 || inGracePeriod) {
+            // 12:00以降、または深夜0:00〜3:59（グレースピリオド＝前日扱い）
+            // → 朝はクローズ、夕方の振り返りを表示
             setIsMorning(false);
             setMorningClosed(true);
           } else {
