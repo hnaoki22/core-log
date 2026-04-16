@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { getTodayJST, getCurrentHourJST, isGracePeriod } from "@/lib/date-utils";
+import { getPlaceholderExample } from "@/lib/placeholder-examples";
 import { useState, useEffect, useRef } from "react";
 import { useFeatures } from "@/lib/use-features";
 import { StructuredInput } from "@/components/features/StructuredInput";
@@ -351,11 +352,12 @@ export default function InputPage() {
                     ref={isMorning ? morningTextareaRef : eveningTextareaRef}
                     value={isMorning ? morning : evening}
                     onChange={(e) => (isMorning ? setMorning(e.target.value) : setEvening(e.target.value))}
-                    placeholder={
-                      isMorning
-                        ? "例：午後のプレゼンで「結論から先に言う」を意識する"
-                        : "例：チームミーティングで意見が出やすい雰囲気を作った"
-                    }
+                    placeholder={getPlaceholderExample({
+                      token,
+                      dojoPhase: participant.dojoPhase,
+                      date: today,
+                      type: isMorning ? "morning" : "evening",
+                    })}
                     className="input-field min-h-[200px] resize-none leading-relaxed pr-12"
                   />
                   {useVoice && (
