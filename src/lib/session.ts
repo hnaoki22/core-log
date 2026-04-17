@@ -7,9 +7,10 @@
  * Node.js crypto (createHmac, timingSafeEqual) is NOT available in Edge Runtime.
  */
 
-// Use CRON_SECRET as the signing key (already available in env)
-// Falls back to a default for dev only — in prod CRON_SECRET is always set
-const SESSION_SECRET = process.env.CRON_SECRET || process.env.SESSION_SECRET || "dev-session-secret-do-not-use-in-production";
+// Use a dedicated SESSION_SECRET for stable session signing across deployments.
+// CRON_SECRET may change on each Vercel deployment, invalidating all sessions.
+// SESSION_SECRET is set explicitly in Vercel env vars and remains stable.
+const SESSION_SECRET = process.env.SESSION_SECRET || process.env.CRON_SECRET || "dev-session-secret-do-not-use-in-production";
 
 /** Session cookie duration: 30 days in seconds */
 export const SESSION_MAX_AGE = 30 * 24 * 60 * 60;
