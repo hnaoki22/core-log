@@ -85,9 +85,9 @@ export async function POST(req: NextRequest) {
     // Look up participant for email notification
     const targetParticipant = await getParticipantByName(participantName, tenantId);
     // participant_id column is UUID type; participant.id may be a string ID (e.g. "p-shimoji")
-    // Only pass it if it looks like a valid UUID, otherwise pass empty string
+    // Only pass it if it looks like a valid UUID, otherwise pass null to omit it
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    const participantDbId = (targetParticipant?.id && UUID_RE.test(targetParticipant.id)) ? targetParticipant.id : "";
+    const participantDbId = (targetParticipant?.id && UUID_RE.test(targetParticipant.id)) ? targetParticipant.id : null;
 
     let result;
     try {

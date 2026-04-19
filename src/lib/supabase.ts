@@ -1092,21 +1092,26 @@ export async function createFeedback(
     weekNum?: number;
   },
   tenantId: string,
-  participantId: string
+  participantId: string | null
 ): Promise<{ id: string } | null> {
+  // Build insert payload — only include participant_id if it's a valid UUID
+  // Empty string "" is NOT valid for UUID columns in Supabase
+  const insertPayload: Record<string, unknown> = {
+    tenant_id: tenantId,
+    participant_name: fb.participantName,
+    author_name: fb.authorName,
+    type: fb.type,
+    content: fb.content,
+    period: fb.period || "",
+    week_num: fb.weekNum ?? 0,
+    date: toDateStr(new Date()),
+  };
+  if (participantId) {
+    insertPayload.participant_id = participantId;
+  }
   const { data, error } = await getClient()
     .from("feedback")
-    .insert({
-      tenant_id: tenantId,
-      participant_id: participantId,
-      participant_name: fb.participantName,
-      author_name: fb.authorName,
-      type: fb.type,
-      content: fb.content,
-      period: fb.period || "",
-      week_num: fb.weekNum ?? 0,
-      date: toDateStr(new Date()),
-    })
+    .insert(insertPayload)
     .select("id")
     .single();
   if (error) {
