@@ -79,8 +79,12 @@ export async function POST(req: NextRequest) {
     }
 
     const authorName = manager?.name || "Human Mature";
-    const feedbackType = type || (isAdmin ? "HMãã£ã¼ãããã¯" : "ä¸å¸ã³ã¡ã³ã");
+    const feedbackType = type || (isAdmin ? "HMフィードバック" : "上司コメント");
     const tenantId = manager?.tenantId || DEFAULT_TENANT_ID;
+
+    // Look up participant first — needed for both feedback creation and email notification
+    const targetParticipant = await getParticipantByName(participantName, tenantId);
+    const participantDbId = targetParticipant?.id || "";
 
     let result;
     try {
@@ -91,7 +95,7 @@ export async function POST(req: NextRequest) {
         content,
         period: period || "",
         weekNum: weekNum || 1,
-      }, tenantId, "");
+      }, tenantId, participantDbId);
     } catch (fbError: unknown) {
       const msg = fbError instanceof Error ? fbError.message : String(fbError);
       return NextResponse.json({ error: "Failed to create feedback", detail: msg }, { status: 500 });
@@ -103,9 +107,6 @@ export async function POST(req: NextRequest) {
 
     // Send email notification to participant (non-blocking)
     try {
-      // Search all participants to find the one with matching name
-      const targetParticipant = await getParticipantByName(participantName, tenantId);
-
       if (targetParticipant?.email && !targetParticipant.email.includes("example.com") && targetParticipant.emailEnabled) {
         sendNotificationEmail({
           to: targetParticipant.email,
