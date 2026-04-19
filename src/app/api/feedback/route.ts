@@ -82,9 +82,12 @@ export async function POST(req: NextRequest) {
     const feedbackType = type || (isAdmin ? "HMフィードバック" : "上司コメント");
     const tenantId = manager?.tenantId || DEFAULT_TENANT_ID;
 
-    // Look up participant first — needed for both feedback creation and email notification
+    // Look up participant for email notification
     const targetParticipant = await getParticipantByName(participantName, tenantId);
-    const participantDbId = targetParticipant?.id || "";
+    // participant_id column is UUID type; participant.id may be a string ID (e.g. "p-shimoji")
+    // Only pass it if it looks like a valid UUID, otherwise pass empty string
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const participantDbId = (targetParticipant?.id && UUID_RE.test(targetParticipant.id)) ? targetParticipant.id : "";
 
     let result;
     try {
