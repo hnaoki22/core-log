@@ -213,10 +213,13 @@ export async function getParticipantByToken(token: string): Promise<ParticipantI
 }
 
 export async function getParticipantByName(name: string, tenantId?: string): Promise<ParticipantInfo | null> {
-  // If tenantId is provided, use Supabase
-  if (tenantId && hasSupabase()) {
+  // Search Supabase — with or without tenant filter (cross-tenant when tenantId is undefined)
+  if (hasSupabase()) {
     const sp = await getParticipantByNameFromSupabase(name, tenantId);
-    if (sp) return { ...notionParticipantToInfo(sp), backend: "supabase", tenantId };
+    if (sp) {
+      const resolvedTenant = sp.tenantId || tenantId || DEFAULT_TENANT_ID;
+      return { ...notionParticipantToInfo(sp), backend: "supabase", tenantId: resolvedTenant };
+    }
   }
   // Fallback to mock
   const mp = mockGetByName(name);

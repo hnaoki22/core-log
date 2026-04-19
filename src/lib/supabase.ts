@@ -546,19 +546,21 @@ export async function getParticipantByTokenFromSupabase(
 
 export async function getParticipantByNameFromSupabase(
   name: string,
-  tenantId: string
-): Promise<NotionParticipant | null> {
-  const { data, error } = await getClient()
+  tenantId?: string
+): Promise<(NotionParticipant & { tenantId?: string }) | null> {
+  let query = getClient()
     .from("participants")
     .select("*")
-    .eq("tenant_id", tenantId)
-    .eq("name", name)
-    .maybeSingle();
+    .eq("name", name);
+  if (tenantId) {
+    query = query.eq("tenant_id", tenantId);
+  }
+  const { data, error } = await query.maybeSingle();
   if (error) {
     logger.error("Query failed", { error: error.message, name, tenantId });
   }
   if (!data) return null;
-  return rowToParticipant(data);
+  return { ...rowToParticipant(data), tenantId: data.tenant_id };
 }
 
 // Cross-tenant: find participant by name without tenant filter (for admin views)

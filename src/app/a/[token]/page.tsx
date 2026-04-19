@@ -354,7 +354,8 @@ export default function AdminDashboard() {
     setFbContent(""); setFbPeriod(""); setFbWeekNum(1); setFbSuccess(false);
     setFbRecentLogs([]); setFbLogsLoading(true); setShowFeedbackModal(true);
     setAiDraftLoading(false);
-    fetch(`/api/feedback?token=${token}&participant=${encodeURIComponent(participantName)}&includeLogs=true`)
+    const tenantParam = selectedTenantSlug ? `&tenant=${selectedTenantSlug}` : "";
+    fetch(`/api/feedback?token=${token}&participant=${encodeURIComponent(participantName)}&includeLogs=true${tenantParam}`)
       .then((r) => r.json())
       .then((d) => setFbRecentLogs(d.recentLogs || []))
       .catch(() => setFbRecentLogs([]))
@@ -395,7 +396,8 @@ export default function AdminDashboard() {
     if (!fbContent.trim()) return;
     setFbSubmitting(true);
     try {
-      const res = await fetch("/api/feedback", {
+      const fbTenantParam = selectedTenantSlug ? `?tenant=${selectedTenantSlug}` : "";
+      const res = await fetch(`/api/feedback${fbTenantParam}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, participantName: fbTargetName, content: fbContent, period: fbPeriod, weekNum: fbWeekNum, type: "HMフィードバック" }),

@@ -10,6 +10,7 @@ import {
 } from "@/lib/supabase";
 import { getParticipantByToken, getManagerByToken, getParticipantByName } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
+import { resolveAdminTenantContext } from "@/lib/tenant-context";
 
 /**
  * GET /api/feedback?token=xxx
@@ -35,7 +36,18 @@ export async function GET(req: NextRequest) {
   const manager = await getManagerByToken(token);
   const isAdmin = await isAdminToken(token);
   if ((manager || isAdmin) && participantName) {
-    const tenantId = manager?.tenantId || DEFAULT_TENANT_ID;
+    // Resolve tenant: respect ?tenant= param for cross-tenant admin access
+    const ctx = manager
+      ? await resolveAdminTenantContext(req, manager)
+      : { tenantId: DEFAULT_TENANT_ID, isAllTenants: false, requestedSlug: null };
+
+    // When viewing all tenants, find the participant's actual tenant
+    let tenantId = ctx.tenantId || DEFAULT_TENANT_ID;
+    if (ctx.isAllTenants) {
+      const targetP = await getParticipantByName(participantName); // cross-tenant search
+      if (targetP?.tenantId) tenantId = targetP.tenantId;
+    }
+
     const includeLogs = req.nextUrl.searchParams.get("includeLogs") === "true";
     const feedback = await getFeedbackByParticipant(participantName, tenantId);
     if (includeLogs) {
@@ -80,10 +92,18 @@ export async function POST(req: NextRequest) {
 
     const authorName = manager?.name || "Human Mature";
     const feedbackType = type || (isAdmin ? "HMフィードバック" : "上司コメント");
-    const tenantId = manager?.tenantId || DEFAULT_TENANT_ID;
 
-    // Look up participant for email notification
-    const targetParticipant = await getParticipantByName(participantName, tenantId);
+    // Resolve tenant: respect ?tenant= param for cross-tenant admin access
+    const ctx = manager
+      ? await resolveAdminTenantContext(req, manager)
+      : { tenantId: DEFAULT_TENANT_ID, isAllTenants: false, requestedSlug: null };
+
+    // Look up participant — cross-tenant search when viewing all tenants
+    const targetParticipant = ctx.isAllTenants
+      ? await getParticipantByName(participantName) // cross-tenant search
+      : await getParticipantByName(participantName, ctx.tenantId || DEFAULT_TENANT_ID);
+    // Use the participant's actual tenant for creating feedback
+    const tenantId = targetParticipant?.tenantId || ctx.tenantId || DEFAULT_TENANT_ID;
     // participant_id column is UUID type; participant.id may be a string ID (e.g. "p-shimoji")
     // Only pass it if it looks like a valid UUID, otherwise pass null to omit it
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
