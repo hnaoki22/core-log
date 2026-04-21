@@ -88,13 +88,19 @@ export async function middleware(request: NextRequest) {
       const [, , token] = tokenMatch;
       const cookieHeader = request.headers.get("cookie");
 
-      // Check if session is valid (async — uses Web Crypto API for HMAC)
+      // Check if session is valid (async — uses Web Crypto API for HMAC, multi-key validation)
       const sessionValid = await isSessionValid(token, cookieHeader);
       if (!sessionValid) {
-        // Log for debugging session issues (cookie absent vs invalid)
+        // Enhanced diagnostic logging for session issues
         const cookieName = getSessionCookieName(token);
         const hasCookie = cookieHeader?.includes(cookieName) ?? false;
-        console.warn(`[OTP] Session invalid for token=${token.slice(0, 6)}... hasCookie=${hasCookie} referer=${request.headers.get("referer") || "none"}`);
+        const userAgent = request.headers.get("user-agent") || "none";
+        const isSafari = userAgent.includes("Safari") && !userAgent.includes("Chrome");
+        console.warn(
+          `[OTP] Session invalid: token=${token.slice(0, 6)}... hasCookie=${hasCookie} ` +
+          `safari=${isSafari} path=${pathname} ` +
+          `referer=${request.headers.get("referer") || "none"}`
+        );
         // Redirect to verification page
         const verifyUrl = new URL(`/verify/${token}`, request.url);
         return NextResponse.redirect(verifyUrl);
