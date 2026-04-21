@@ -8,8 +8,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
-import { isSessionValid, getSessionCookieName, SESSION_MAX_AGE } from "@/lib/session";
+import { isSessionValid, getSessionCookieName, createSignedSessionValue, SESSION_MAX_AGE } from "@/lib/session";
 import { isFeatureEnabled } from "@/lib/feature-flags";
+import { checkSession } from "@/lib/session-store";
 import { validateEnv } from "@/lib/env";
 
 // Validate environment variables on cold start
@@ -91,13 +92,42 @@ export async function middleware(request: NextRequest) {
       // Check if session is valid (async — uses Web Crypto API for HMAC, multi-key validation)
       const sessionValid = await isSessionValid(token, cookieHeader);
       if (!sessionValid) {
-        // Enhanced diagnostic logging for session issues
+        // Cookie validation failed — try Supabase-backed session as fallback.
+        // This handles iOS in-app browser cookie isolation, cookie clearing, etc.
+        const supabaseSessionValid = await checkSession(token);
+
+        if (supabaseSessionValid) {
+          // Session exists in Supabase but cookie is missing/invalid.
+          // Re-issue the cookie so future requests don't need Supabase lookup.
+          console.log(
+            `[OTP] Session recovered from Supabase: token=${token.slice(0, 6)}... ` +
+            `Reissuing cookie. path=${pathname}`
+          );
+          const cookieName = getSessionCookieName(token);
+          const signedValue = await createSignedSessionValue(token);
+          const res = NextResponse.next();
+          res.cookies.set({
+            name: cookieName,
+            value: signedValue,
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            maxAge: SESSION_MAX_AGE,
+            path: "/",
+          });
+          Object.entries(securityHeaders).forEach(([key, value]) => {
+            res.headers.set(key, value);
+          });
+          return res;
+        }
+
+        // Both cookie and Supabase validation failed — redirect to OTP verification
         const cookieName = getSessionCookieName(token);
         const hasCookie = cookieHeader?.includes(cookieName) ?? false;
         const userAgent = request.headers.get("user-agent") || "none";
         const isSafari = userAgent.includes("Safari") && !userAgent.includes("Chrome");
         console.warn(
-          `[OTP] Session invalid: token=${token.slice(0, 6)}... hasCookie=${hasCookie} ` +
+          `[OTP] Session invalid (cookie+supabase): token=${token.slice(0, 6)}... hasCookie=${hasCookie} ` +
           `safari=${isSafari} path=${pathname} ` +
           `referer=${request.headers.get("referer") || "none"}`
         );

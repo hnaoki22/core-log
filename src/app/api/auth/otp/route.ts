@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateOTP, verifyOTP, getRemainingAttempts } from "@/lib/otp";
 import { getSessionCookieName, createSignedSessionValue, SESSION_MAX_AGE } from "@/lib/session";
+import { storeSession } from "@/lib/session-store";
 import { getParticipantByToken, getManagerByToken } from "@/lib/participant-db";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { logger } from "@/lib/logger";
@@ -214,6 +215,12 @@ async function handleVerifyOTP(token: string, code: string): Promise<NextRespons
   });
 
   logger.info("OTP verified, session set", { token, email: result.email });
+
+  // Also store session in Supabase as fallback for cookie-less scenarios
+  // (iOS in-app browsers, cookie clearing, etc.)
+  storeSession(token).catch((err) => {
+    logger.warn("Failed to store session in Supabase (non-blocking)", { error: String(err) });
+  });
 
   return response;
 }
