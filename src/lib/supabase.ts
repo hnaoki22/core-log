@@ -1052,6 +1052,38 @@ export async function addMissionComment(
 // ---------------------------------------------------------------------------
 // FEEDBACK QUERIES
 // ---------------------------------------------------------------------------
+
+/**
+ * Get feedback counts per participant for a tenant (or all tenants).
+ * Returns a Map: participantName → count
+ * Used by admin dashboard to display correct FB counts.
+ */
+export async function getFeedbackCountsByTenant(
+  tenantId?: string
+): Promise<Map<string, number>> {
+  const client = getClient();
+  let query = client
+    .from("feedback")
+    .select("participant_name");
+
+  if (tenantId) {
+    query = query.eq("tenant_id", tenantId);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    logger.error("Feedback count query failed", { error: error.message, tenantId });
+    return new Map();
+  }
+
+  const counts = new Map<string, number>();
+  for (const row of data || []) {
+    const name = row.participant_name;
+    counts.set(name, (counts.get(name) || 0) + 1);
+  }
+  return counts;
+}
+
 export async function getFeedbackByParticipant(
   participantName: string,
   tenantId: string
