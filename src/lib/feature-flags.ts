@@ -53,8 +53,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "core.eveningInput",
-    label: "夕方の振り返り入力",
-    description: "毎夕、1日の気づきや学びを自由記述する欄。",
+    label: "本日の振り返り入力",
+    description: "毎日、1日の気づきや学びを自由記述する欄。",
     category: "core",
     defaultEnabled: true,
     phase1Enabled: true,

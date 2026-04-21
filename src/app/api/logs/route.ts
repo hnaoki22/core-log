@@ -4,6 +4,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLogsByParticipant, getMissionsByParticipant, getMissionComments, getFeedbackByParticipant, DEFAULT_TENANT_ID } from "@/lib/supabase";
 import { getParticipantByToken } from "@/lib/participant-db";
+import { computeParticipantStats } from "@/lib/stats";
+import { getTodayJST } from "@/lib/date-utils";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -53,6 +55,10 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Compute accurate stats using the same logic as admin/manager dashboards
+  const todayJST = getTodayJST();
+  const stats = computeParticipantStats(logs, todayJST);
+
   return NextResponse.json({
     participant: {
       id: participant.id,
@@ -63,6 +69,16 @@ export async function GET(request: NextRequest) {
     },
     logs,
     missions,
+    stats: {
+      entryDays: stats.entryDays,
+      completeDays: stats.completeDays,
+      completionRate: stats.completionRate,
+      streak: stats.streak,
+      todayStatus: stats.todayStatus,
+      morningCount: stats.morningCount,
+      eveningCount: stats.eveningCount,
+      businessDaysElapsed: stats.businessDaysElapsed,
+    },
     badges: {
       feedback: logsWithNewFeedback.length,
       feedbackTotal: feedbacks.length,

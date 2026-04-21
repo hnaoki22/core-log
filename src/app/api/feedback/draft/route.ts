@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       let entry = `【${log.date} (${log.dayOfWeek})】エネルギー: ${energyStr}`;
       entry += `\n  朝の意図: ${log.morningIntent || "未記入"}`;
       if (log.eveningInsight) {
-        entry += `\n  夕の気づき: ${log.eveningInsight}`;
+        entry += `\n  本日の振り返り: ${log.eveningInsight}`;
       }
       if (log.managerComment) {
         entry += `\n  上司コメント: ${log.managerComment}`;

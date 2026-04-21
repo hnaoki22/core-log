@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       "参加者名",
       "部署",
       "朝の意図",
-      "夕方の気づき",
+      "本日の振り返り",
       "エネルギー",
       "ステータス",
       "HMフィードバック",

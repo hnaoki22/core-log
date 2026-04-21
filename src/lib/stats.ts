@@ -122,8 +122,10 @@ export function computeParticipantStats(
 
   const entryDays = submittedLogs.length;
 
-  // FB count: logs with HM feedback
-  const fbCount = logs.filter((l) => l.hmFeedback).length;
+  // FB count: DEPRECATED — logs.hmFeedback is always null (legacy column).
+  // Real feedback counts come from the dedicated `feedback` table via getFeedbackCountsByTenant().
+  // This field is kept at 0 for backward compat; do NOT use it for display.
+  const fbCount = 0;
 
   // ===== Completion rate (time-aware, monotonic denominator) =====
   //

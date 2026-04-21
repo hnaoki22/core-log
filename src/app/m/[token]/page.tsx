@@ -50,7 +50,7 @@ export default function ManagerHome() {
   const [data, setData] = useState<ManagerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [highRiskParticipant, setHighRiskParticipant] = useState<BurnoutScore | null>(null);
+  const [highRiskParticipants, setHighRiskParticipants] = useState<BurnoutScore[]>([]);
 
   useEffect(() => {
     async function fetchData() {
@@ -66,9 +66,9 @@ export default function ManagerHome() {
             const burnoutRes = await fetch(`/api/features/burnout?token=${token}`);
             if (burnoutRes.ok) {
               const burnoutData = await burnoutRes.json();
-              const highRisk = burnoutData.scores?.find((s: BurnoutScore) => s.riskLevel === "high");
-              if (highRisk) {
-                setHighRiskParticipant(highRisk);
+              const highRisks = burnoutData.scores?.filter((s: BurnoutScore) => s.riskLevel === "high") || [];
+              if (highRisks.length > 0) {
+                setHighRiskParticipants(highRisks);
               }
             }
           } catch {
@@ -156,13 +156,15 @@ export default function ManagerHome() {
 
       <div className="max-w-md mx-auto px-5 pt-5 space-y-4 animate-fade-up relative z-10">
         {/* High Risk Burnout Alert */}
-        {highRiskParticipant && isOn("tier-a.burnoutScore") && (
+        {highRiskParticipants.length > 0 && isOn("tier-a.burnoutScore") && (
           <Link href={`/m/${token}/features/burnout`}>
             <div className="card p-3 border-2 border-red-300 bg-red-50 hover:bg-red-100 transition-colors cursor-pointer">
               <div className="flex items-start gap-2">
                 <span className="text-lg flex-shrink-0">⚠️</span>
                 <div className="flex-1">
-                  <p className="text-xs font-semibold text-red-700">要注意: {highRiskParticipant.participantName}さんのバーンアウトリスクが高まっています</p>
+                  <p className="text-xs font-semibold text-red-700">
+                    要注意: {highRiskParticipants.map((h) => h.participantName).join("・")}さんのバーンアウトリスクが高まっています
+                  </p>
                   <p className="text-[10px] text-red-600 mt-0.5">詳細を確認する →</p>
                 </div>
               </div>

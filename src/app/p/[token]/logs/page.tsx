@@ -167,7 +167,7 @@ export default function LogsPage() {
                       {log.eveningInsight && (
                         <div>
                           <div className="flex items-center gap-2 mb-1">
-                            <p className="text-[10px] font-medium text-amber-600 tracking-wide uppercase">夜の振り返り</p>
+                            <p className="text-[10px] font-medium text-amber-600 tracking-wide uppercase">本日の振り返り</p>
                             {log.eveningTime && (
                               <span className="text-[10px] text-[#C9BDAE]">{formatTime(log.eveningTime)}</span>
                             )}

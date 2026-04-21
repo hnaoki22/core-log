@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
         // Look up which participant owns this log entry
         const ownerName = await getLogEntryOwner(participantId);
         if (ownerName) {
-          const targetParticipant = await getParticipantByName(ownerName);
+          const targetParticipant = await getParticipantByName(ownerName, manager.tenantId);
           if (targetParticipant?.email && !targetParticipant.email.includes("example.com")) {
             sendNotificationEmail({
               to: targetParticipant.email,

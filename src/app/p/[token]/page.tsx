@@ -53,6 +53,10 @@ export default function ParticipantHome() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [badges, setBadges] = useState<{ feedback: number; feedbackTotal: number; mission: number }>({ feedback: 0, feedbackTotal: 0, mission: 0 });
   const [unreadFeedback, setUnreadFeedback] = useState(0);
+  const [serverStats, setServerStats] = useState<{
+    entryDays: number; completeDays: number; completionRate: number;
+    streak: number; todayStatus: string; businessDaysElapsed: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const { isOn } = useFeatures(); // features hook is still used by BottomNav via context
@@ -73,6 +77,7 @@ export default function ParticipantHome() {
         const data = await res.json();
         setParticipant(data.participant);
         setLogs(data.logs || []);
+        if (data.stats) setServerStats(data.stats);
         if (data.badges) setBadges(data.badges);
 
         if (fbRes.ok) {
@@ -131,36 +136,15 @@ export default function ParticipantHome() {
       return { text: "今日の記入を始めましょう", sub: "朝の意図設定からスタート", href: `/p/${token}/input` };
     }
     if (todayLog.status === "morning_only") {
-      return { text: "夕方の振り返りがまだです", sub: "1日の気づきを記録しましょう", href: `/p/${token}/input` };
+      return { text: "本日の振り返りがまだです", sub: "1日の気づきを記録しましょう", href: `/p/${token}/input` };
     }
     return { text: "今日の記入が完了しました", sub: "素晴らしい一日でしたね", href: null };
   };
 
-  const entryDays = logs.filter((log) => log.status !== "empty").length;
-  const totalPossibleDays = Math.max(entryDays, 1);
-  const entryRate = totalPossibleDays > 0 ? Math.round((entryDays / totalPossibleDays) * 100) : 0;
-
-  const computeStreak = () => {
-    if (logs.length === 0) return 0;
-    const sortedLogs = [...logs].filter((log) => log.status !== "empty").sort((a, b) => b.date.localeCompare(a.date));
-    if (sortedLogs.length === 0) return 0;
-    let streak = 0;
-    const todayStr = getTodayJST();
-    const today = new Date(todayStr + "T00:00:00");
-    for (let i = 0; i < sortedLogs.length; i++) {
-      const checkDate = new Date(today);
-      checkDate.setDate(checkDate.getDate() - i);
-      const checkStr = checkDate.toISOString().split("T")[0];
-      if (sortedLogs.some((log) => log.date === checkStr)) {
-        streak++;
-      } else {
-        break;
-      }
-    }
-    return streak;
-  };
-
-  const streak = computeStreak();
+  // Use server-computed stats (same logic as admin/manager dashboards)
+  const entryDays = serverStats?.entryDays ?? logs.filter((log) => log.status !== "empty").length;
+  const entryRate = serverStats?.completionRate ?? 0;
+  const streak = serverStats?.streak ?? 0;
   const todayStatus = getTodayStatus();
   const recentLogs = logs.slice(0, 5);
 

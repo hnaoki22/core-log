@@ -5,9 +5,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { isBusinessDay, getJSTDateString, getJSTDayOfWeek } from "@/lib/calendar";
-import { getLogsByParticipant, getAllTenants } from "@/lib/supabase";
+import { getAllLogsForTenant, getAllTenants } from "@/lib/supabase";
 import { getAllParticipants, getAllManagers } from "@/lib/participant-db";
-import { isProgramEnded } from "@/lib/date-utils";
+import { isProgramEnded, getTodayJST } from "@/lib/date-utils";
+import { computeParticipantStats } from "@/lib/stats";
 import { logger } from "@/lib/logger";
 
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -39,45 +40,41 @@ export async function GET(request: NextRequest) {
   }
 
   const tenants = await getAllTenants();
-  let allParticipants: Awaited<ReturnType<typeof getAllParticipants>> = [];
-  let allManagers: Awaited<ReturnType<typeof getAllManagers>> = [];
-
-  // Load all participants and managers from all tenants
-  for (const tenant of tenants) {
-    const tenantParticipants = await getAllParticipants(tenant.id);
-    const tenantManagers = await getAllManagers(tenant.id);
-    allParticipants = allParticipants.concat(tenantParticipants);
-    allManagers = allManagers.concat(tenantManagers);
-  }
-
   const isFriday = getJSTDayOfWeek() === 5;
+  const todayJST = getTodayJST();
 
   const results: { managerName: string; type: string; sent: boolean; reason?: string }[] = [];
 
-  for (const manager of allManagers) {
-    if (!manager.email) continue;
+  // Process each tenant with batch queries (not N+1)
+  for (const tenant of tenants) {
+    const [tenantParticipants, tenantManagers, allLogsMap] = await Promise.all([
+      getAllParticipants(tenant.id),
+      getAllManagers(tenant.id),
+      getAllLogsForTenant(tenant.id),
+    ]);
 
-    // Find this manager's participants (from same tenant)
-    const myParticipants = allParticipants.filter((p) => p.managerId === manager.id && p.tenantId === manager.tenantId);
-    if (myParticipants.length === 0) continue;
+    for (const manager of tenantManagers) {
+      if (!manager.email) continue;
 
-    // Check for each participant if manager has commented recently
-    const participantsNeedingAttention: string[] = [];
-    const participantStats: {
-      name: string;
-      entryDays: number;
-      lastEntry: string | null;
-      streak: number;
-    }[] = [];
+      const myParticipants = tenantParticipants.filter((p) => p.managerId === manager.id);
+      if (myParticipants.length === 0) continue;
 
-    for (const p of myParticipants) {
-      // Skip participants whose program hasn't started yet
-      if (p.startDate && todayStr < p.startDate) continue;
-      // Skip ended programs
-      if (p.endDate && isProgramEnded(p.endDate)) continue;
+      const participantsNeedingAttention: string[] = [];
+      const participantStatsList: {
+        name: string;
+        entryDays: number;
+        lastEntry: string | null;
+        streak: number;
+        weekEntryDays: number;
+        businessDaysThisWeek: number;
+      }[] = [];
 
-      try {
-        const logs = await getLogsByParticipant(p.name, p.tenantId || tenants[0]?.id);
+      for (const p of myParticipants) {
+        if (p.startDate && todayStr < p.startDate) continue;
+        if (p.endDate && isProgramEnded(p.endDate)) continue;
+
+        const logs = allLogsMap.get(p.name) || [];
+        if (logs.length === 0) continue;
 
         // Check if manager commented in last 3 days
         const recentLogs = logs.filter((l) => {
@@ -85,68 +82,64 @@ export async function GET(request: NextRequest) {
           return diff >= 0 && diff <= 3;
         });
         const hasRecentComment = recentLogs.some((l) => l.managerComment);
-        if (!hasRecentComment && logs.length > 0) {
+        if (!hasRecentComment) {
           participantsNeedingAttention.push(p.name);
         }
 
-        // Weekly stats for Friday summary
+        // Weekly stats for Friday summary — use stats.ts for accurate streak
         if (isFriday) {
+          const stats = computeParticipantStats(logs, todayJST);
           const weekLogs = logs.filter((l) => {
             const diff = daysBetween(l.date, todayStr);
             return diff >= 0 && diff < 7;
           });
-          const entryDays = weekLogs.filter((l) => l.morningIntent || l.eveningInsight).length;
+          const weekEntryDays = weekLogs.filter((l) => l.morningIntent || l.eveningInsight).length;
 
-          // Calculate streak
-          let streak = 0;
-          const entryDates = new Set(logs.filter((l) => l.morningIntent || l.eveningInsight).map((l) => l.date));
+          // Count actual business days this week (Mon-Fri, excluding holidays)
+          let businessDaysThisWeek = 0;
           let checkDate = todayStr;
-          for (let i = 0; i < 30; i++) {
-            if (entryDates.has(checkDate)) {
-              streak++;
-            } else if (getDayOfWeek(checkDate) !== 0 && getDayOfWeek(checkDate) !== 6) {
-              break;
-            }
+          for (let i = 0; i < 7; i++) {
+            if (isBusinessDay(checkDate)) businessDaysThisWeek++;
             checkDate = subtractOneDay(checkDate);
           }
 
-          participantStats.push({
+          participantStatsList.push({
             name: p.name,
-            entryDays,
+            entryDays: stats.entryDays,
             lastEntry: logs[0]?.date || null,
-            streak,
+            streak: stats.streak,
+            weekEntryDays,
+            businessDaysThisWeek,
           });
         }
-      } catch {
-        // skip this participant
       }
-    }
 
-    // Send nudge reminder if needed
-    if (participantsNeedingAttention.length > 0) {
-      const sent = await sendManagerNudge(
-        manager.email,
-        manager.name,
-        manager.token,
-        participantsNeedingAttention
-      );
-      results.push({
-        managerName: manager.name,
-        type: "nudge",
-        sent,
-        reason: `${participantsNeedingAttention.length} participants need attention`,
-      });
-    }
+      // Send nudge reminder if needed
+      if (participantsNeedingAttention.length > 0) {
+        const sent = await sendManagerNudge(
+          manager.email,
+          manager.name,
+          manager.token,
+          participantsNeedingAttention
+        );
+        results.push({
+          managerName: manager.name,
+          type: "nudge",
+          sent,
+          reason: `${participantsNeedingAttention.length} participants need attention`,
+        });
+      }
 
-    // Send weekly summary on Fridays
-    if (isFriday && participantStats.length > 0) {
-      const sent = await sendWeeklySummary(
-        manager.email,
-        manager.name,
-        manager.token,
-        participantStats
-      );
-      results.push({ managerName: manager.name, type: "weekly_summary", sent });
+      // Send weekly summary on Fridays
+      if (isFriday && participantStatsList.length > 0) {
+        const sent = await sendWeeklySummary(
+          manager.email,
+          manager.name,
+          manager.token,
+          participantStatsList
+        );
+        results.push({ managerName: manager.name, type: "weekly_summary", sent });
+      }
     }
   }
 
@@ -168,10 +161,6 @@ function daysBetween(from: string, to: string): number {
   const f = new Date(from + "T12:00:00+09:00");
   const t = new Date(to + "T12:00:00+09:00");
   return Math.abs(Math.round((t.getTime() - f.getTime()) / (1000 * 60 * 60 * 24)));
-}
-
-function getDayOfWeek(dateStr: string): number {
-  return new Date(dateStr + "T12:00:00+09:00").getUTCDay();
 }
 
 function subtractOneDay(dateStr: string): string {
@@ -244,7 +233,7 @@ async function sendWeeklySummary(
   to: string,
   managerName: string,
   managerToken: string,
-  stats: { name: string; entryDays: number; lastEntry: string | null; streak: number }[]
+  stats: { name: string; entryDays: number; lastEntry: string | null; streak: number; weekEntryDays: number; businessDaysThisWeek: number }[]
 ): Promise<boolean> {
   if (!RESEND_API_KEY) {
     logger.info("Weekly summary skipped: no API key", { managerName });
@@ -257,7 +246,7 @@ async function sendWeeklySummary(
       (s) => `
     <tr>
       <td style="padding: 8px 12px; border-bottom: 1px solid #EFE8DD; font-size: 14px;">${s.name}</td>
-      <td style="padding: 8px 12px; border-bottom: 1px solid #EFE8DD; text-align: center; font-size: 14px;">${s.entryDays}/5日</td>
+      <td style="padding: 8px 12px; border-bottom: 1px solid #EFE8DD; text-align: center; font-size: 14px;">${s.weekEntryDays}/${s.businessDaysThisWeek}日</td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #EFE8DD; text-align: center; font-size: 14px;">${s.streak}日連続</td>
     </tr>
   `

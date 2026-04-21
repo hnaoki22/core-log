@@ -125,7 +125,7 @@ export default async function ParticipantDetailPage({ params }: Params) {
                   {entry.eveningInsight && (
                     <div className="mb-2">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-[10px] font-medium text-amber-600 tracking-wide uppercase">夕の気づき</span>
+                        <span className="text-[10px] font-medium text-amber-600 tracking-wide uppercase">本日の振り返り</span>
                         {entry.eveningTime && (
                           <span className="text-[10px] text-[#C9BDAE]">{formatTime(entry.eveningTime)}</span>
                         )}

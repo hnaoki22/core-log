@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       const hour = getCurrentHourJST();
       if (hour >= 12 || isGracePeriod()) {
         return NextResponse.json(
-          { error: "朝の意図設定は12:00までです。夕方の振り返りをご記入ください。", morningClosed: true },
+          { error: "朝の意図設定は12:00までです。本日の振り返りをご記入ください。", morningClosed: true },
           { status: 403 }
         );
       }
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
               senderName: participantName || participant.name,
               token: mgr.token,
               type: "daily_log_submitted",
-              detail: `夕の気づき：${sanitizedEveningInsight.substring(0, 60)}${sanitizedEveningInsight.length > 60 ? "…" : ""}`,
+              detail: `本日の振り返り：${sanitizedEveningInsight.substring(0, 60)}${sanitizedEveningInsight.length > 60 ? "…" : ""}`,
             });
           }
         }
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
               senderName: participantName,
               token: mgr.token,
               type: "daily_log_submitted",
-              detail: `夕の振り返り：${sanitizedEveningInsight.substring(0, 60)}${sanitizedEveningInsight.length > 60 ? "…" : ""}`,
+              detail: `本日の振り返り：${sanitizedEveningInsight.substring(0, 60)}${sanitizedEveningInsight.length > 60 ? "…" : ""}`,
             });
           }
         }

@@ -105,7 +105,7 @@ export default function InputPage() {
             }
           } else if (hour >= 12 || inGracePeriod) {
             // 12:00以降、または深夜0:00〜3:59（グレースピリオド＝前日扱い）
-            // → 朝はクローズ、夕方の振り返りを表示
+            // → 朝はクローズ、本日の振り返りを表示
             setIsMorning(false);
             setMorningClosed(true);
           } else {
@@ -154,7 +154,7 @@ export default function InputPage() {
             </svg>
           </div>
           <h2 className="text-xl font-semibold text-[#1A1A2E] mb-2">今日の記入は完了済みです</h2>
-          <p className="text-[#5B5560] text-sm mb-8">朝の意図と夕方の振り返りが記入されています</p>
+          <p className="text-[#5B5560] text-sm mb-8">朝の意図と本日の振り返りが記入されています</p>
           <button
             onClick={() => router.push(`/p/${token}`)}
             className="btn-primary w-full py-3.5 text-sm"
@@ -296,7 +296,7 @@ export default function InputPage() {
             戻る
           </button>
           <h1 className="text-xl font-semibold tracking-tight">
-            {isMorning ? "朝の意図設定" : "夜の振り返り"}
+            {isMorning ? "朝の意図設定" : "本日の振り返り"}
           </h1>
           <p className="text-indigo-200 text-sm mt-1.5 font-light">
             {isMorning ? "今日、ひとつだけ意識するとしたら？" : "今日やってみてどうでしたか？"}
