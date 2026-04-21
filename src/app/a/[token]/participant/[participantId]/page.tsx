@@ -2,7 +2,7 @@
 // Shows full log history for a single participant (read-only from admin perspective)
 
 import Link from "next/link";
-import { getLogsByParticipant, getMissionsByParticipant, getParticipantByNameCrossTenant, NotionLogEntry, DEFAULT_TENANT_ID } from "@/lib/supabase";
+import { getLogsByParticipant, getMissionsByParticipant, getParticipantByNameCrossTenant, getFeedbackByParticipant, NotionLogEntry, DEFAULT_TENANT_ID } from "@/lib/supabase";
 import { getManagerByToken } from "@/lib/participant-db";
 import { formatTimeJST, formatFullDateTimeJST } from "@/lib/date-utils";
 import { hasMorning, hasEvening, getDayStatus, computeParticipantStats } from "@/lib/stats";
@@ -35,6 +35,8 @@ export default async function AdminParticipantPage({ params }: Params) {
   let logs: NotionLogEntry[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let missions: any[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let feedbacks: any[] = [];
 
   try {
     // Admin views participants across tenants, so we must resolve
@@ -52,12 +54,14 @@ export default async function AdminParticipantPage({ params }: Params) {
       tenantId = manager?.tenantId || DEFAULT_TENANT_ID;
     }
 
-    const [fetchedLogs, fetchedMissions] = await Promise.all([
+    const [fetchedLogs, fetchedMissions, fetchedFeedbacks] = await Promise.all([
       getLogsByParticipant(participantName, tenantId),
       getMissionsByParticipant(participantName, tenantId),
+      getFeedbackByParticipant(participantName, tenantId),
     ]);
     logs = fetchedLogs;
     missions = fetchedMissions;
+    feedbacks = fetchedFeedbacks;
   } catch (e) {
     console.error("Failed to fetch data:", e);
   }
@@ -150,6 +154,32 @@ export default async function AdminParticipantPage({ params }: Params) {
                   {m.content && (
                     <p className="text-xs text-[#8B8489] leading-relaxed">{m.content}</p>
                   )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* HM Feedback History (from feedback table) */}
+        {feedbacks.length > 0 && (
+          <section className="card overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#EFE8DD]">
+              <h2 className="text-xs font-semibold text-[#5B5560] tracking-wide uppercase">
+                HMフィードバック ({feedbacks.length}件)
+              </h2>
+            </div>
+            <div className="divide-y divide-[#EFE8DD]">
+              {feedbacks.map((fb: { id: string; content: string; authorName: string; type: string; period: string; weekNum: number; date: string }) => (
+                <div key={fb.id} className="p-4">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-medium text-amber-600">{fb.type || "HMフィードバック"}</span>
+                    <span className="text-[10px] text-[#8B8489]">
+                      {fb.date || ""}
+                      {fb.period ? ` · ${fb.period}` : ""}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#2C2C4A] leading-relaxed whitespace-pre-wrap">{fb.content}</p>
+                  <div className="mt-1 text-[10px] text-[#8B8489]">by {fb.authorName}</div>
                 </div>
               ))}
             </div>

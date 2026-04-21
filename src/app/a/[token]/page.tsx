@@ -150,6 +150,12 @@ export default function AdminDashboard() {
   const [managerImportLoading, setManagerImportLoading] = useState(false);
   const [managerImportError, setManagerImportError] = useState<typeof importError>(null);
 
+  // FB History modal state (read-only, available to observers)
+  const [showFbHistory, setShowFbHistory] = useState(false);
+  const [fbHistoryTarget, setFbHistoryTarget] = useState("");
+  const [fbHistoryList, setFbHistoryList] = useState<{ id: string; content: string; authorName: string; type: string; period: string; weekNum: number; date: string; isRead: boolean }[]>([]);
+  const [fbHistoryLoading, setFbHistoryLoading] = useState(false);
+
   const handleExport = async () => {
     setExporting(true);
     try {
@@ -347,6 +353,17 @@ export default function AdminDashboard() {
         if (refreshRes.ok) setData(await refreshRes.json());
       } else { alert(result.error || "追加に失敗しました"); }
     } catch { alert("エラーが発生しました"); } finally { setSubmitting(false); }
+  };
+
+  const openFbHistory = (participantName: string) => {
+    setFbHistoryTarget(participantName);
+    setFbHistoryList([]); setFbHistoryLoading(true); setShowFbHistory(true);
+    const tenantParam = selectedTenantSlug ? `&tenant=${selectedTenantSlug}` : "";
+    fetch(`/api/feedback?token=${token}&participant=${encodeURIComponent(participantName)}${tenantParam}`)
+      .then((r) => r.json())
+      .then((d) => setFbHistoryList(d.feedback || []))
+      .catch(() => setFbHistoryList([]))
+      .finally(() => setFbHistoryLoading(false));
   };
 
   const openFeedbackModal = (participantName: string) => {
@@ -819,6 +836,12 @@ export default function AdminDashboard() {
                         >
                           ログ
                         </a>
+                        <button
+                          onClick={() => openFbHistory(p.name)}
+                          className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
+                        >
+                          FB履歴
+                        </button>
                         {!isObserver && (
                           <>
                             <button
@@ -1237,6 +1260,43 @@ export default function AdminDashboard() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* FB History Modal (read-only, visible to admin + observer) */}
+      {showFbHistory && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
+            <div className="p-5 border-b border-[#EFE8DD] flex items-center justify-between">
+              <h3 className="text-base font-semibold text-[#1A1A2E]">{fbHistoryTarget} のFB履歴</h3>
+              <button onClick={() => setShowFbHistory(false)} className="text-[#8B8489] hover:text-[#5B5560]">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto flex-1">
+              {fbHistoryLoading ? (
+                <div className="text-center text-sm text-[#8B8489] py-8">読み込み中...</div>
+              ) : fbHistoryList.length === 0 ? (
+                <div className="text-center text-sm text-[#8B8489] py-8">フィードバック履歴がありません</div>
+              ) : (
+                <div className="space-y-4">
+                  {fbHistoryList.map((fb) => (
+                    <div key={fb.id} className="bg-amber-50/50 border border-amber-100 rounded-xl p-3">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] font-medium text-amber-600">{fb.type || "HMフィードバック"}</span>
+                        <span className="text-[10px] text-[#8B8489]">
+                          {fb.date || ""}
+                          {fb.period ? ` · ${fb.period}` : ""}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#2C2C4A] leading-relaxed whitespace-pre-wrap">{fb.content}</p>
+                      <div className="mt-1.5 text-[10px] text-[#8B8489]">by {fb.authorName}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
