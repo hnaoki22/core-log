@@ -2,7 +2,7 @@
 // Returns manager info + enriched participant data
 
 import { NextRequest, NextResponse } from "next/server";
-import { getAllLogsForTenant, DEFAULT_TENANT_ID } from "@/lib/supabase";
+import { getAllLogsForTenant, DEFAULT_TENANT_ID, getFeedbackCountsByTenant } from "@/lib/supabase";
 import {
   getManagerByToken,
   getParticipantsForManager,
@@ -25,9 +25,10 @@ export async function GET(request: NextRequest) {
   const tenantId = manager.tenantId || DEFAULT_TENANT_ID;
 
   // Fetch participants and ALL logs in parallel (2 queries instead of N+1)
-  const [participantMocks, allLogsMap] = await Promise.all([
+  const [participantMocks, allLogsMap, feedbackCounts] = await Promise.all([
     getParticipantsForManager(manager.id, tenantId),
     getAllLogsForTenant(tenantId),
+    getFeedbackCountsByTenant(tenantId),
   ]);
   const todayJST = getTodayJST();
 
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
         entryDays: stats.entryDays,
         entryRate: stats.completionRate,
         streak: stats.streak,
-        fbCount: stats.fbCount,
+        fbCount: feedbackCounts.get(p.name) || 0,
         todayHasLog: stats.todayStatus !== "none",
         latestLog: latestLog
           ? {

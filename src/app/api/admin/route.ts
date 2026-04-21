@@ -2,7 +2,7 @@
 // Returns all participants + managers with enriched Supabase data
 
 import { NextRequest, NextResponse } from "next/server";
-import { DEFAULT_TENANT_ID, getAllLogsForTenant, getTenantBySlug, getAllTenants } from "@/lib/supabase";
+import { DEFAULT_TENANT_ID, getAllLogsForTenant, getTenantBySlug, getAllTenants, getFeedbackCountsByTenant } from "@/lib/supabase";
 import {
   getAllParticipants,
   getAllManagers,
@@ -47,11 +47,12 @@ export async function GET(request: NextRequest) {
 
   // Fetch ALL data in parallel — 4 queries total instead of N+1
   // When tenantId is null, queries fetch from all tenants
-  const [participantMocks, managers, allLogsMap, tenants] = await Promise.all([
+  const [participantMocks, managers, allLogsMap, tenants, feedbackCounts] = await Promise.all([
     getAllParticipants(tenantId),
     getAllManagers(tenantId),
     getAllLogsForTenant(tenantId ?? undefined),
     manager.isAdmin ? getAllTenants() : Promise.resolve([]),
+    getFeedbackCountsByTenant(tenantId ?? undefined),
   ]);
   const todayJST = getTodayJST();
 
@@ -79,7 +80,7 @@ export async function GET(request: NextRequest) {
         entryDays: stats.entryDays,
         entryRate: stats.completionRate, // now uses completion rate
         streak: stats.streak,
-        fbCount: stats.fbCount,
+        fbCount: feedbackCounts.get(p.name) || 0,
         managerId: p.managerId,
         fbPolicy: p.fbPolicy || "",
         weekNum: calculateWeekNum(p.startDate || ""),
