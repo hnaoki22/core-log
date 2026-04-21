@@ -4,6 +4,7 @@
 
 import { getParticipantByEmail } from "./participant-db";
 import { logger } from "./logger";
+import { escapeHtml } from "./sanitize";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const FROM_EMAIL = process.env.REMIND_FROM_EMAIL || "CORE Log <noreply@resend.dev>";
@@ -214,7 +215,7 @@ function buildNotificationEmail(options: NotificationOptions) {
             </div>
             <p>${recipientName}さん</p>
             <p><strong>${senderName}</strong>さんがミッションにコメントしました。</p>
-            ${detail ? `<div style="background: #F5E5BF; border-left: 4px solid #C17817; padding: 12px 16px; margin: 16px 0; border-radius: 4px;"><p style="margin: 0; color: #9A3412; font-size: 14px;">${detail}</p></div>` : ""}
+            ${detail ? `<div style="background: #F5E5BF; border-left: 4px solid #C17817; padding: 12px 16px; margin: 16px 0; border-radius: 4px;"><p style="margin: 0; color: #9A3412; font-size: 14px;">${escapeHtml(detail)}</p></div>` : ""}
             <div style="text-align: center; margin: 24px 0;">
               <a href="${url}" style="display: inline-block; background: #C17817; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
                 ミッションを確認する →
@@ -237,7 +238,7 @@ function buildNotificationEmail(options: NotificationOptions) {
             </div>
             <p>${recipientName}さん</p>
             <p><strong>${senderName}</strong>さんが新しいミッションを設定しました。</p>
-            ${detail ? `<div style="background: #F2F2F7; border-left: 4px solid #1A1A2E; padding: 12px 16px; margin: 16px 0; border-radius: 4px;"><p style="margin: 0; color: #141423; font-size: 14px; font-weight: bold;">${detail}</p></div>` : ""}
+            ${detail ? `<div style="background: #F2F2F7; border-left: 4px solid #1A1A2E; padding: 12px 16px; margin: 16px 0; border-radius: 4px;"><p style="margin: 0; color: #141423; font-size: 14px; font-weight: bold;">${escapeHtml(detail)}</p></div>` : ""}
             <div style="text-align: center; margin: 24px 0;">
               <a href="${url}" style="display: inline-block; background: #1A1A2E; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
                 ミッションを確認する →
@@ -260,7 +261,7 @@ function buildNotificationEmail(options: NotificationOptions) {
             </div>
             <p>${recipientName}さん</p>
             <p><strong>${senderName}</strong>さんがあなたの日報にコメントしました。</p>
-            ${detail ? `<div style="background: #EFF6FF; border-left: 4px solid #1A1A2E; padding: 12px 16px; margin: 16px 0; border-radius: 4px;"><p style="margin: 0; color: #1E40AF; font-size: 14px;">${detail}</p></div>` : ""}
+            ${detail ? `<div style="background: #EFF6FF; border-left: 4px solid #1A1A2E; padding: 12px 16px; margin: 16px 0; border-radius: 4px;"><p style="margin: 0; color: #1E40AF; font-size: 14px;">${escapeHtml(detail)}</p></div>` : ""}
             <div style="text-align: center; margin: 24px 0;">
               <a href="${url}" style="display: inline-block; background: #1A1A2E; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
                 日報を確認する →
@@ -309,7 +310,7 @@ function buildNotificationEmail(options: NotificationOptions) {
             </div>
             <p>${recipientName}さん</p>
             <p><strong>${senderName}</strong>さんが日報を投稿しました。</p>
-            ${detail ? `<div style="background: #F0FDF4; border-left: 4px solid #22C55E; padding: 12px 16px; margin: 16px 0; border-radius: 4px;"><p style="margin: 0; color: #166534; font-size: 14px;">${detail}</p></div>` : ""}
+            ${detail ? `<div style="background: #F0FDF4; border-left: 4px solid #22C55E; padding: 12px 16px; margin: 16px 0; border-radius: 4px;"><p style="margin: 0; color: #166534; font-size: 14px;">${escapeHtml(detail)}</p></div>` : ""}
             <div style="text-align: center; margin: 24px 0;">
               <a href="${url}" style="display: inline-block; background: #22C55E; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
                 ダッシュボードを確認する →
