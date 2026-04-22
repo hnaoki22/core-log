@@ -35,7 +35,6 @@ export async function GET(request: NextRequest) {
   // tenantSlug === "some-slug" means a specific tenant was selected (admin only)
   // Observer (non-admin): strict resolver — must have tenantId
   let tenantId: string | null;
-  const isAllTenants = !tenantSlug && manager.isAdmin;
 
   if (manager.isAdmin) {
     // Admin can view any tenant or all tenants
