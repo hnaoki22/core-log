@@ -6,7 +6,7 @@
  * If it misfires, security controls are silently bypassed.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { isProductionMode, isMockFallbackEnabled } from "./env";
 
 describe("isProductionMode", () => {
