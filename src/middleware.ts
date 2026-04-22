@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { rateLimit, getClientIp, buildRateLimitKey } from "@/lib/rate-limit";
 import { isSessionValid, getSessionCookieName, createSignedSessionValue, SESSION_MAX_AGE } from "@/lib/session";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { checkSession } from "@/lib/session-store";
@@ -33,7 +33,8 @@ function logApiRequest(
   method: string,
   path: string,
   ip: string,
-  rateLimitStatus?: { success: boolean; remaining: number }
+  rateLimitStatus?: { success: boolean; remaining: number },
+  rateLimitKey?: string
 ) {
   const logEntry = {
     timestamp: new Date().toISOString(),
@@ -41,6 +42,7 @@ function logApiRequest(
     method,
     path,
     ip,
+    rateLimitKey,
     rateLimit: rateLimitStatus,
   };
 
@@ -193,11 +195,13 @@ export async function middleware(request: NextRequest) {
     // Only apply rate limiting if we have a valid IP
     // Skip for "unknown" IPs to avoid incorrectly rate-limiting them together
     if (clientIp !== "unknown") {
-      // Apply rate limiting to API routes
-      const rateLimitResult = rateLimit(clientIp, 60, 60000);
+      // Build composite key: `${tokenPrefix}:${ip}` when authenticated, else `${ip}`.
+      // This keeps tenants sharing a NAT from draining each other's bucket.
+      const rateLimitKey = buildRateLimitKey(request, clientIp);
+      const rateLimitResult = rateLimit(rateLimitKey, 60, 60000);
 
       // Log the request
-      logApiRequest(method, pathname, clientIp, rateLimitResult);
+      logApiRequest(method, pathname, clientIp, rateLimitResult, rateLimitKey);
 
       // If rate limited, return 429
       if (!rateLimitResult.success) {
