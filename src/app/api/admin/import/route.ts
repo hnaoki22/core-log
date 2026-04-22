@@ -7,8 +7,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getManagerByToken, isAdminToken } from "@/lib/participant-db";
+import { resolveManagerTenantStrict } from "@/lib/tenant-context";
 import {
-  DEFAULT_TENANT_ID,
   createParticipantInSupabase as createParticipant,
   createManagerInSupabase as createManager,
   getAllManagersFromSupabase as getAllManagers,
@@ -152,7 +152,11 @@ export async function POST(request: NextRequest) {
     if (!manager || !manager.isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
-    const tenantId = manager.tenantId || DEFAULT_TENANT_ID;
+    const tenantResult = resolveManagerTenantStrict(manager);
+    if (!tenantResult.ok) {
+      return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
+    }
+    const tenantId = tenantResult.tenantId;
 
     if (!csv || typeof csv !== "string") {
       return NextResponse.json(

@@ -37,10 +37,31 @@ import {
   type Participant,
   type Manager,
 } from "./mock-data";
+import { isMockFallbackEnabled, isProductionMode } from "./env";
+import { logger } from "./logger";
 
 // Check backend availability
 function hasSupabase(): boolean {
   return !!(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL);
+}
+
+/**
+ * Whether mock-data fallback is allowed in the current environment.
+ * Production deployments must NOT fall through to mock fixtures — doing so
+ * lets development tokens, hardcoded admin tokens, and test participants
+ * leak into real traffic.
+ *
+ * We log the first skipped-mock event so anyone debugging a "missing user"
+ * in production sees why — rather than silently returning null.
+ */
+let mockFallbackWarnedOnce = false;
+function shouldUseMockFallback(context: string): boolean {
+  if (isMockFallbackEnabled()) return true;
+  if (!mockFallbackWarnedOnce) {
+    mockFallbackWarnedOnce = true;
+    logger.warn("mock fallback blocked in production", { context });
+  }
+  return false;
 }
 
 // ===== Unified types that all backends can provide =====
@@ -175,6 +196,7 @@ export async function getAllParticipants(tenantId?: string | null): Promise<Part
       tenantId: tid || "all",
     }));
   }
+  if (!shouldUseMockFallback("getAllParticipants")) return [];
   return mockGetAllParticipants().map(mockParticipantToInfo);
 }
 
@@ -207,7 +229,8 @@ export async function getParticipantByToken(token: string): Promise<ParticipantI
       // Supabase lookup failed — continue to mock
     }
   }
-  // 2. Fallback to mock
+  // 2. Fallback to mock (non-production only)
+  if (!shouldUseMockFallback("getParticipantByToken")) return null;
   const mp = mockGetByToken(token);
   return mp ? mockParticipantToInfo(mp) : null;
 }
@@ -221,7 +244,8 @@ export async function getParticipantByName(name: string, tenantId?: string): Pro
       return { ...notionParticipantToInfo(sp), backend: "supabase", tenantId: resolvedTenant };
     }
   }
-  // Fallback to mock
+  // Fallback to mock (non-production only)
+  if (!shouldUseMockFallback("getParticipantByName")) return null;
   const mp = mockGetByName(name);
   return mp ? mockParticipantToInfo(mp) : null;
 }
@@ -231,7 +255,8 @@ export async function getParticipantByEmail(email: string, tenantId?: string): P
     const sp = await getParticipantByEmailFromSupabase(email, tenantId);
     if (sp) return { ...notionParticipantToInfo(sp), backend: "supabase", tenantId };
   }
-  // Fallback to mock
+  // Fallback to mock (non-production only)
+  if (!shouldUseMockFallback("getParticipantByEmail")) return null;
   const mp = mockGetByEmail(email);
   return mp ? mockParticipantToInfo(mp) : null;
 }
@@ -254,6 +279,7 @@ export async function getParticipantById(id: string, tenantId?: string): Promise
       // Continue to mock
     }
   }
+  if (!shouldUseMockFallback("getParticipantById")) return null;
   const mp = mockGetById(id);
   return mp ? mockParticipantToInfo(mp) : null;
 }
@@ -268,6 +294,7 @@ export async function getAllManagers(tenantId?: string | null): Promise<ManagerI
       tenantId: tid || "all",
     }));
   }
+  if (!shouldUseMockFallback("getAllManagers")) return [];
   return mockGetAllManagers().map(mockManagerToInfo);
 }
 
@@ -300,7 +327,8 @@ export async function getManagerByToken(token: string): Promise<ManagerInfo | nu
       // Continue to mock
     }
   }
-  // 2. Fallback to mock
+  // 2. Fallback to mock (non-production only)
+  if (!shouldUseMockFallback("getManagerByToken")) return null;
   const mm = mockGetManagerByToken(token);
   return mm ? mockManagerToInfo(mm) : null;
 }
@@ -315,6 +343,7 @@ export async function getManagerById(id: string): Promise<ManagerInfo | null> {
       // Continue to mock
     }
   }
+  if (!shouldUseMockFallback("getManagerById")) return null;
   const mm = mockGetManagerById(id);
   return mm ? mockManagerToInfo(mm) : null;
 }
@@ -328,7 +357,8 @@ export async function getParticipantsForManager(managerId: string, tenantId?: st
       tenantId,
     }));
   }
-  // Fallback to mock
+  // Fallback to mock (non-production only)
+  if (!shouldUseMockFallback("getParticipantsForManager")) return [];
   return mockGetParticipantsForManager(managerId).map(mockParticipantToInfo);
 }
 
@@ -342,8 +372,18 @@ export async function isAdminToken(token: string): Promise<boolean> {
       // Continue to fallback
     }
   }
-  // Read from environment variable with fallback defaults
-  const ADMIN_TOKENS = (process.env.ADMIN_TOKENS || "munetomo-admin,UE8m8SSJAgRBwsSZ")
+  // Env-var fallback. In production, REQUIRE process.env.ADMIN_TOKENS —
+  // hardcoded tokens "munetomo-admin,UE8m8SSJAgRBwsSZ" are a development
+  // convenience and MUST NOT be valid against real tenants.
+  const envTokens = process.env.ADMIN_TOKENS;
+  if (isProductionMode()) {
+    if (!envTokens) return false;
+    const allowed = envTokens.split(",").map((t) => t.trim()).filter(Boolean);
+    return allowed.includes(token);
+  }
+
+  // Non-production: allow legacy hardcoded tokens for local development.
+  const ADMIN_TOKENS = (envTokens || "munetomo-admin,UE8m8SSJAgRBwsSZ")
     .split(",")
     .map((t) => t.trim());
   return ADMIN_TOKENS.includes(token);

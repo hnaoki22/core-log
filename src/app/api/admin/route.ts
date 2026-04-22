@@ -2,7 +2,7 @@
 // Returns all participants + managers with enriched Supabase data
 
 import { NextRequest, NextResponse } from "next/server";
-import { DEFAULT_TENANT_ID, getAllLogsForTenant, getTenantBySlug, getAllTenants, getFeedbackCountsByTenant } from "@/lib/supabase";
+import { getAllLogsForTenant, getTenantBySlug, getAllTenants, getFeedbackCountsByTenant } from "@/lib/supabase";
 import {
   getAllParticipants,
   getAllManagers,
@@ -10,6 +10,7 @@ import {
 } from "@/lib/participant-db";
 import { computeParticipantStats } from "@/lib/stats";
 import { getTodayJST, calculateWeekNum } from "@/lib/date-utils";
+import { resolveManagerTenantStrict } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
 
@@ -30,19 +31,28 @@ export async function GET(request: NextRequest) {
   const viewerRole = manager.role;
 
   // Determine which tenant to view
-  // tenantSlug === null means "全テナント" (all tenants) was selected
-  // tenantSlug === "some-slug" means a specific tenant was selected
-  let tenantId: string | null = manager.tenantId || DEFAULT_TENANT_ID;
+  // tenantSlug === null means "全テナント" (all tenants) was selected (admin only)
+  // tenantSlug === "some-slug" means a specific tenant was selected (admin only)
+  // Observer (non-admin): strict resolver — must have tenantId
+  let tenantId: string | null;
   const isAllTenants = !tenantSlug && manager.isAdmin;
 
-  if (tenantSlug && manager.isAdmin) {
-    const requestedTenant = await getTenantBySlug(tenantSlug);
-    if (requestedTenant) {
-      tenantId = requestedTenant.id;
+  if (manager.isAdmin) {
+    // Admin can view any tenant or all tenants
+    if (tenantSlug) {
+      const requestedTenant = await getTenantBySlug(tenantSlug);
+      tenantId = requestedTenant ? requestedTenant.id : null;
+    } else {
+      // Admin selected "全テナント" — fetch across all tenants
+      tenantId = null;
     }
-  } else if (isAllTenants) {
-    // Admin selected "全テナント" — fetch across all tenants
-    tenantId = null;
+  } else {
+    // Observer — strict: must have tenantId, otherwise 403
+    const tenantResult = resolveManagerTenantStrict(manager);
+    if (!tenantResult.ok) {
+      return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
+    }
+    tenantId = tenantResult.tenantId;
   }
 
   // Fetch ALL data in parallel — 4 queries total instead of N+1

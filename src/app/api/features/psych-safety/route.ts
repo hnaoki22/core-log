@@ -3,10 +3,11 @@
 // Fetches recent manager feedback and comments, analyzes for safety signals
 
 import { NextRequest, NextResponse } from "next/server";
-import { DEFAULT_TENANT_ID, getClient } from "@/lib/supabase";
+import { getClient } from "@/lib/supabase";
 import { getManagerByToken } from "@/lib/participant-db";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { analyzePsychSafety } from "@/lib/llm";
+import { resolveManagerTenantStrict } from "@/lib/tenant-context";
 
 
 
@@ -52,7 +53,11 @@ export async function GET(req: NextRequest) {
         { status: 403 }
       );
     }
-    const tenantId = manager.tenantId || DEFAULT_TENANT_ID;
+    const tenantResult = resolveManagerTenantStrict(manager);
+    if (!tenantResult.ok) {
+      return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
+    }
+    const tenantId = tenantResult.tenantId;
 
     const client = getClient();
     const now = new Date();

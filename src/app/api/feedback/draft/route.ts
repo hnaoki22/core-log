@@ -4,7 +4,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getManagerByToken } from "@/lib/participant-db";
-import { getAiSystemPrompt as getAiSystemPromptFromSupabase, DEFAULT_TENANT_ID } from "@/lib/supabase";
+import { getAiSystemPrompt as getAiSystemPromptFromSupabase } from "@/lib/supabase";
+import { resolveManagerTenantStrict } from "@/lib/tenant-context";
 import { logger } from "@/lib/logger";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
@@ -63,8 +64,12 @@ export async function POST(request: NextRequest) {
       return entry;
     }).join("\n\n");
 
-    // Get system prompt from Supabase
-    let systemPrompt = await getAiSystemPromptFromSupabase(manager.tenantId || DEFAULT_TENANT_ID);
+    // Get system prompt from Supabase (strict tenant resolution)
+    const tenantResult = resolveManagerTenantStrict(manager);
+    if (!tenantResult.ok) {
+      return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
+    }
+    let systemPrompt = await getAiSystemPromptFromSupabase(tenantResult.tenantId);
     if (!systemPrompt) {
       systemPrompt = `あなたは「Human Mature」という戦略・組織開発コンサルティング会社のシニアコンサルタントです。
 クライアント企業の参加者に対して、週次のフィードバック（CORE Logフィードバック）を作成します。

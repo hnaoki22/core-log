@@ -73,3 +73,46 @@ export async function resolveAdminTenantContext(
   // Admin, no slug — all tenants
   return { tenantId: null, isAllTenants: true, requestedSlug: null };
 }
+
+// ===== Strict tenant resolution (Phase 0 #12) =====
+//
+// The historical pattern `manager.tenantId || DEFAULT_TENANT_ID` silently
+// grants a tenantless non-admin manager access to the default tenant's
+// data. This is almost always wrong — if the manager record truly has no
+// tenantId, the request should be rejected with 403 rather than coerced
+// to the default tenant.
+//
+// `resolveManagerTenantStrict()` replaces that pattern:
+//  - If manager.tenantId is set → use it (regular, scoped case).
+//  - Else if manager.isAdmin === true → allow DEFAULT_TENANT_ID fallback
+//    (super-admins without an explicit tenant scope get the default).
+//  - Else → return { ok: false, status: 403 }. Caller should respond 403.
+//
+// Related memory:
+//   - bug_admin_tenant_silent_fallback.md
+//   - project_phase0_plan.md (item #12)
+
+export type StrictTenantResult =
+  | { ok: true; tenantId: string; source: "manager.tenantId" | "super-admin-default" }
+  | {
+      ok: false;
+      status: 403;
+      errorBody: { error: string; detail: string };
+    };
+
+export function resolveManagerTenantStrict(manager: ManagerLike): StrictTenantResult {
+  if (manager.tenantId) {
+    return { ok: true, tenantId: manager.tenantId, source: "manager.tenantId" };
+  }
+  if (manager.isAdmin) {
+    return { ok: true, tenantId: DEFAULT_TENANT_ID, source: "super-admin-default" };
+  }
+  return {
+    ok: false,
+    status: 403,
+    errorBody: {
+      error: "Forbidden: tenant context unresolved",
+      detail: "manager has no tenantId and is not super-admin",
+    },
+  };
+}

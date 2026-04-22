@@ -3,20 +3,31 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getManagerByToken } from "@/lib/participant-db";
-import { DEFAULT_TENANT_ID, getAiSystemPrompt as getAiSystemPromptFromSupabase, updateAiSystemPrompt as updateAiSystemPromptFromSupabase, getTenantBySlug } from "@/lib/supabase";
+import { getAiSystemPrompt as getAiSystemPromptFromSupabase, updateAiSystemPrompt as updateAiSystemPromptFromSupabase, getTenantBySlug } from "@/lib/supabase";
+import { resolveManagerTenantStrict } from "@/lib/tenant-context";
 
 // Resolve target tenant for per-tenant admin settings.
-// 全テナント mode is ambiguous for settings ops → fall back to admin's home tenant.
+// 1. Admin with ?tenant=slug → that specific tenant
+// 2. Otherwise → strict resolver (admin's home tenant or 403)
+// Super-admin without tenantId still resolves to DEFAULT via strict resolver.
+type SettingsTenantResult =
+  | { ok: true; tenantId: string }
+  | { ok: false; status: number; errorBody: { error: string; detail?: string } };
+
 async function resolveSettingsTenantId(
   request: NextRequest,
   manager: { tenantId?: string | null; isAdmin?: boolean }
-): Promise<string> {
+): Promise<SettingsTenantResult> {
   const slug = request.nextUrl.searchParams.get("tenant");
   if (manager.isAdmin && slug) {
     const t = await getTenantBySlug(slug);
-    if (t) return t.id;
+    if (t) return { ok: true, tenantId: t.id };
   }
-  return manager.tenantId || DEFAULT_TENANT_ID;
+  const strict = resolveManagerTenantStrict(manager);
+  if (!strict.ok) {
+    return { ok: false, status: strict.status, errorBody: strict.errorBody };
+  }
+  return { ok: true, tenantId: strict.tenantId };
 }
 
 const DEFAULT_SYSTEM_PROMPT = `あなたは「Human Mature」という戦略・組織開発コンサルティング会社のシニアコンサルタントです。
@@ -44,9 +55,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
+  const tenantResult = await resolveSettingsTenantId(request, manager);
+  if (!tenantResult.ok) {
+    return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
+  }
+
   try {
-    const tenantId = await resolveSettingsTenantId(request, manager);
-    const prompt = await getAiSystemPromptFromSupabase(tenantId);
+    const prompt = await getAiSystemPromptFromSupabase(tenantResult.tenantId);
     return NextResponse.json({
       systemPrompt: prompt || DEFAULT_SYSTEM_PROMPT,
       isDefault: !prompt,
@@ -77,8 +92,11 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "プロンプトが空です" }, { status: 400 });
     }
 
-    const tenantId = await resolveSettingsTenantId(request, manager);
-    const success = await updateAiSystemPromptFromSupabase(tenantId, systemPrompt.trim());
+    const tenantResult = await resolveSettingsTenantId(request, manager);
+    if (!tenantResult.ok) {
+      return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
+    }
+    const success = await updateAiSystemPromptFromSupabase(tenantResult.tenantId, systemPrompt.trim());
     if (success) {
       return NextResponse.json({ success: true });
     } else {

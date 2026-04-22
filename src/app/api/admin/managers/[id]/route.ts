@@ -3,7 +3,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getManagerByToken } from "@/lib/participant-db";
-import { DEFAULT_TENANT_ID, updateManagerInSupabase } from "@/lib/supabase";
+import { updateManagerInSupabase } from "@/lib/supabase";
+import { resolveManagerTenantStrict } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,11 @@ export async function PUT(
     if (!manager || !manager.isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
-    const tenantId = manager.tenantId || DEFAULT_TENANT_ID;
+    const tenantResult = resolveManagerTenantStrict(manager);
+    if (!tenantResult.ok) {
+      return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
+    }
+    const tenantId = tenantResult.tenantId;
 
     const managerId = params.id;
     if (!managerId) {

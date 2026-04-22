@@ -7,6 +7,7 @@ import { getClient } from "@/lib/supabase";
 import { getManagerByTokenFromSupabase } from "@/lib/supabase";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { generate1on1Briefing } from "@/lib/llm";
+import { resolveManagerTenantStrict } from "@/lib/tenant-context";
 
 
 
@@ -45,7 +46,11 @@ async function handleSelectConcept(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const tenantId = manager.tenantId || "default";
+    const tenantResult = resolveManagerTenantStrict(manager);
+    if (!tenantResult.ok) {
+      return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
+    }
+    const tenantId = tenantResult.tenantId;
     // Update concept selection
     const client = getClient();
     const { data, error } = await client
@@ -97,7 +102,11 @@ export async function GET(req: NextRequest) {
     if (!manager) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const tenantId = manager.tenantId || "default";
+    const tenantResult = resolveManagerTenantStrict(manager);
+    if (!tenantResult.ok) {
+      return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
+    }
+    const tenantId = tenantResult.tenantId;
 
     if (!participantId) {
       return NextResponse.json({ error: "Participant ID required" }, { status: 400 });

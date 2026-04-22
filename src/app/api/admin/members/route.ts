@@ -4,14 +4,13 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import {
-  DEFAULT_TENANT_ID,
   createParticipantInSupabase as createParticipant,
   createManagerInSupabase as createManager,
   getAllManagersFromSupabase as getAllManagers,
   getManagerByTokenFromSupabase as getManagerByTokenSupabase,
   getTenantBySlug,
 } from "@/lib/supabase";
-import { resolveAdminTenantContext } from "@/lib/tenant-context";
+import { resolveAdminTenantContext, resolveManagerTenantStrict } from "@/lib/tenant-context";
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,7 +30,11 @@ export async function POST(request: NextRequest) {
     // Admin with ?tenant=slug → that tenant. Otherwise admin's home tenant.
     // If admin is in 全テナント mode, reject (ambiguous target).
     const tenantSlug = request.nextUrl.searchParams.get("tenant");
-    let tenantId = manager.tenantId || DEFAULT_TENANT_ID;
+    const tenantResult = resolveManagerTenantStrict(manager);
+    if (!tenantResult.ok) {
+      return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
+    }
+    let tenantId = tenantResult.tenantId;
     if (manager.isAdmin && tenantSlug) {
       const t = await getTenantBySlug(tenantSlug);
       if (t) tenantId = t.id;
