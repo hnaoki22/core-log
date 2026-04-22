@@ -58,3 +58,28 @@ export function getRequiredEnv(name: string): string {
   }
   return value;
 }
+
+/**
+ * Whether this build is running as a real production deployment.
+ * Used to gate mock-data fallbacks and hardcoded admin tokens — those are
+ * development conveniences that must NEVER run against production traffic.
+ *
+ * We treat NEXT_PUBLIC_ENV_NAME=preview (Vercel preview deployments) as
+ * non-production so test fixtures still work on preview URLs. Any other
+ * NODE_ENV=production build is locked down.
+ */
+export function isProductionMode(): boolean {
+  if (process.env.NODE_ENV !== "production") return false;
+  // Explicit non-prod marker from Vercel env: preview, development
+  const envName = process.env.NEXT_PUBLIC_ENV_NAME;
+  if (envName === "preview" || envName === "development") return false;
+  return true;
+}
+
+/**
+ * Whether the mock-data backend fallback is permitted. Disabled in production
+ * to prevent development fixtures from leaking into real tenants.
+ */
+export function isMockFallbackEnabled(): boolean {
+  return !isProductionMode();
+}
