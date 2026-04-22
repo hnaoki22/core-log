@@ -10,7 +10,6 @@
 
 
 import {
-  DEFAULT_TENANT_ID,
   getParticipantByTokenFromSupabase,
   getManagerByTokenFromSupabase,
   getManagerByIdFromSupabase,
@@ -186,8 +185,13 @@ function mockManagerToInfo(mm: Manager): ManagerInfo {
 
 export async function getAllParticipants(tenantId?: string | null): Promise<ParticipantInfo[]> {
   // tenantId=undefined/null → fetch ALL tenants (cross-tenant admin mode)
-  // tenantId=string → fetch specific tenant
-  const tid = tenantId === null || tenantId === undefined ? undefined : (tenantId || DEFAULT_TENANT_ID);
+  // tenantId=string (non-empty) → fetch specific tenant
+  // tenantId="" → treated as "unspecified" and logged — empty string would silently
+  // fall through to default tenant in the old code; reject instead.
+  if (tenantId === "") {
+    logger.warn("getAllParticipants called with empty-string tenantId — treating as all-tenants", {});
+  }
+  const tid = tenantId === null || tenantId === undefined || tenantId === "" ? undefined : tenantId;
   if (hasSupabase()) {
     const sps = await getAllParticipantsFromSupabase(tid);
     return sps.map((sp) => ({
@@ -240,7 +244,13 @@ export async function getParticipantByName(name: string, tenantId?: string): Pro
   if (hasSupabase()) {
     const sp = await getParticipantByNameFromSupabase(name, tenantId);
     if (sp) {
-      const resolvedTenant = sp.tenantId || tenantId || DEFAULT_TENANT_ID;
+      // sp.tenantId is NOT NULL in production DB (2026-04-22 audit). Fall through to tenantId
+      // only as a last resort for unit-test fixtures that may omit the field.
+      const resolvedTenant = sp.tenantId || tenantId;
+      if (!resolvedTenant) {
+        logger.error("getParticipantByName: participant found but tenantId missing", { name });
+        return null;
+      }
       return { ...notionParticipantToInfo(sp), backend: "supabase", tenantId: resolvedTenant };
     }
   }
@@ -264,8 +274,9 @@ export async function getParticipantByEmail(email: string, tenantId?: string): P
 export async function getParticipantById(id: string, tenantId?: string): Promise<ParticipantInfo | null> {
   if (hasSupabase()) {
     try {
-      // Check all participants in the tenant and find by ID
-      const tid = tenantId || DEFAULT_TENANT_ID;
+      // Caller is expected to pass tenantId (NOT NULL in DB). If not provided, scan across tenants
+      // rather than silently defaulting to the master tenant.
+      const tid = tenantId || undefined;
       const all = await getAllParticipantsFromSupabase(tid);
       const found = all.find((p) => p.id === id);
       if (found) {
@@ -285,7 +296,10 @@ export async function getParticipantById(id: string, tenantId?: string): Promise
 }
 
 export async function getAllManagers(tenantId?: string | null): Promise<ManagerInfo[]> {
-  const tid = tenantId === null || tenantId === undefined ? undefined : (tenantId || DEFAULT_TENANT_ID);
+  if (tenantId === "") {
+    logger.warn("getAllManagers called with empty-string tenantId — treating as all-tenants", {});
+  }
+  const tid = tenantId === null || tenantId === undefined || tenantId === "" ? undefined : tenantId;
   if (hasSupabase()) {
     const sms = await getAllManagersFromSupabase(tid);
     return sms.map((sm) => ({

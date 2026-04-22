@@ -2,7 +2,7 @@
 // Shows individual participant's log entries + full mission management
 
 import Link from "next/link";
-import { getLogsByParticipant, getMissionsByParticipant, getParticipantByNameCrossTenant, NotionLogEntry, DEFAULT_TENANT_ID } from "@/lib/supabase";
+import { getLogsByParticipant, getMissionsByParticipant, getParticipantByNameCrossTenant, NotionLogEntry } from "@/lib/supabase";
 import { getManagerByToken } from "@/lib/participant-db";
 import { formatTimeJST, formatFullDateTimeJST } from "@/lib/date-utils";
 import CommentForm from "./CommentForm";
@@ -42,21 +42,23 @@ export default async function ParticipantDetailPage({ params }: Params) {
     // Resolve the participant's own tenantId first (handles cross-tenant views).
     // Fallback to the manager's tenantId if participant lookup fails.
     const participant = await getParticipantByNameCrossTenant(participantName);
-    let tenantId: string;
+    let tenantId: string | null = null;
 
     if (participant?.tenantId) {
       tenantId = participant.tenantId;
     } else {
       const manager = await getManagerByToken(token);
-      tenantId = manager?.tenantId || DEFAULT_TENANT_ID;
+      tenantId = manager?.tenantId ?? null;
     }
 
-    const [fetchedLogs, fetchedMissions] = await Promise.all([
-      getLogsByParticipant(participantName, tenantId),
-      getMissionsByParticipant(participantName, tenantId),
-    ]);
-    logs = fetchedLogs;
-    missions = fetchedMissions;
+    if (tenantId) {
+      const [fetchedLogs, fetchedMissions] = await Promise.all([
+        getLogsByParticipant(participantName, tenantId),
+        getMissionsByParticipant(participantName, tenantId),
+      ]);
+      logs = fetchedLogs;
+      missions = fetchedMissions;
+    }
   } catch (e) {
     console.error("Failed to fetch data:", e);
   }

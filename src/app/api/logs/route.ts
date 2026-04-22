@@ -2,7 +2,7 @@
 // Returns all CORE Log entries for a participant
 
 import { NextRequest, NextResponse } from "next/server";
-import { getLogsByParticipant, getMissionsByParticipant, getMissionComments, getFeedbackByParticipant, DEFAULT_TENANT_ID } from "@/lib/supabase";
+import { getLogsByParticipant, getMissionsByParticipant, getMissionComments, getFeedbackByParticipant } from "@/lib/supabase";
 import { getParticipantByToken } from "@/lib/participant-db";
 import { computeParticipantStats } from "@/lib/stats";
 import { getTodayJST } from "@/lib/date-utils";
@@ -20,8 +20,11 @@ export async function GET(request: NextRequest) {
   if (!participant) {
     return NextResponse.json({ error: "Participant not found" }, { status: 404 });
   }
+  if (!participant.tenantId) {
+    return NextResponse.json({ error: "Participant tenant unresolved" }, { status: 500 });
+  }
 
-  const tenantId = participant.tenantId || DEFAULT_TENANT_ID;
+  const tenantId = participant.tenantId;
 
   const [logs, missions, feedbacks] = await Promise.all([
     getLogsByParticipant(participant.name, tenantId),
