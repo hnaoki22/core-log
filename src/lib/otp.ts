@@ -9,6 +9,7 @@
 
 import crypto from "crypto";
 import { logger } from "./logger";
+import { isProductionMode } from "./env";
 
 // Try to import Supabase client
 let supabaseClient: ReturnType<typeof import("@supabase/supabase-js").createClient> | null = null;
@@ -50,26 +51,63 @@ let useSupabase: boolean | null = null; // null = not yet determined
 
 /**
  * Check if otp_codes table exists in Supabase
+ *
+ * Phase 0 #15 — In production, memory fallback is UNSAFE because:
+ *   - Serverless invocations have independent memory (generated code on one
+ *     lambda won't be visible on the next)
+ *   - Codes are lost on redeploy
+ *   - No cross-region durability
+ * We log a loud WARN (not INFO) in production so the misconfiguration
+ * surfaces in Vercel logs and can be fixed before scale-out.
  */
 async function checkSupabaseOTP(): Promise<boolean> {
   if (useSupabase !== null) return useSupabase;
   try {
     const client = await getSupabaseClient();
-    if (!client) { useSupabase = false; return false; }
+    if (!client) {
+      useSupabase = false;
+      warnMemoryFallbackIfProd("supabase client unavailable");
+      return false;
+    }
     // Try a simple query to check if table exists
     const { error } = await client.from("otp_codes").select("id").limit(1);
     if (error && error.message.includes("does not exist")) {
-      logger.info("OTP: otp_codes table not found, using in-memory fallback");
       useSupabase = false;
+      warnMemoryFallbackIfProd("otp_codes table not found");
+      if (!isProductionMode()) {
+        logger.info("OTP: otp_codes table not found, using in-memory fallback (dev)");
+      }
       return false;
     }
     useSupabase = !error;
-    if (useSupabase) logger.info("OTP: Using Supabase-backed store");
+    if (useSupabase) {
+      logger.info("OTP: Using Supabase-backed store");
+    } else {
+      warnMemoryFallbackIfProd(`supabase probe failed: ${error?.message ?? "unknown"}`);
+    }
     return useSupabase;
-  } catch {
+  } catch (e) {
     useSupabase = false;
+    warnMemoryFallbackIfProd(`supabase probe threw: ${e instanceof Error ? e.message : String(e)}`);
     return false;
   }
+}
+
+/**
+ * Emit a single boot-time WARN to Vercel logs when OTP is running on the
+ * in-memory fallback in production. This is a one-time signal; per-call
+ * warnings are emitted separately by memoryGenerateOTP / memoryVerifyOTP.
+ */
+let memoryFallbackWarnedOnce = false;
+function warnMemoryFallbackIfProd(reason: string): void {
+  if (!isProductionMode()) return;
+  if (memoryFallbackWarnedOnce) return;
+  memoryFallbackWarnedOnce = true;
+  logger.warn(
+    "OTP: memory fallback active in production — codes will NOT survive serverless invocations. " +
+    "Configure the `otp_codes` Supabase table to restore durable OTP storage.",
+    { reason }
+  );
 }
 
 /**
@@ -173,6 +211,11 @@ function memoryCountOTPsInLastHour(token: string): number {
 }
 
 function memoryGenerateOTP(token: string, email: string): string {
+  if (isProductionMode()) {
+    logger.warn("OTP: memory path used for generate() in production", {
+      tokenPrefix: token.slice(0, 8),
+    });
+  }
   const count = memoryCountOTPsInLastHour(token);
   if (count >= MAX_OTPS_PER_HOUR) {
     throw new Error("OTP request rate limit exceeded. Please try again in 1 hour.");
@@ -185,6 +228,11 @@ function memoryGenerateOTP(token: string, email: string): string {
 }
 
 function memoryVerifyOTP(token: string, code: string): { valid: boolean; email?: string } {
+  if (isProductionMode()) {
+    logger.warn("OTP: memory path used for verify() in production", {
+      tokenPrefix: token.slice(0, 8),
+    });
+  }
   const key = `${token}:${code}`;
   const entry = memoryStore[key];
   if (!entry) return { valid: false };
