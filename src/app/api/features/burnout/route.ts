@@ -3,9 +3,10 @@
 // Returns: list of burnout scores with risk levels
 
 import { NextRequest, NextResponse } from "next/server";
-import { DEFAULT_TENANT_ID, getClient } from "@/lib/supabase";
+import { getClient } from "@/lib/supabase";
 import { getManagerByTokenFromSupabase } from "@/lib/supabase";
 import { isFeatureEnabled } from "@/lib/feature-flags";
+import { resolveManagerTenantStrict } from "@/lib/tenant-context";
 
 type EnergyLevel = "excellent" | "good" | "okay" | "low" | null;
 
@@ -59,7 +60,11 @@ export async function GET(req: NextRequest) {
     if (!manager) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const tenantId = manager.tenantId || DEFAULT_TENANT_ID;
+    const tenantResult = resolveManagerTenantStrict(manager);
+    if (!tenantResult.ok) {
+      return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
+    }
+    const tenantId = tenantResult.tenantId;
 
     const client = getClient();
     const now = new Date();

@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/supabase";
 import { getManagerByTokenFromSupabase } from "@/lib/supabase";
 import { isFeatureEnabled } from "@/lib/feature-flags";
+import { resolveManagerTenantStrict } from "@/lib/tenant-context";
 
 
 
@@ -37,7 +38,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const tenantId = manager.tenantId || "default";
+    const tenantResult = resolveManagerTenantStrict(manager);
+    if (!tenantResult.ok) {
+      return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
+    }
+    const tenantId = tenantResult.tenantId;
     // Store reflection in database
     const client = getClient();
     const { data, error } = await client
@@ -92,7 +97,11 @@ export async function GET(req: NextRequest) {
     if (!manager) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const tenantId = manager.tenantId || "default";
+    const tenantResult = resolveManagerTenantStrict(manager);
+    if (!tenantResult.ok) {
+      return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
+    }
+    const tenantId = tenantResult.tenantId;
 
     // Fetch past reflections for this manager
     const client = getClient();

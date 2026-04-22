@@ -3,10 +3,11 @@
 // Returns dashboard data for the organization
 
 import { NextRequest, NextResponse } from "next/server";
-import { getClient } from "@/lib/supabase";
+import { getClient, DEFAULT_TENANT_ID } from "@/lib/supabase";
 import { getManagerByTokenFromSupabase } from "@/lib/supabase";
 import { isAdminOrObserverToken } from "@/lib/participant-db";
 import { isFeatureEnabled } from "@/lib/feature-flags";
+import { resolveManagerTenantStrict } from "@/lib/tenant-context";
 
 
 
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Verify admin or manager token
-    let tenantId: string | undefined;
+    let tenantId: string;
     const isAdminOrObserver = await isAdminOrObserverToken(token);
     if (!isAdminOrObserver) {
       // Try manager-specific access
@@ -45,10 +46,16 @@ export async function GET(req: NextRequest) {
           { status: 403 }
         );
       }
-      tenantId = manager.tenantId || "default";
+      const tenantResult = resolveManagerTenantStrict(manager);
+      if (!tenantResult.ok) {
+        return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
+      }
+      tenantId = tenantResult.tenantId;
     } else {
-      // Admin/observer - use default tenant
-      tenantId = "default";
+      // Admin/observer: fall back to DEFAULT_TENANT_ID — matches other admin-scoped endpoints.
+      // NOTE: pre-Phase0 this used the literal "default"; kept compatible by pointing at
+      // the real default UUID. If it was intentionally different before, revisit in Phase 0.5.
+      tenantId = DEFAULT_TENANT_ID;
     }
 
     const client = getClient();

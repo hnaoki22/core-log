@@ -2,13 +2,14 @@
 // Returns manager info + enriched participant data
 
 import { NextRequest, NextResponse } from "next/server";
-import { getAllLogsForTenant, DEFAULT_TENANT_ID, getFeedbackCountsByTenant } from "@/lib/supabase";
+import { getAllLogsForTenant, getFeedbackCountsByTenant } from "@/lib/supabase";
 import {
   getManagerByToken,
   getParticipantsForManager,
 } from "@/lib/participant-db";
 import { computeParticipantStats } from "@/lib/stats";
 import { getTodayJST } from "@/lib/date-utils";
+import { resolveManagerTenantStrict } from "@/lib/tenant-context";
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
@@ -22,7 +23,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Manager not found" }, { status: 404 });
   }
 
-  const tenantId = manager.tenantId || DEFAULT_TENANT_ID;
+  const tenantResult = resolveManagerTenantStrict(manager);
+  if (!tenantResult.ok) {
+    return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
+  }
+  const tenantId = tenantResult.tenantId;
 
   // Fetch participants and ALL logs in parallel (2 queries instead of N+1)
   const [participantMocks, allLogsMap, feedbackCounts] = await Promise.all([
