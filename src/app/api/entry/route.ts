@@ -3,7 +3,7 @@
 // Prevents duplicate entries for the same day
 
 import { NextRequest, NextResponse } from "next/server";
-import { createMorningEntry, createEveningOnlyEntry, updateEveningEntry, hasLoggedToday, DEFAULT_TENANT_ID } from "@/lib/supabase";
+import { createMorningEntry, createEveningOnlyEntry, updateEveningEntry, hasLoggedToday } from "@/lib/supabase";
 import { getParticipantByToken, getManagerById } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
 import { isProgramEnded, isProgramNotStarted, getCurrentHourJST, isGracePeriod } from "@/lib/date-utils";
@@ -21,21 +21,26 @@ export async function POST(request: NextRequest) {
 
     // Check if participant's program is still active
     const participant = await getParticipantByToken(token);
-    const tenantId = participant?.tenantId || DEFAULT_TENANT_ID;
-    const participantId = participant?.id || "";
-    if (participant) {
-      if (participant.endDate && isProgramEnded(participant.endDate)) {
-        return NextResponse.json({
-          error: "プログラムは終了しています。日報の入力はできません。",
-          programEnded: true,
-        }, { status: 403 });
-      }
-      if (participant.startDate && isProgramNotStarted(participant.startDate)) {
-        return NextResponse.json({
-          error: "プログラムはまだ開始されていません。",
-          notStarted: true,
-        }, { status: 403 });
-      }
+    if (!participant) {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    }
+    if (!participant.tenantId) {
+      logger.error("Entry API: participant missing tenantId (DB invariant broken)", { participantId: participant.id });
+      return NextResponse.json({ error: "Participant tenant unresolved" }, { status: 500 });
+    }
+    const tenantId = participant.tenantId;
+    const participantId = participant.id;
+    if (participant.endDate && isProgramEnded(participant.endDate)) {
+      return NextResponse.json({
+        error: "プログラムは終了しています。日報の入力はできません。",
+        programEnded: true,
+      }, { status: 403 });
+    }
+    if (participant.startDate && isProgramNotStarted(participant.startDate)) {
+      return NextResponse.json({
+        error: "プログラムはまだ開始されていません。",
+        notStarted: true,
+      }, { status: 403 });
     }
 
     // Real Notion API

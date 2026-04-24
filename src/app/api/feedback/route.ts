@@ -6,7 +6,6 @@ import {
   markFeedbackAsRead,
   getUnreadFeedbackCount,
   getLogsByParticipant,
-  DEFAULT_TENANT_ID,
 } from "@/lib/supabase";
 import { getParticipantByToken, getManagerByToken, getParticipantByName } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
@@ -27,8 +26,11 @@ export async function GET(req: NextRequest) {
   // Check if participant token
   const participant = await getParticipantByToken(token);
   if (participant) {
-    const feedback = await getFeedbackByParticipant(participant.name, participant.tenantId || DEFAULT_TENANT_ID);
-    const unreadCount = await getUnreadFeedbackCount(participant.name, participant.tenantId || DEFAULT_TENANT_ID);
+    if (!participant.tenantId) {
+      return NextResponse.json({ error: "Participant tenant unresolved" }, { status: 500 });
+    }
+    const feedback = await getFeedbackByParticipant(participant.name, participant.tenantId);
+    const unreadCount = await getUnreadFeedbackCount(participant.name, participant.tenantId);
     return NextResponse.json({ feedback, unreadCount, totalCount: feedback.length });
   }
 
@@ -36,16 +38,21 @@ export async function GET(req: NextRequest) {
   const manager = await getManagerByToken(token);
   const isAdmin = await isAdminToken(token);
   if ((manager || isAdmin) && participantName) {
-    // Resolve tenant: respect ?tenant= param for cross-tenant admin access
-    const ctx = manager
-      ? await resolveAdminTenantContext(req, manager)
-      : { tenantId: DEFAULT_TENANT_ID, isAllTenants: false, requestedSlug: null };
+    // Resolve tenant: respect ?tenant= param for cross-tenant admin access.
+    // Legacy admin-only tokens (no manager row) are modelled as virtual super-admins so they
+    // can still scope to a specific tenant via ?tenant=slug rather than silently defaulting.
+    const virtualManager = manager || { isAdmin: true, tenantId: null };
+    const ctx = await resolveAdminTenantContext(req, virtualManager);
 
-    // When viewing all tenants, find the participant's actual tenant
-    let tenantId = ctx.tenantId || DEFAULT_TENANT_ID;
+    // When viewing all tenants, find the participant's actual tenant. Otherwise ctx.tenantId
+    // is always set by resolveAdminTenantContext (non-admin → own tenant, admin+slug → that tenant).
+    let tenantId: string | null = ctx.tenantId;
     if (ctx.isAllTenants) {
       const targetP = await getParticipantByName(participantName); // cross-tenant search
-      if (targetP?.tenantId) tenantId = targetP.tenantId;
+      tenantId = targetP?.tenantId || null;
+    }
+    if (!tenantId) {
+      return NextResponse.json({ error: "対象参加者が見つかりませんでした" }, { status: 404 });
     }
 
     const includeLogs = req.nextUrl.searchParams.get("includeLogs") === "true";
@@ -93,17 +100,23 @@ export async function POST(req: NextRequest) {
     const authorName = manager?.name || "Human Mature";
     const feedbackType = type || (isAdmin ? "HMフィードバック" : "上司コメント");
 
-    // Resolve tenant: respect ?tenant= param for cross-tenant admin access
-    const ctx = manager
-      ? await resolveAdminTenantContext(req, manager)
-      : { tenantId: DEFAULT_TENANT_ID, isAllTenants: false, requestedSlug: null };
+    // Resolve tenant: respect ?tenant= param for cross-tenant admin access.
+    // Legacy admin-only tokens get modelled as virtual super-admins so they honour ?tenant=.
+    const virtualManager = manager || { isAdmin: true, tenantId: null };
+    const ctx = await resolveAdminTenantContext(req, virtualManager);
 
     // Look up participant — cross-tenant search when viewing all tenants
-    const targetParticipant = ctx.isAllTenants
+    const targetParticipant = ctx.isAllTenants || !ctx.tenantId
       ? await getParticipantByName(participantName) // cross-tenant search
-      : await getParticipantByName(participantName, ctx.tenantId || DEFAULT_TENANT_ID);
+      : await getParticipantByName(participantName, ctx.tenantId);
+    if (!targetParticipant) {
+      return NextResponse.json({ error: "対象参加者が見つかりませんでした" }, { status: 404 });
+    }
     // Use the participant's actual tenant for creating feedback
-    const tenantId = targetParticipant?.tenantId || ctx.tenantId || DEFAULT_TENANT_ID;
+    const tenantId = targetParticipant.tenantId || ctx.tenantId;
+    if (!tenantId) {
+      return NextResponse.json({ error: "Tenant unresolved" }, { status: 500 });
+    }
     // participant_id column is UUID type; participant.id may be a string ID (e.g. "p-shimoji")
     // Only pass it if it looks like a valid UUID, otherwise pass null to omit it
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -8,7 +8,6 @@ import {
   updateMissionStatus,
   updateMissionFields,
   getMissionsByParticipant,
-  DEFAULT_TENANT_ID,
 } from "@/lib/supabase";
 import { getManagerByToken, getParticipantByToken, getParticipantByName } from "@/lib/participant-db";
 import { getTodayJST } from "@/lib/date-utils";
@@ -22,20 +21,26 @@ export async function GET(request: NextRequest) {
   if (!participantName) {
     return NextResponse.json({ error: "participantName required" }, { status: 400 });
   }
+  if (!token) {
+    return NextResponse.json({ error: "token required" }, { status: 401 });
+  }
 
   try {
-    // Resolve tenant dynamically from token (manager or participant)
-    let tenantId = DEFAULT_TENANT_ID;
-    if (token) {
-      const manager = await getManagerByToken(token);
-      if (manager?.tenantId) {
-        tenantId = manager.tenantId;
-      } else {
-        const participant = await getParticipantByToken(token);
-        if (participant?.tenantId) {
-          tenantId = participant.tenantId;
-        }
+    // Resolve tenant strictly from token (manager or participant). No default fallback —
+    // returning the master tenant's missions to an unauthenticated caller is a leak.
+    let tenantId: string | null = null;
+    const manager = await getManagerByToken(token);
+    if (manager?.tenantId) {
+      tenantId = manager.tenantId;
+    } else {
+      const participant = await getParticipantByToken(token);
+      if (participant?.tenantId) {
+        tenantId = participant.tenantId;
       }
+    }
+
+    if (!tenantId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const missions = await getMissionsByParticipant(participantName, tenantId);
@@ -75,7 +80,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "participantName required" }, { status: 400 });
     }
 
-    const tenantId = participant?.tenantId || manager?.tenantId || DEFAULT_TENANT_ID;
+    const tenantId = participant?.tenantId || manager?.tenantId;
+    if (!tenantId) {
+      return NextResponse.json({ error: "Tenant unresolved" }, { status: 500 });
+    }
     const targetParticipantObj = participant || await getParticipantByName(effectiveName, tenantId);
     const participantId = targetParticipantObj?.id || "";
 
