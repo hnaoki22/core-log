@@ -17,7 +17,7 @@ const DEFAULT_CLIENT = process.env.FEATURE_FLAGS_CLIENT || "default";
 // Every feature (existing or new) is declared here. Adding a flag = one entry.
 
 export type FlagCategory =
-  | "core"          // Core input (always on — shown as read-only)
+  | "core"          // Core input (always on â shown as read-only)
   | "existing"      // Existing features (mission, streak, feedback, etc)
   | "tier-s"        // Tier S: Differentiators
   | "tier-a"        // Tier A: Manager Safety Net
@@ -36,7 +36,7 @@ export type FeatureFlag = {
   defaultEnabled: boolean;        // Fallback when Notion unavailable
   phase1Enabled: boolean;         // Whether ON in Daiko Phase 1 preset
   dependencies?: string[];        // Other flag keys that must be on
-  implemented: boolean;           // false = not yet built (shows as "準備中")
+  implemented: boolean;           // false = not yet built (shows as "æºåä¸­")
   recommendedPhase?: 1 | 2 | 3;   // Recommended Daiko introduction phase
 };
 
@@ -44,8 +44,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   // ===== Core (always on) =====
   {
     key: "core.morningInput",
-    label: "朝の意図入力",
-    description: "毎朝、今日の意図を自由記述するフリー入力欄。CORE Logの中核機能。",
+    label: "æã®æå³å¥å",
+    description: "æ¯æãä»æ¥ã®æå³ãèªç±è¨è¿°ããããªã¼å¥åæ¬ãCORE Logã®ä¸­æ ¸æ©è½ã",
     category: "core",
     defaultEnabled: true,
     phase1Enabled: true,
@@ -53,8 +53,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "core.eveningInput",
-    label: "本日の振り返り入力",
-    description: "毎日、1日の気づきや学びを自由記述する欄。",
+    label: "æ¬æ¥ã®æ¯ãè¿ãå¥å",
+    description: "æ¯æ¥ã1æ¥ã®æ°ã¥ããå­¦ã³ãèªç±è¨è¿°ããæ¬ã",
     category: "core",
     defaultEnabled: true,
     phase1Enabled: true,
@@ -62,8 +62,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "core.logHistory",
-    label: "過去ログ閲覧",
-    description: "自分の過去の記入履歴をカレンダー/リスト形式で閲覧。",
+    label: "éå»ã­ã°é²è¦§",
+    description: "èªåã®éå»ã®è¨å¥å±¥æ­´ãã«ã¬ã³ãã¼/ãªã¹ãå½¢å¼ã§é²è¦§ã",
     category: "core",
     defaultEnabled: true,
     phase1Enabled: true,
@@ -73,8 +73,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   // ===== Existing features =====
   {
     key: "feature.energyTracking",
-    label: "エネルギー記録",
-    description: "4段階の絵文字で当日のエネルギー状態を記録。時系列グラフで可視化。",
+    label: "ã¨ãã«ã®ã¼è¨é²",
+    description: "4æ®µéã®çµµæå­ã§å½æ¥ã®ã¨ãã«ã®ã¼ç¶æãè¨é²ãæç³»åã°ã©ãã§å¯è¦åã",
     category: "existing",
     defaultEnabled: true,
     phase1Enabled: true,
@@ -83,8 +83,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "feature.mission",
-    label: "Mission機能",
-    description: "中長期の目標・ミッションを設定し、日々のログと紐付ける。",
+    label: "Missionæ©è½",
+    description: "ä¸­é·æã®ç®æ¨ã»ããã·ã§ã³ãè¨­å®ããæ¥ãã®ã­ã°ã¨ç´ä»ããã",
     category: "existing",
     defaultEnabled: true,
     phase1Enabled: true,
@@ -93,8 +93,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "feature.streak",
-    label: "連続記入ストリーク",
-    description: "連続記入日数を表示し、習慣化を促す心理的フック。3日/7日でアイコン変化。",
+    label: "é£ç¶è¨å¥ã¹ããªã¼ã¯",
+    description: "é£ç¶è¨å¥æ¥æ°ãè¡¨ç¤ºããç¿æ£åãä¿ãå¿ççããã¯ã3æ¥/7æ¥ã§ã¢ã¤ã³ã³å¤åã",
     category: "existing",
     defaultEnabled: true,
     phase1Enabled: true,
@@ -103,8 +103,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "feature.badges",
-    label: "バッジ・実績",
-    description: "Mission達成や記入回数到達で獲得できる実績マーク。",
+    label: "ããã¸ã»å®ç¸¾",
+    description: "Missionéæãè¨å¥åæ°å°éã§ç²å¾ã§ããå®ç¸¾ãã¼ã¯ã",
     category: "existing",
     defaultEnabled: true,
     phase1Enabled: true,
@@ -113,8 +113,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "feature.animations",
-    label: "演出アニメーション",
-    description: "記入完了時のフェードイン・チェックマーク等のUIエフェクト。",
+    label: "æ¼åºã¢ãã¡ã¼ã·ã§ã³",
+    description: "è¨å¥å®äºæã®ãã§ã¼ãã¤ã³ã»ãã§ãã¯ãã¼ã¯ç­ã®UIã¨ãã§ã¯ãã",
     category: "existing",
     defaultEnabled: true,
     phase1Enabled: true,
@@ -123,8 +123,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "feature.reminderMail",
-    label: "リマインドメール",
-    description: "朝8:00と夕17:00に、未記入者へ自動リマインドメール送信。",
+    label: "ãªãã¤ã³ãã¡ã¼ã«",
+    description: "æ8:00ã¨å¤17:00ã«ãæªè¨å¥èã¸èªåãªãã¤ã³ãã¡ã¼ã«éä¿¡ã",
     category: "existing",
     defaultEnabled: true,
     phase1Enabled: true,
@@ -133,18 +133,18 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "feature.managerFeedback",
-    label: "マネージャーフィードバック",
-    description: "上司が部下のログにコメントを返す機能。未読バッジ付き。OFF時は閲覧のみ。",
+    label: "ããã¼ã¸ã£ã¼ãã£ã¼ãããã¯",
+    description: "ä¸å¸ãé¨ä¸ã®ã­ã°ã«ã³ã¡ã³ããè¿ãæ©è½ãæªèª­ããã¸ä»ããOFFæã¯é²è¦§ã®ã¿ã",
     category: "existing",
     defaultEnabled: true,
-    phase1Enabled: false, // Daiko Phase 1: 上司は読むだけ
+    phase1Enabled: false, // Daiko Phase 1: ä¸å¸ã¯èª­ãã ã
     implemented: true,
     recommendedPhase: 2,
   },
   {
     key: "feature.csvExport",
-    label: "CSVエクスポート",
-    description: "管理者画面からログデータをCSV出力。分析・レポート作成用。",
+    label: "CSVã¨ã¯ã¹ãã¼ã",
+    description: "ç®¡çèç»é¢ããã­ã°ãã¼ã¿ãCSVåºåãåæã»ã¬ãã¼ãä½æç¨ã",
     category: "existing",
     defaultEnabled: true,
     phase1Enabled: true,
@@ -152,8 +152,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "feature.otpAuth",
-    label: "OTPメール認証",
-    description: "トークンURLアクセス時にメールOTPで本人確認を追加。セキュリティ強化。",
+    label: "OTPã¡ã¼ã«èªè¨¼",
+    description: "ãã¼ã¯ã³URLã¢ã¯ã»ã¹æã«ã¡ã¼ã«OTPã§æ¬äººç¢ºèªãè¿½å ãã»ã­ã¥ãªãã£å¼·åã",
     category: "existing",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -161,8 +161,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "feature.managerAnalytics",
-    label: "マネージャー分析画面",
-    description: "上司画面の部下別の記入率・エネルギートレンド分析。",
+    label: "ããã¼ã¸ã£ã¼åæç»é¢",
+    description: "ä¸å¸ç»é¢ã®é¨ä¸å¥ã®è¨å¥çã»ã¨ãã«ã®ã¼ãã¬ã³ãåæã",
     category: "existing",
     defaultEnabled: true,
     phase1Enabled: true,
@@ -172,8 +172,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   // ===== Tier S: Differentiators =====
   {
     key: "tier-s.ruminationDetection",
-    label: "反芻(Rumination)検知",
-    description: "LLMで夕方ログを解析し、ネガティブな反芻パターンを検知。建設的リフレーミングを促す。",
+    label: "åè»(Rumination)æ¤ç¥",
+    description: "LLMã§å¤æ¹ã­ã°ãè§£æãããã¬ãã£ããªåè»ãã¿ã¼ã³ãæ¤ç¥ãå»ºè¨­çãªãã¬ã¼ãã³ã°ãä¿ãã",
     category: "tier-s",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -182,8 +182,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "tier-s.doubleLoopPrompt",
-    label: "ダブルループ問い(週次)",
-    description: "週1回、朝の入力前に「なぜそれをやるのか?」を強制表示。前提破壊を促す。",
+    label: "ããã«ã«ã¼ãåã(é±æ¬¡)",
+    description: "é±1åãæã®å¥ååã«ããªããããããã®ã?ããå¼·å¶è¡¨ç¤ºãåæç ´å£ãä¿ãã",
     category: "tier-s",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -192,8 +192,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "tier-s.weeklyConceptualization",
-    label: "週次持論化(Q3)",
-    description: "金曜夕方、5日分のログをLLM要約→持論仮説3案提示→本人が選ぶ。",
+    label: "é±æ¬¡æè«å(Q3)",
+    description: "éæå¤æ¹ã5æ¥åã®ã­ã°ãLLMè¦ç´âæè«ä»®èª¬3æ¡æç¤ºâæ¬äººãé¸ã¶ã",
     category: "tier-s",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -202,8 +202,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "tier-s.structuredInput",
-    label: "事実/観察/教訓 3分割入力",
-    description: "夕方入力を3フィールドに分割。プリズム構造で反芻を防ぐ。",
+    label: "äºå®/è¦³å¯/æè¨ 3åå²å¥å",
+    description: "å¤æ¹å¥åã3ãã£ã¼ã«ãã«åå²ãããªãºã æ§é ã§åè»ãé²ãã",
     category: "tier-s",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -214,8 +214,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   // ===== Tier A: Manager Safety Net =====
   {
     key: "tier-a.oneOnOneBriefing",
-    label: "1on1ブリーフィング自動生成",
-    description: "1on1直前に、部下の1週間のトレンド・反芻兆候・質問テンプレを自動生成。",
+    label: "1on1ããªã¼ãã£ã³ã°èªåçæ",
+    description: "1on1ç´åã«ãé¨ä¸ã®1é±éã®ãã¬ã³ãã»åè»ååã»è³ªåãã³ãã¬ãèªåçæã",
     category: "tier-a",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -225,8 +225,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "tier-a.burnoutScore",
-    label: "離職・燃え尽き予兆スコア",
-    description: "エネルギー × 記入率 × 反芻スコアの複合指標。マネージャーにのみアラート。",
+    label: "é¢è·ã»çãå°½ãäºåã¹ã³ã¢",
+    description: "ã¨ãã«ã®ã¼ Ã è¨å¥ç Ã åè»ã¹ã³ã¢ã®è¤åææ¨ãããã¼ã¸ã£ã¼ã«ã®ã¿ã¢ã©ã¼ãã",
     category: "tier-a",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -235,9 +235,19 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     dependencies: ["tier-s.ruminationDetection"],
   },
   {
+    key: "tier-a.consultantSpotlight",
+    label: "コンサル・スポットライト",
+    description: "全参加者のログをAI分析し「今週注目すべき参加者」を最大5名抽出。省察深度(L1-L4)、テーマ持続性、介入提案を提示。",
+    category: "tier-a",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    implemented: true,
+    recommendedPhase: 2,
+  },
+  {
     key: "tier-a.psychSafetyMonitor",
-    label: "心理的安全性モニター",
-    description: "マネージャーのFB文面を解析。「犯人探し」「非難」シグナルを検出し経営層へ集計。",
+    label: "å¿ççå®å¨æ§ã¢ãã¿ã¼",
+    description: "ããã¼ã¸ã£ã¼ã®FBæé¢ãè§£æããç¯äººæ¢ãããéé£ãã·ã°ãã«ãæ¤åºãçµå¶å±¤ã¸éè¨ã",
     category: "tier-a",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -247,8 +257,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "tier-a.managerSelfReflection",
-    label: "マネージャー自身の内省",
-    description: "マネージャーも週次で「部下の内省をどう支援できたか」を記入。",
+    label: "ããã¼ã¸ã£ã¼èªèº«ã®åç",
+    description: "ããã¼ã¸ã£ã¼ãé±æ¬¡ã§ãé¨ä¸ã®åçãã©ãæ¯æ´ã§ãããããè¨å¥ã",
     category: "tier-a",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -260,7 +270,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   {
     key: "tier-b.aar",
     label: "AAR(After Action Review)",
-    description: "プロジェクト単位で期待→実際→ギャップ→教訓を構造化。組織知見へ昇華。",
+    description: "ãã­ã¸ã§ã¯ãåä½ã§æå¾âå®éâã®ã£ããâæè¨ãæ§é åãçµç¹ç¥è¦ã¸æè¯ã",
     category: "tier-b",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -269,8 +279,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "tier-b.knowledgeLibrary",
-    label: "組織ナレッジライブラリ",
-    description: "個人の持論を匿名化して組織全体に公開。タグ検索可能。",
+    label: "çµç¹ãã¬ãã¸ã©ã¤ãã©ãª",
+    description: "åäººã®æè«ãå¿ååãã¦çµç¹å¨ä½ã«å¬éãã¿ã°æ¤ç´¢å¯è½ã",
     category: "tier-b",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -280,8 +290,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "tier-b.cultureScore",
-    label: "学習文化スコアダッシュボード",
-    description: "組織全体のリフレクション質量を可視化。経営層向け月次レポート。",
+    label: "å­¦ç¿æåã¹ã³ã¢ããã·ã¥ãã¼ã",
+    description: "çµç¹å¨ä½ã®ãªãã¬ã¯ã·ã§ã³è³ªéãå¯è¦åãçµå¶å±¤åãææ¬¡ã¬ãã¼ãã",
     category: "tier-b",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -290,8 +300,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "tier-b.peerReflection",
-    label: "ピア・リフレクション",
-    description: "同期同士で1つの問いを投げ合う。Outsight(外部視点)の実装。",
+    label: "ãã¢ã»ãªãã¬ã¯ã·ã§ã³",
+    description: "åæåå£«ã§1ã¤ã®åããæãåããOutsight(å¤é¨è¦ç¹)ã®å®è£ã",
     category: "tier-b",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -302,8 +312,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   // ===== Tier C: Competency Trap Escape =====
   {
     key: "tier-c.unlearnChallenge",
-    label: "アンラーン・チャレンジ(月次)",
-    description: "月1回「自分の強みが通用しなかった瞬間」を記入。Disorienting Dilemma誘発。",
+    label: "ã¢ã³ã©ã¼ã³ã»ãã£ã¬ã³ã¸(ææ¬¡)",
+    description: "æ1åãèªåã®å¼·ã¿ãéç¨ããªãã£ãç¬éããè¨å¥ãDisorienting Dilemmaèªçºã",
     category: "tier-c",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -312,8 +322,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "tier-c.identityTracking",
-    label: "アイデンティティ再構築トラッキング",
-    description: "四半期ごと「3ヶ月前と今の自分の違い」を記入。言語化によるリフレーミング。",
+    label: "ã¢ã¤ãã³ãã£ãã£åæ§ç¯ãã©ãã­ã³ã°",
+    description: "ååæãã¨ã3ã¶æåã¨ä»ã®èªåã®éãããè¨å¥ãè¨èªåã«ãããªãã¬ã¼ãã³ã°ã",
     category: "tier-c",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -322,8 +332,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "tier-c.outsightTask",
-    label: "Outsight獲得タスク",
-    description: "「普段話さない人と1人会う」等のタスクを週次アサイン。",
+    label: "Outsightç²å¾ã¿ã¹ã¯",
+    description: "ãæ®æ®µè©±ããªãäººã¨1äººä¼ããç­ã®ã¿ã¹ã¯ãé±æ¬¡ã¢ãµã¤ã³ã",
     category: "tier-c",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -334,8 +344,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   // ===== Tier D: PsyCap =====
   {
     key: "tier-d.heroAssessment",
-    label: "HERO自己評価(月次)",
-    description: "Hope / Efficacy / Resilience / Optimism の4軸評価。時系列グラフで可視化。",
+    label: "HEROèªå·±è©ä¾¡(ææ¬¡)",
+    description: "Hope / Efficacy / Resilience / Optimism ã®4è»¸è©ä¾¡ãæç³»åã°ã©ãã§å¯è¦åã",
     category: "tier-d",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -344,8 +354,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "tier-d.efficacyBooster",
-    label: "自己効力感ブースター",
-    description: "過去の「困難を乗り越えた」ログを月末にリマインド表示。燃え尽き予防。",
+    label: "èªå·±å¹åæãã¼ã¹ã¿ã¼",
+    description: "éå»ã®ãå°é£ãä¹ãè¶ãããã­ã°ãææ«ã«ãªãã¤ã³ãè¡¨ç¤ºãçãå°½ãäºé²ã",
     category: "tier-d",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -354,8 +364,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "tier-d.hopeDesign",
-    label: "Hope設計ワーク(四半期)",
-    description: "目標への複数経路を構造化して記入するワーク。",
+    label: "Hopeè¨­è¨ã¯ã¼ã¯(ååæ)",
+    description: "ç®æ¨ã¸ã®è¤æ°çµè·¯ãæ§é åãã¦è¨å¥ããã¯ã¼ã¯ã",
     category: "tier-d",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -366,8 +376,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   // ===== Tier E: UX =====
   {
     key: "tier-e.microRitualOptimizer",
-    label: "マイクロリチュアル最適化",
-    description: "記入所要時間を計測し、長すぎる人に短縮版を提示。",
+    label: "ãã¤ã¯ã­ãªãã¥ã¢ã«æé©å",
+    description: "è¨å¥æè¦æéãè¨æ¸¬ããé·ãããäººã«ç­ç¸®çãæç¤ºã",
     category: "tier-e",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -376,8 +386,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "tier-e.ruminationTimer",
-    label: "反芻防止タイマー",
-    description: "同じフィールドに3分以上停滞したら「深呼吸」マイクロインタラクション。",
+    label: "åè»é²æ­¢ã¿ã¤ãã¼",
+    description: "åããã£ã¼ã«ãã«3åä»¥ä¸åæ»ããããæ·±å¼å¸ããã¤ã¯ã­ã¤ã³ã¿ã©ã¯ã·ã§ã³ã",
     category: "tier-e",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -386,8 +396,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "tier-e.calendarBlock",
-    label: "カレンダーThinking Time自動ブロック",
-    description: "Googleカレンダーに毎日15分のリフレクション枠を自動登録。",
+    label: "ã«ã¬ã³ãã¼Thinking Timeèªåãã­ãã¯",
+    description: "Googleã«ã¬ã³ãã¼ã«æ¯æ¥15åã®ãªãã¬ã¯ã·ã§ã³æ ãèªåç»é²ã",
     category: "tier-e",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -396,8 +406,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "tier-e.voiceInput",
-    label: "音声入力対応",
-    description: "Whisper APIで音声→テキスト変換。書くのが苦手な人向け。",
+    label: "é³å£°å¥åå¯¾å¿",
+    description: "Whisper APIã§é³å£°âãã­ã¹ãå¤æãæ¸ãã®ãè¦æãªäººåãã",
     category: "tier-e",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -408,8 +418,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   // ===== Tier F: ROI/Evidence =====
   {
     key: "tier-f.growthRoi",
-    label: "成長ROIダッシュボード",
-    description: "内省時間→持論獲得→行動変容を数値で可視化。Wipro +22.8%への自己接続。",
+    label: "æé·ROIããã·ã¥ãã¼ã",
+    description: "åçæéâæè«ç²å¾âè¡åå¤å®¹ãæ°å¤ã§å¯è¦åãWipro +22.8%ã¸ã®èªå·±æ¥ç¶ã",
     category: "tier-f",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -418,8 +428,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "tier-f.beforeAfter",
-    label: "Before/Afterアセスメント",
-    description: "導入時と3ヶ月後で同じ自己評価を実施。変化量を表示。",
+    label: "Before/Afterã¢ã»ã¹ã¡ã³ã",
+    description: "å°å¥æã¨3ã¶æå¾ã§åãèªå·±è©ä¾¡ãå®æ½ãå¤åéãè¡¨ç¤ºã",
     category: "tier-f",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -428,8 +438,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "tier-f.clientReport",
-    label: "組織導入効果レポート自動生成",
-    description: "クライアント経営層向け月次レポートをExcel/PDFで自動出力。",
+    label: "çµç¹å°å¥å¹æã¬ãã¼ãèªåçæ",
+    description: "ã¯ã©ã¤ã¢ã³ãçµå¶å±¤åãææ¬¡ã¬ãã¼ããExcel/PDFã§èªååºåã",
     category: "tier-f",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -440,8 +450,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   // ===== Tier G: Business Model =====
   {
     key: "tier-g.multiTenant",
-    label: "マルチテナント管理",
-    description: "複数クライアントを1つのCORE Logで並行運用。",
+    label: "ãã«ãããã³ãç®¡ç",
+    description: "è¤æ°ã¯ã©ã¤ã¢ã³ãã1ã¤ã®CORE Logã§ä¸¦è¡éç¨ã",
     category: "tier-g",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -450,8 +460,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "tier-g.pitchGenerator",
-    label: "導入ピッチ資料自動生成",
-    description: "クライアント初回提案用スライドを自動生成(理論+実装+エビデンス)。",
+    label: "å°å¥ãããè³æèªåçæ",
+    description: "ã¯ã©ã¤ã¢ã³ãååææ¡ç¨ã¹ã©ã¤ããèªåçæ(çè«+å®è£+ã¨ããã³ã¹)ã",
     category: "tier-g",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -460,8 +470,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "tier-g.consultIntervention",
-    label: "コンサル介入記録",
-    description: "コンサル側の1on1参加・研修実施をログに紐づけ、効果測定。",
+    label: "ã³ã³ãµã«ä»å¥è¨é²",
+    description: "ã³ã³ãµã«å´ã®1on1åå ã»ç ä¿®å®æ½ãã­ã°ã«ç´ã¥ããå¹ææ¸¬å®ã",
     category: "tier-g",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -481,8 +491,8 @@ export type Preset = {
 export const PRESETS: Preset[] = [
   {
     id: "minimal",
-    label: "ミニマル",
-    description: "フリー入力のみ。最もシンプルな習慣化重視の構成。",
+    label: "ãããã«",
+    description: "ããªã¼å¥åã®ã¿ãæãã·ã³ãã«ãªç¿æ£åéè¦ã®æ§æã",
     getFlags: () => {
       const flags: Record<string, boolean> = {};
       for (const f of FEATURE_CATALOG) {
@@ -495,8 +505,8 @@ export const PRESETS: Preset[] = [
   },
   {
     id: "daiko-phase1",
-    label: "大幸薬品 Phase 1",
-    description: "フリー入力 + 既存機能(FB以外)。上司は読むだけの期間。",
+    label: "å¤§å¹¸è¬å Phase 1",
+    description: "ããªã¼å¥å + æ¢å­æ©è½(FBä»¥å¤)ãä¸å¸ã¯èª­ãã ãã®æéã",
     getFlags: () => {
       const flags: Record<string, boolean> = {};
       for (const f of FEATURE_CATALOG) {
@@ -507,8 +517,8 @@ export const PRESETS: Preset[] = [
   },
   {
     id: "daiko-phase2",
-    label: "大幸薬品 Phase 2",
-    description: "Phase 1 + マネージャーFB + 週次ダブルループ問い + HERO評価。",
+    label: "å¤§å¹¸è¬å Phase 2",
+    description: "Phase 1 + ããã¼ã¸ã£ã¼FB + é±æ¬¡ããã«ã«ã¼ãåã + HEROè©ä¾¡ã",
     getFlags: () => {
       const flags: Record<string, boolean> = {};
       for (const f of FEATURE_CATALOG) {
@@ -524,8 +534,8 @@ export const PRESETS: Preset[] = [
   },
   {
     id: "daiko-phase3",
-    label: "大幸薬品 Phase 3",
-    description: "Phase 2 + 反芻検知 + 持論化 + 1on1ブリーフィング + AAR。",
+    label: "å¤§å¹¸è¬å Phase 3",
+    description: "Phase 2 + åè»æ¤ç¥ + æè«å + 1on1ããªã¼ãã£ã³ã° + AARã",
     getFlags: () => {
       const flags: Record<string, boolean> = {};
       for (const f of FEATURE_CATALOG) {
@@ -548,8 +558,8 @@ export const PRESETS: Preset[] = [
   },
   {
     id: "full",
-    label: "フル(全機能ON)",
-    description: "実装済みの全機能をON。デモ・検証用。",
+    label: "ãã«(å¨æ©è½ON)",
+    description: "å®è£æ¸ã¿ã®å¨æ©è½ãONããã¢ã»æ¤è¨¼ç¨ã",
     getFlags: () => {
       const flags: Record<string, boolean> = {};
       for (const f of FEATURE_CATALOG) {
