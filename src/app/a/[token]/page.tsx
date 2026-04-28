@@ -1027,6 +1027,14 @@ export default function AdminDashboard() {
                       <p className="text-xs text-[#8B8489]">コーチング記録</p>
                     </a>
                   )}
+
+                  {isOn("tier-a.consultantSpotlight") && (
+                    <a href={`/a/${token}/features/spotlight`} className="card p-4 hover:shadow-md transition-shadow">
+                      <div className="text-2xl mb-2">🔍</div>
+                      <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">スポットライト</h3>
+                      <p className="text-xs text-[#8B8489]">注目参加者AI分析</p>
+                    </a>
+                  )}
                   {isOn("tier-b.knowledgeLibrary") && (
                     <a href={`/a/${token}/features/knowledge`} className="card p-4 hover:shadow-md transition-shadow">
                       <div className="text-2xl mb-2">📚</div>
