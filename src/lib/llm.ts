@@ -19,8 +19,8 @@ export async function llmAnalyze(
   options?: { temperature?: number; maxTokens?: number }
 ): Promise<string> {
   if (!process.env.ANTHROPIC_API_KEY) {
-    console.warn("ANTHROPIC_API_KEY not set – returning fallback");
-    return "（AI分析は現在利用できません。ANTHROPIC_API_KEYを設定してください。）";
+    console.warn("ANTHROPIC_API_KEY not set â returning fallback");
+    return "ï¼AIåæã¯ç¾å¨å©ç¨ã§ãã¾ãããANTHROPIC_API_KEYãè¨­å®ãã¦ãã ãããï¼";
   }
   try {
     const res = await anthropic.messages.create({
@@ -36,7 +36,7 @@ export async function llmAnalyze(
     return block.type === "text" ? block.text.trim() : "";
   } catch (err) {
     console.error("LLM analysis error:", err);
-    return "（AI分析でエラーが発生しました。）";
+    return "ï¼AIåæã§ã¨ã©ã¼ãçºçãã¾ãããï¼";
   }
 }
 
@@ -46,7 +46,7 @@ export async function llmJson<T>(
   fallback: T
 ): Promise<T> {
   const raw = await llmAnalyze(
-    systemPrompt + "\n\n必ずJSON形式のみで回答してください。マークダウンのコードブロックは使わないでください。",
+    systemPrompt + "\n\nå¿ãJSONå½¢å¼ã®ã¿ã§åç­ãã¦ãã ããããã¼ã¯ãã¦ã³ã®ã³ã¼ããã­ãã¯ã¯ä½¿ããªãã§ãã ããã",
     userContent,
     { temperature: 0.3 }
   );
@@ -75,29 +75,29 @@ export async function analyzeRumination(
   recentLogs?: string[]
 ): Promise<RuminationResult> {
   const context = recentLogs?.length
-    ? `\n\n過去のログ（直近${recentLogs.length}日分）:\n${recentLogs.map((l, i) => `Day-${i + 1}: ${l}`).join("\n")}`
+    ? `\n\néå»ã®ã­ã°ï¼ç´è¿${recentLogs.length}æ¥åï¼:\n${recentLogs.map((l, i) => `Day-${i + 1}: ${l}`).join("\n")}`
     : "";
 
   return llmJson<RuminationResult>(
-    `あなたは組織心理学の専門家です。ユーザーの夕方の振り返りログを分析し、ネガティブな反芻（rumination）パターンを検出してください。
+    `ããªãã¯çµç¹å¿çå­¦ã®å°éå®¶ã§ããã¦ã¼ã¶ã¼ã®å¤æ¹ã®æ¯ãè¿ãã­ã°ãåæãããã¬ãã£ããªåè»ï¼ruminationï¼ãã¿ã¼ã³ãæ¤åºãã¦ãã ããã
 
-反芻の兆候：
-- 同じ失敗や不安を繰り返し言及
-- 自責的な表現（「自分がダメだから」「いつもこうなる」）
-- 解決策なく問題を堂々巡り
-- 過去の出来事への固執
-- カタストロフィー思考（最悪の結末を想像）
+åè»ã®ååï¼
+- åãå¤±æãä¸å®ãç¹°ãè¿ãè¨å
+- èªè²¬çãªè¡¨ç¾ï¼ãèªåããã¡ã ãããããã¤ããããªããï¼
+- è§£æ±ºç­ãªãåé¡ãå ãå·¡ã
+- éå»ã®åºæ¥äºã¸ã®åºå·
+- ã«ã¿ã¹ãã­ãã£ã¼æèï¼ææªã®çµæ«ãæ³åï¼
 
-JSON形式で回答：
+JSONå½¢å¼ã§åç­ï¼
 {
-  "score": 0-10の数値,
+  "score": 0-10ã®æ°å¤,
   "isRuminating": true/false,
-  "pattern": "パターン名（自責反芻/問題固執/カタストロフィー/なし）",
-  "reframe": "建設的なリフレーミングの提案（1-2文）",
-  "summary": "分析の要約（1文）"
+  "pattern": "ãã¿ã¼ã³åï¼èªè²¬åè»/åé¡åºå·/ã«ã¿ã¹ãã­ãã£ã¼/ãªãï¼",
+  "reframe": "å»ºè¨­çãªãªãã¬ã¼ãã³ã°ã®ææ¡ï¼1-2æï¼",
+  "summary": "åæã®è¦ç´ï¼1æï¼"
 }`,
-    `今日の振り返り:\n${eveningText}${context}`,
-    { score: 0, isRuminating: false, pattern: "なし", reframe: "", summary: "分析できませんでした" }
+    `ä»æ¥ã®æ¯ãè¿ã:\n${eveningText}${context}`,
+    { score: 0, isRuminating: false, pattern: "ãªã", reframe: "", summary: "åæã§ãã¾ããã§ãã" }
   );
 }
 
@@ -113,24 +113,24 @@ export async function generateWeeklyConcepts(
   weekLogs: { date: string; morning: string; evening: string }[]
 ): Promise<ConceptResult> {
   const logsText = weekLogs
-    .map((l) => `[${l.date}]\n朝: ${l.morning}\n夕: ${l.evening}`)
+    .map((l) => `[${l.date}]\næ: ${l.morning}\nå¤: ${l.evening}`)
     .join("\n\n");
 
   return llmJson<ConceptResult>(
-    `あなたは経験学習理論の専門家です。1週間のリフレクションログを分析し、本人の「持論（マイセオリー）」の候補を3つ提案してください。
+    `ããªãã¯çµé¨å­¦ç¿çè«ã®å°éå®¶ã§ãã1é±éã®ãªãã¬ã¯ã·ã§ã³ã­ã°ãåæããæ¬äººã®ãæè«ï¼ãã¤ã»ãªãªã¼ï¼ãã®åè£ã3ã¤ææ¡ãã¦ãã ããã
 
-持論とは：経験から抽出された、本人独自の行動原則や仕事哲学のこと。
-例：「朝一番の報告が信頼を生む」「反対意見こそ丁寧に聞くと突破口が見える」
+æè«ã¨ã¯ï¼çµé¨ããæ½åºããããæ¬äººç¬èªã®è¡åååãä»äºå²å­¦ã®ãã¨ã
+ä¾ï¼ãæä¸çªã®å ±åãä¿¡é ¼ãçãããåå¯¾æè¦ããä¸å¯§ã«èãã¨çªç ´å£ãè¦ããã
 
-JSON形式で回答：
+JSONå½¢å¼ã§åç­ï¼
 {
   "theses": [
-    { "title": "持論タイトル", "description": "説明（2-3文）", "confidence": 0.0-1.0 }
+    { "title": "æè«ã¿ã¤ãã«", "description": "èª¬æï¼2-3æï¼", "confidence": 0.0-1.0 }
   ],
-  "weekSummary": "週全体の要約（2-3文）"
+  "weekSummary": "é±å¨ä½ã®è¦ç´ï¼2-3æï¼"
 }`,
-    `今週のログ:\n${logsText}`,
-    { theses: [], weekSummary: "ログが不足しています" }
+    `ä»é±ã®ã­ã°:\n${logsText}`,
+    { theses: [], weekSummary: "ã­ã°ãä¸è¶³ãã¦ãã¾ã" }
   );
 }
 
@@ -151,29 +151,29 @@ export async function generate1on1Briefing(
   ruminationScores?: number[]
 ): Promise<BriefingResult> {
   const logsText = weekLogs
-    .map((l) => `[${l.date}] エネルギー:${l.energy || "未記録"}\n朝: ${l.morning}\n夕: ${l.evening}`)
+    .map((l) => `[${l.date}] ã¨ãã«ã®ã¼:${l.energy || "æªè¨é²"}\næ: ${l.morning}\nå¤: ${l.evening}`)
     .join("\n\n");
 
   const ruminationContext = ruminationScores?.length
-    ? `\n反芻スコア推移: ${ruminationScores.join(" → ")}`
+    ? `\nåè»ã¹ã³ã¢æ¨ç§»: ${ruminationScores.join(" â ")}`
     : "";
 
   return llmJson<BriefingResult>(
-    `あなたは1on1ミーティングの専門コーチです。マネージャーが部下との1on1前に確認するブリーフィングを作成してください。
+    `ããªãã¯1on1ãã¼ãã£ã³ã°ã®å°éã³ã¼ãã§ããããã¼ã¸ã£ã¼ãé¨ä¸ã¨ã®1on1åã«ç¢ºèªããããªã¼ãã£ã³ã°ãä½æãã¦ãã ããã
 
-JSON形式で回答：
+JSONå½¢å¼ã§åç­ï¼
 {
-  "summary": "1週間の概要（3-4文）",
-  "energyTrend": "エネルギーの傾向（1文）",
-  "ruminationRisk": "反芻リスク（低/中/高 + 簡単な説明）",
-  "suggestedQuestions": ["質問1", "質問2", "質問3"],
-  "keyThemes": ["テーマ1", "テーマ2"]
+  "summary": "1é±éã®æ¦è¦ï¼3-4æï¼",
+  "energyTrend": "ã¨ãã«ã®ã¼ã®å¾åï¼1æï¼",
+  "ruminationRisk": "åè»ãªã¹ã¯ï¼ä½/ä¸­/é« + ç°¡åãªèª¬æï¼",
+  "suggestedQuestions": ["è³ªå1", "è³ªå2", "è³ªå3"],
+  "keyThemes": ["ãã¼ã1", "ãã¼ã2"]
 }`,
-    `${participantName}さんの今週のログ:\n${logsText}${ruminationContext}`,
+    `${participantName}ããã®ä»é±ã®ã­ã°:\n${logsText}${ruminationContext}`,
     {
-      summary: "データ不足のため生成できませんでした",
-      energyTrend: "不明",
-      ruminationRisk: "不明",
+      summary: "ãã¼ã¿ä¸è¶³ã®ããçæã§ãã¾ããã§ãã",
+      energyTrend: "ä¸æ",
+      ruminationRisk: "ä¸æ",
       suggestedQuestions: [],
       keyThemes: [],
     }
@@ -198,25 +198,25 @@ export async function analyzePsychSafety(
     .join("\n");
 
   return llmJson<PsychSafetyResult>(
-    `あなたは組織心理学の専門家です。マネージャーのフィードバック文面を分析し、心理的安全性のシグナルを検出してください。
+    `ããªãã¯çµç¹å¿çå­¦ã®å°éå®¶ã§ããããã¼ã¸ã£ã¼ã®ãã£ã¼ãããã¯æé¢ãåæããå¿ççå®å¨æ§ã®ã·ã°ãã«ãæ¤åºãã¦ãã ããã
 
-ネガティブシグナル：犯人探し、非難、脅迫、マイクロマネジメント、感情的攻撃
-ポジティブシグナル：承認、好奇心、成長支援、失敗の学習化、共感
+ãã¬ãã£ãã·ã°ãã«ï¼ç¯äººæ¢ããéé£ãèè¿«ããã¤ã¯ã­ããã¸ã¡ã³ããææçæ»æ
+ãã¸ãã£ãã·ã°ãã«ï¼æ¿èªãå¥½å¥å¿ãæé·æ¯æ´ãå¤±æã®å­¦ç¿åãå±æ
 
-JSON形式で回答：
+JSONå½¢å¼ã§åç­ï¼
 {
   "score": 0-10,
-  "signals": ["ネガティブシグナルの具体例"],
-  "positives": ["ポジティブシグナルの具体例"],
-  "summary": "総合評価（1-2文）"
+  "signals": ["ãã¬ãã£ãã·ã°ãã«ã®å·ä½ä¾"],
+  "positives": ["ãã¸ãã£ãã·ã°ãã«ã®å·ä½ä¾"],
+  "summary": "ç·åè©ä¾¡ï¼1-2æï¼"
 }`,
-    `フィードバック一覧:\n${texts}`,
-    { score: 5, signals: [], positives: [], summary: "分析できませんでした" }
+    `ãã£ã¼ãããã¯ä¸è¦§:\n${texts}`,
+    { score: 5, signals: [], positives: [], summary: "åæã§ãã¾ããã§ãã" }
   );
 }
 
 // ---------------------------------------------------------------------------
-// Efficacy Booster — Find past "overcome" moments (Tier D)
+// Efficacy Booster â Find past "overcome" moments (Tier D)
 // ---------------------------------------------------------------------------
 export type EfficacyMoment = {
   date: string;
@@ -228,17 +228,17 @@ export async function findEfficacyMoments(
   logs: { date: string; morning: string; evening: string }[]
 ): Promise<EfficacyMoment[]> {
   const logsText = logs
-    .map((l) => `[${l.date}]\n朝: ${l.morning}\n夕: ${l.evening}`)
+    .map((l) => `[${l.date}]\næ: ${l.morning}\nå¤: ${l.evening}`)
     .join("\n\n");
 
   return llmJson<EfficacyMoment[]>(
-    `あなたは心理的資本(PsyCap)の専門家です。ユーザーのログから「困難を乗り越えた瞬間」「小さな成功体験」を最大3つ見つけてください。自己効力感(Self-Efficacy)を高めるリマインドに使います。
+    `ããªãã¯å¿ççè³æ¬(PsyCap)ã®å°éå®¶ã§ããã¦ã¼ã¶ã¼ã®ã­ã°ãããå°é£ãä¹ãè¶ããç¬éããå°ããªæåä½é¨ããæå¤§3ã¤è¦ã¤ãã¦ãã ãããèªå·±å¹åæ(Self-Efficacy)ãé«ãããªãã¤ã³ãã«ä½¿ãã¾ãã
 
-JSON配列で回答：
+JSONéåã§åç­ï¼
 [
-  { "date": "YYYY-MM-DD", "excerpt": "該当するログの要約", "lesson": "ここから得られた教訓（1文）" }
+  { "date": "YYYY-MM-DD", "excerpt": "è©²å½ããã­ã°ã®è¦ç´", "lesson": "ããããå¾ãããæè¨ï¼1æï¼" }
 ]`,
-    `過去のログ:\n${logsText}`,
+    `éå»ã®ã­ã°:\n${logsText}`,
     []
   );
 }
@@ -263,18 +263,18 @@ export async function generateReportSummary(
   }
 ): Promise<ReportSummary> {
   return llmJson<ReportSummary>(
-    `あなたは組織開発コンサルタントです。CORE Logの組織全体の統計データから、経営層向けの月次サマリーを作成してください。
+    `ããªãã¯çµç¹éçºã³ã³ãµã«ã¿ã³ãã§ããCORE Logã®çµç¹å¨ä½ã®çµ±è¨ãã¼ã¿ãããçµå¶å±¤åãã®ææ¬¡ãµããªã¼ãä½æãã¦ãã ããã
 
-JSON形式で回答：
+JSONå½¢å¼ã§åç­ï¼
 {
-  "executiveSummary": "エグゼクティブサマリー（3-4文）",
-  "keyFindings": ["発見1", "発見2", "発見3"],
-  "recommendations": ["推奨アクション1", "推奨アクション2"],
-  "riskAreas": ["リスク領域1"]
+  "executiveSummary": "ã¨ã°ã¼ã¯ãã£ããµããªã¼ï¼3-4æï¼",
+  "keyFindings": ["çºè¦1", "çºè¦2", "çºè¦3"],
+  "recommendations": ["æ¨å¥¨ã¢ã¯ã·ã§ã³1", "æ¨å¥¨ã¢ã¯ã·ã§ã³2"],
+  "riskAreas": ["ãªã¹ã¯é å1"]
 }`,
-    `組織統計:\n参加者数: ${orgStats.totalParticipants}\n平均記入率: ${orgStats.avgEntryRate}%\n平均エネルギースコア: ${orgStats.avgEnergyScore}/4\n平均連続記入: ${orgStats.streakAvg}日\n平均反芻スコア: ${orgStats.ruminationAvgScore}/10`,
+    `çµç¹çµ±è¨:\nåå èæ°: ${orgStats.totalParticipants}\nå¹³åè¨å¥ç: ${orgStats.avgEntryRate}%\nå¹³åã¨ãã«ã®ã¼ã¹ã³ã¢: ${orgStats.avgEnergyScore}/4\nå¹³åé£ç¶è¨å¥: ${orgStats.streakAvg}æ¥\nå¹³ååè»ã¹ã³ã¢: ${orgStats.ruminationAvgScore}/10`,
     {
-      executiveSummary: "データ不足のためレポートを生成できませんでした。",
+      executiveSummary: "ãã¼ã¿ä¸è¶³ã®ããã¬ãã¼ããçæã§ãã¾ããã§ããã",
       keyFindings: [],
       recommendations: [],
       riskAreas: [],
@@ -291,10 +291,151 @@ export async function generatePitchContent(
   challenges: string
 ): Promise<string> {
   return llmAnalyze(
-    `あなたは組織開発コンサルティング会社「Human Mature」のコンサルタントです。
-クライアント企業に対するCORE Log導入提案の要点を作成してください。
-理論的背景（経験学習、ダブルループ学習、心理的資本）と実装機能の対応を含めてください。`,
-    `企業名: ${companyName}\n業種: ${industry}\n課題: ${challenges}`,
+    `ããªãã¯çµç¹éçºã³ã³ãµã«ãã£ã³ã°ä¼ç¤¾ãHuman Matureãã®ã³ã³ãµã«ã¿ã³ãã§ãã
+ã¯ã©ã¤ã¢ã³ãä¼æ¥­ã«å¯¾ããCORE Logå°å¥ææ¡ã®è¦ç¹ãä½æãã¦ãã ããã
+çè«çèæ¯ï¼çµé¨å­¦ç¿ãããã«ã«ã¼ãå­¦ç¿ãå¿ççè³æ¬ï¼ã¨å®è£æ©è½ã®å¯¾å¿ãå«ãã¦ãã ããã`,
+    `ä¼æ¥­å: ${companyName}\næ¥­ç¨®: ${industry}\nèª²é¡: ${challenges}`,
     { temperature: 0.5, maxTokens: 2048 }
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Reflection Depth Analysis (Tier A – Consultant Tooling)
+// ---------------------------------------------------------------------------
+export type ReflectionLevel = "L1" | "L2" | "L3" | "L4";
+
+export type ReflectionDepthResult = {
+  currentLevel: ReflectionLevel;
+  trajectory: "deepening" | "stable" | "flattening";
+  themePersistence: {
+    theme: string;
+    dayCount: number;
+    description: string;
+  }[];
+  newConcepts: string[];
+  notableShift: string | null;
+  summary: string;
+};
+
+export async function analyzeReflectionDepth(
+  participantName: string,
+  weekLogs: { date: string; morning: string; evening: string }[]
+): Promise<ReflectionDepthResult> {
+  const logsText = weekLogs
+    .map((l) => `[${l.date}]\n朝: ${l.morning}\n夕: ${l.evening}`)
+    .join("\n\n");
+
+  return llmJson<ReflectionDepthResult>(
+    `あなたは経験学習理論と省察(リフレクション)の専門家です。参加者のログを分析し、省察の深度とテーマの持続性を評価してください。
+
+## 省察深度レベル（L1〜L4）
+- L1（事実報告）: 何が起きたかの記述のみ。「会議に出た」「資料を作った」
+- L2（感情・気づき）: 感じたこと、気づいたことの記述。「焦った」「意外だった」
+- L3（構造的洞察）: パターンや因果関係の分析。「先回りしない方が部下が動く」「問い方を変えると反応が変わる」
+- L4（行動変容・概念化）: 自分の行動原則や持論の生成・検証。概念を自分の言葉で再定義し、実践に適用している
+
+## テーマの持続性
+- 同じテーマ（例：「傾聴」「先回りしない」「問いの質」）が複数日にわたって登場しているか
+- 持続している場合、そのテーマがどう深化・変容しているか
+
+## 新しい概念の使用
+- 外部から得た概念（研修、書籍、フィードバック等）をログ内で使い始めた形跡
+
+JSON形式で回答：
+{
+  "currentLevel": "L1" | "L2" | "L3" | "L4",
+  "trajectory": "deepening" | "stable" | "flattening",
+  "themePersistence": [
+    { "theme": "テーマ名", "dayCount": 何日持続, "description": "テーマの深化の様子（1文）" }
+  ],
+  "newConcepts": ["新しく使い始めた概念名"],
+  "notableShift": "特筆すべき変化があれば1文で。なければnull",
+  "summary": "この参加者の省察状態の総合評価（2-3文）"
+}`,
+    `${participantName}さんの直近ログ:\n${logsText}`,
+    {
+      currentLevel: "L1",
+      trajectory: "stable",
+      themePersistence: [],
+      newConcepts: [],
+      notableShift: null,
+      summary: "ログが不足しています",
+    }
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Consultant Spotlight — "今週注目すべき参加者" (Tier A – Consultant Tooling)
+// ---------------------------------------------------------------------------
+export type SpotlightParticipant = {
+  name: string;
+  reason: string;
+  reflectionLevel: ReflectionLevel;
+  trajectory: "deepening" | "stable" | "flattening";
+  suggestedIntervention: string;
+  priority: "high" | "medium" | "low";
+};
+
+export type ConsultantSpotlightResult = {
+  spotlight: SpotlightParticipant[];
+  orgPulse: string;
+  weekSummary: string;
+};
+
+export async function generateConsultantSpotlight(
+  participantSummaries: {
+    name: string;
+    department: string;
+    logs: { date: string; morning: string; evening: string; energy: string | null }[];
+  }[]
+): Promise<ConsultantSpotlightResult> {
+  const summaryText = participantSummaries
+    .map((p) => {
+      const logLines = p.logs
+        .map((l) => `  [${l.date}] E:${l.energy || "?"} 朝:${l.morning} 夕:${l.evening || "(未記入)"}`)
+        .join("\n");
+      return `■ ${p.name}（${p.department}）\n${logLines}`;
+    })
+    .join("\n\n");
+
+  return llmJson<ConsultantSpotlightResult>(
+    `あなたは組織開発コンサルタントの「目」として機能するAIです。
+全参加者の直近1週間のログを読み、コンサルタントが最優先で注目すべき参加者を最大5名選んでください。
+
+## 選定基準（優先度順）
+1. **急成長の兆候**: 省察が急にL1→L3以上に深化、新概念の使用開始、行動変容の記述
+2. **停滞・後退の兆候**: 以前より省察が浅くなった、エネルギーが低下傾向、ログが形骸化
+3. **テーマの持続性**: 同じ問いを数日間追い続けている（良い兆候 — 強化のチャンス）
+4. **介入の好機**: 「もう一押し」で飛躍しそうな参加者、問いを投げると一段深くなりそうな参加者
+5. **反芻・自責の兆候**: ネガティブなパターンの繰り返し
+
+## 介入提案の型
+- 承認型:「この変化に気づいていることを伝える」
+- 問い型:「○○について考えてみてください」
+- 資料型:「○○に関する参考資料を共有する」
+- 対話型:「次回1on1で○○について話す」
+- 見守り型:「今は介入せず、自走を観察する」
+
+JSON形式で回答：
+{
+  "spotlight": [
+    {
+      "name": "参加者名",
+      "reason": "なぜこの人に注目すべきか（1-2文）",
+      "reflectionLevel": "L1" | "L2" | "L3" | "L4",
+      "trajectory": "deepening" | "stable" | "flattening",
+      "suggestedIntervention": "推奨する介入（型名＋具体的な内容）",
+      "priority": "high" | "medium" | "low"
+    }
+  ],
+  "orgPulse": "組織全体の今週の状態（1-2文）",
+  "weekSummary": "コンサルへの週次サマリー（3-4文。全体傾向、注目ポイント、推奨アクション）"
+}`,
+    `全参加者の直近ログ:\n${summaryText}`,
+    {
+      spotlight: [],
+      orgPulse: "データ不足のため組織パルスを評価できません",
+      weekSummary: "分析に必要なログが不足しています",
+    }
   );
 }
