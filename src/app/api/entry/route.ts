@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
         if (participant?.managerId) {
           const mgr = await getManagerById(participant.managerId);
           if (mgr?.email && !mgr.email.includes("example.com")) {
-            sendNotificationEmail({
+            await sendNotificationEmail({
               to: mgr.email,
               recipientName: mgr.name.split(" ")[0],
               senderName: participantName,
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
         if (participant?.managerId) {
           const mgr = await getManagerById(participant.managerId);
           if (mgr?.email && !mgr.email.includes("example.com")) {
-            sendNotificationEmail({
+            await sendNotificationEmail({
               to: mgr.email,
               recipientName: mgr.name.split(" ")[0],
               senderName: participantName || participant.name,
@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
         if (participant?.managerId) {
           const mgr = await getManagerById(participant.managerId);
           if (mgr?.email && !mgr.email.includes("example.com")) {
-            sendNotificationEmail({
+            await sendNotificationEmail({
               to: mgr.email,
               recipientName: mgr.name.split(" ")[0],
               senderName: participantName,

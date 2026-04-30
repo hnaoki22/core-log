@@ -144,14 +144,14 @@ export async function POST(req: NextRequest) {
     // Send email notification to participant (non-blocking)
     try {
       if (targetParticipant?.email && !targetParticipant.email.includes("example.com") && targetParticipant.emailEnabled) {
-        sendNotificationEmail({
+        await sendNotificationEmail({
           to: targetParticipant.email,
           recipientName: targetParticipant.name.split(" ")[0],
           senderName: authorName,
           token: targetParticipant.token,
           type: "hm_feedback",
           detail: content.length > 100 ? content.substring(0, 100) + "..." : content,
-        }).catch(console.error);
+        });
       }
     } catch (notifyError) {
       console.error("Feedback notification error (non-critical):", notifyError);

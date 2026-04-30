@@ -36,14 +36,14 @@ export async function POST(request: NextRequest) {
         if (ownerName) {
           const targetParticipant = await getParticipantByName(ownerName, manager.tenantId);
           if (targetParticipant?.email && !targetParticipant.email.includes("example.com")) {
-            sendNotificationEmail({
+            await sendNotificationEmail({
               to: targetParticipant.email,
               recipientName: targetParticipant.name.split(" ")[0],
               senderName: manager.name,
               token: targetParticipant.token,
               type: "manager_comment",
               detail: sanitizedComment.length > 100 ? sanitizedComment.substring(0, 100) + "..." : sanitizedComment,
-            }).catch(console.error);
+            });
           }
         }
       }

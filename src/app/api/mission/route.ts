@@ -110,14 +110,14 @@ export async function POST(request: NextRequest) {
         // Manager created → notify participant
         const targetParticipant = await getParticipantByName(effectiveName, tenantId);
         if (targetParticipant?.email && !targetParticipant.email.includes("example.com")) {
-          sendNotificationEmail({
+          await sendNotificationEmail({
             to: targetParticipant.email,
             recipientName: targetParticipant.name.split(" ")[0],
             senderName: manager.name,
             token: targetParticipant.token,
             type: "mission_created",
             detail: sanitizedTitle,
-          }).catch(console.error);
+          });
         }
       }
       // Participant created → no notification needed for now
