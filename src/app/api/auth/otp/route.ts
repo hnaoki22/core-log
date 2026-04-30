@@ -216,11 +216,26 @@ async function handleVerifyOTP(token: string, code: string): Promise<NextRespons
 
   logger.info("OTP verified, session set", { token, email: result.email });
 
-  // Also store session in Supabase as fallback for cookie-less scenarios
-  // (iOS in-app browsers, cookie clearing, etc.)
-  storeSession(token).catch((err) => {
-    logger.warn("Failed to store session in Supabase (non-blocking)", { error: String(err) });
-  });
+  // Store session in Supabase as fallback for cookie-less scenarios
+  // (iOS in-app browsers, cookie clearing, ITP 7-day cookie cap, etc.)
+  //
+  // CRITICAL: This MUST be awaited. Vercel serverless functions terminate
+  // immediately after the response is returned, killing any pending background
+  // promises. A fire-and-forget call here means the otp_sessions row may never
+  // be written, causing middleware.checkSession() to fail and triggering the
+  // OTP re-prompt loop on iOS Safari.
+  //
+  // Same pattern as the 2026-04-30 fix for sendNotificationEmail (commit 94d04a7).
+  try {
+    const stored = await storeSession(token);
+    if (!stored) {
+      logger.warn("Supabase session store returned false — fallback recovery may not work for this token", { token });
+    }
+  } catch (err) {
+    // Network/Supabase failure: log but don't fail the OTP verification —
+    // the cookie is already set and that's the primary auth mechanism.
+    logger.warn("Failed to store session in Supabase (non-blocking for cookie auth)", { error: String(err), token });
+  }
 
   return response;
 }
