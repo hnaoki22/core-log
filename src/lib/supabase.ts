@@ -55,6 +55,8 @@ export type NotionLogEntry = {
   managerReaction: string | null;
   morningTime: string | null;
   eveningTime: string | null;
+  morningDurationSec: number | null;
+  eveningDurationSec: number | null;
   dojoPhase: string;
   weekNum: number;
 };
@@ -156,6 +158,8 @@ function rowToLog(r: any): NotionLogEntry {
     managerReaction: r.manager_reaction || null,
     morningTime: r.morning_time || null,
     eveningTime: r.evening_time || null,
+    morningDurationSec: r.morning_duration_sec ?? null,
+    eveningDurationSec: r.evening_duration_sec ?? null,
     dojoPhase: r.dojo_phase || "",
     weekNum: r.week_num ?? 0,
   };
@@ -329,6 +333,19 @@ export async function getLogEntryOwner(
 // ---------------------------------------------------------------------------
 // LOG CREATION / UPDATE
 // ---------------------------------------------------------------------------
+/**
+ * 記入所要時間（focus → submit）を 0〜1800 秒（30 分）の範囲にクリップ。
+ * 範囲外・undefined・NaN・負値は null を返す（DB に NULL として記録）。
+ */
+function sanitizeDurationSec(v: number | null | undefined): number | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v !== "number" || !Number.isFinite(v)) return null;
+  const i = Math.round(v);
+  if (i < 0) return null;
+  if (i > 1800) return 1800; // クリップ
+  return i;
+}
+
 export async function createMorningEntry(
   participantName: string,
   date: string,
@@ -337,7 +354,8 @@ export async function createMorningEntry(
   dojoPhase: string,
   weekNum: number,
   tenantId: string,
-  participantId: string
+  participantId: string,
+  morningDurationSec: number | null = null
 ): Promise<string | null> {
   const now = new Date();
   const d = new Date(date);
@@ -357,6 +375,7 @@ export async function createMorningEntry(
       dojo_phase: dojoPhase,
       week_num: weekNum,
       morning_time: now.toISOString(),
+      morning_duration_sec: sanitizeDurationSec(morningDurationSec),
     })
     .select("id")
     .single();
@@ -374,15 +393,21 @@ export async function createMorningEntry(
 export async function updateEveningEntry(
   pageId: string,
   eveningInsight: string,
-  energy: string | null
+  energy: string | null,
+  eveningDurationSec: number | null = null
 ): Promise<boolean> {
   const now = new Date();
-  const updateData = {
+  const sanitized = sanitizeDurationSec(eveningDurationSec);
+  const updateData: Record<string, unknown> = {
     evening_insight: eveningInsight,
     energy: energy || undefined,
     status: "complete",
     evening_time: now.toISOString(),
   };
+  // duration が計測できた場合のみ更新（null の場合はカラムを触らない）
+  if (sanitized !== null) {
+    updateData.evening_duration_sec = sanitized;
+  }
   const { error, data: updated } = await getClient()
     .from("logs")
     .update(updateData)
@@ -407,7 +432,8 @@ export async function createEveningOnlyEntry(
   dojoPhase: string,
   weekNum: number,
   tenantId: string,
-  participantId: string
+  participantId: string,
+  eveningDurationSec: number | null = null
 ): Promise<string | null> {
   const now = new Date();
   const d = new Date(date);
@@ -427,6 +453,7 @@ export async function createEveningOnlyEntry(
       dojo_phase: dojoPhase,
       week_num: weekNum,
       evening_time: now.toISOString(),
+      evening_duration_sec: sanitizeDurationSec(eveningDurationSec),
     })
     .select("id")
     .single();

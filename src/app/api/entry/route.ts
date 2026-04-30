@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     // Real Notion API
     if (type === "morning") {
-      const { participantName, date, morningIntent, energy, dojoPhase, weekNum } = body;
+      const { participantName, date, morningIntent, energy, dojoPhase, weekNum, morningDurationSec } = body;
 
       // 朝の記入は12:00（正午）まで
       // 深夜0:00〜3:59はグレースピリオド（前日扱い）なので朝の記入は不可
@@ -69,10 +69,17 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const pageId = await createMorningEntry(participantName, date, sanitizedMorningIntent, energy, dojoPhase, weekNum, tenantId, participantId);
+      const pageId = await createMorningEntry(
+        participantName, date, sanitizedMorningIntent, energy,
+        dojoPhase, weekNum, tenantId, participantId,
+        typeof morningDurationSec === "number" ? morningDurationSec : null
+      );
       if (!pageId) {
         return NextResponse.json({ error: "Failed to create entry" }, { status: 500 });
       }
+      // duration を含めて応答（フロントの「N 分 N 秒で書きました」表示用）
+      const respDuration = typeof morningDurationSec === "number" && morningDurationSec >= 0 && morningDurationSec <= 1800
+        ? Math.round(morningDurationSec) : null;
 
       // Notify manager that subordinate submitted morning log
       try {
@@ -94,12 +101,12 @@ export async function POST(request: NextRequest) {
         logger.error("Failed to send manager notification", { error: String(e), participantName });
       }
 
-      logger.info("Morning entry created", { participantName, date, pageId });
-      return NextResponse.json({ success: true, pageId });
+      logger.info("Morning entry created", { participantName, date, pageId, durationSec: respDuration });
+      return NextResponse.json({ success: true, pageId, durationSec: respDuration });
     }
 
     if (type === "evening") {
-      const { pageId, eveningInsight, energy, participantName } = body;
+      const { pageId, eveningInsight, energy, participantName, eveningDurationSec } = body;
       if (!pageId) {
         return NextResponse.json({ error: "pageId is required for evening entry" }, { status: 400 });
       }
@@ -107,10 +114,15 @@ export async function POST(request: NextRequest) {
       // Sanitize user input
       const sanitizedEveningInsight = sanitizeInput(eveningInsight || "");
 
-      const success = await updateEveningEntry(pageId, sanitizedEveningInsight, energy);
+      const success = await updateEveningEntry(
+        pageId, sanitizedEveningInsight, energy,
+        typeof eveningDurationSec === "number" ? eveningDurationSec : null
+      );
       if (!success) {
         return NextResponse.json({ error: "Failed to update entry" }, { status: 500 });
       }
+      const respDurationE = typeof eveningDurationSec === "number" && eveningDurationSec >= 0 && eveningDurationSec <= 1800
+        ? Math.round(eveningDurationSec) : null;
 
       // Notify manager that subordinate submitted evening log
       try {
@@ -132,13 +144,13 @@ export async function POST(request: NextRequest) {
         logger.error("Failed to send manager notification", { error: String(e), participantName });
       }
 
-      logger.info("Evening entry updated", { participantName, pageId });
-      return NextResponse.json({ success: true });
+      logger.info("Evening entry updated", { participantName, pageId, durationSec: respDurationE });
+      return NextResponse.json({ success: true, durationSec: respDurationE });
     }
 
     // 朝未記入で12:00を過ぎた場合の夕方のみエントリー
     if (type === "evening_only") {
-      const { participantName, date, eveningInsight, energy, dojoPhase, weekNum } = body;
+      const { participantName, date, eveningInsight, energy, dojoPhase, weekNum, eveningDurationSec } = body;
 
       const sanitizedEveningInsight = sanitizeInput(eveningInsight || "");
 
@@ -151,10 +163,16 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const pageId = await createEveningOnlyEntry(participantName, date, sanitizedEveningInsight, energy, dojoPhase, weekNum, tenantId, participantId);
+      const pageId = await createEveningOnlyEntry(
+        participantName, date, sanitizedEveningInsight, energy,
+        dojoPhase, weekNum, tenantId, participantId,
+        typeof eveningDurationSec === "number" ? eveningDurationSec : null
+      );
       if (!pageId) {
         return NextResponse.json({ error: "Failed to create entry" }, { status: 500 });
       }
+      const respDurationEO = typeof eveningDurationSec === "number" && eveningDurationSec >= 0 && eveningDurationSec <= 1800
+        ? Math.round(eveningDurationSec) : null;
 
       // Notify manager
       try {
@@ -176,8 +194,8 @@ export async function POST(request: NextRequest) {
         logger.error("Failed to send manager notification", { error: String(e), participantName });
       }
 
-      logger.info("Evening-only entry created", { participantName, date, pageId });
-      return NextResponse.json({ success: true, pageId });
+      logger.info("Evening-only entry created", { participantName, date, pageId, durationSec: respDurationEO });
+      return NextResponse.json({ success: true, pageId, durationSec: respDurationEO });
     }
 
     return NextResponse.json({ error: "Invalid type" }, { status: 400 });
