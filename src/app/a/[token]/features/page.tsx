@@ -23,6 +23,12 @@ type FeatureFlag = {
 type Preset = { id: string; label: string; description: string };
 
 type ApiData = {
+  // tenantId is the canonical scope for these flags. tenantSlug/tenantName
+  // are populated by the admin API for display. clientId is kept for older
+  // versions of the API that didn't include these fields yet.
+  tenantId?: string;
+  tenantSlug?: string | null;
+  tenantName?: string | null;
   clientId: string;
   catalog: FeatureFlag[];
   presets: Preset[];
@@ -164,13 +170,17 @@ export default function FeatureFlagsAdminPage() {
             <Link href={`/a/${token}`} className="text-indigo-200 text-xs hover:text-white transition">
               ← 管理画面に戻る
             </Link>
-            <span className="text-[10px] text-indigo-200 font-mono bg-white/10 px-2 py-1 rounded">
-              client: {data.clientId}
+            <span className="text-[10px] text-indigo-200 bg-white/10 px-2 py-1 rounded">
+              編集中のテナント: <strong className="text-white">{data.tenantName ?? data.tenantSlug ?? data.tenantId ?? data.clientId}</strong>
+              {data.tenantSlug && (
+                <span className="ml-1.5 text-indigo-300/70 font-mono">({data.tenantSlug})</span>
+              )}
             </span>
           </div>
           <h1 className="text-2xl font-semibold tracking-tight mt-2">機能設定(Feature Flags)</h1>
           <p className="text-indigo-200 text-sm mt-1.5 leading-relaxed">
-            クライアントの導入フェーズに応じて、機能を段階的にON/OFFできます。
+            このテナントの導入フェーズに応じて、機能を段階的にON/OFFできます。<br />
+            <span className="text-indigo-300/80 text-xs">変更はこのテナントの参加者・管理者のみに反映されます（他テナントの設定には影響しません）。</span>
           </p>
           {!data.storageConfigured && (
             <div className="mt-3 bg-amber-400/20 border border-amber-300/40 text-amber-100 text-xs rounded-lg p-3">

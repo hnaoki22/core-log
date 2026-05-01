@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/supabase";
 import { getManagerByToken } from "@/lib/participant-db";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 import { analyzePsychSafety } from "@/lib/llm";
 import { resolveManagerTenantStrict } from "@/lib/tenant-context";
 
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-a.psychSafetyMonitor");
+    const featureEnabled = await isFeatureEnabledForToken("tier-a.psychSafetyMonitor", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Psychological safety feature is not enabled" },

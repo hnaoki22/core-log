@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getManagerByTokenFromSupabase } from "@/lib/supabase";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 import { generatePitchContent } from "@/lib/llm";
 
 export async function POST(req: NextRequest) {
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-g.pitchGenerator");
+    const featureEnabled = await isFeatureEnabledForToken("tier-g.pitchGenerator", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Pitch generator feature is not enabled" },

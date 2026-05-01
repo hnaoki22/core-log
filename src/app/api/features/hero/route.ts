@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/supabase";
 import { getParticipantByTokenFromSupabase } from "@/lib/supabase";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 
 type HeroAnswers = {
   hope: number[];
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-d.heroAssessment");
+    const featureEnabled = await isFeatureEnabledForToken("tier-d.heroAssessment", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Hero assessment feature is not enabled" },
@@ -126,7 +126,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-d.heroAssessment");
+    const featureEnabled = await isFeatureEnabledForToken("tier-d.heroAssessment", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Hero assessment feature is not enabled" },

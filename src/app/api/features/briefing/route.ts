@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/supabase";
 import { getManagerByTokenFromSupabase } from "@/lib/supabase";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 import { generate1on1Briefing } from "@/lib/llm";
 import { resolveManagerTenantStrict } from "@/lib/tenant-context";
 
@@ -89,7 +89,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-a.oneOnOneBriefing");
+    const featureEnabled = await isFeatureEnabledForToken("tier-a.oneOnOneBriefing", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Briefing feature is not enabled" },

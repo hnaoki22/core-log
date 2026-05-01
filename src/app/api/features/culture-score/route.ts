@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClient, DEFAULT_TENANT_ID } from "@/lib/supabase";
 import { getManagerByTokenFromSupabase } from "@/lib/supabase";
 import { isAdminOrObserverToken } from "@/lib/participant-db";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 import { resolveManagerTenantStrict } from "@/lib/tenant-context";
 
 
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-b.cultureScore");
+    const featureEnabled = await isFeatureEnabledForToken("tier-b.cultureScore", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Culture score feature is not enabled" },

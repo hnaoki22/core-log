@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/supabase";
 import { getParticipantByTokenFromSupabase } from "@/lib/supabase";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-e.calendarBlock");
+    const featureEnabled = await isFeatureEnabledForToken("tier-e.calendarBlock", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Calendar block feature is not enabled" },
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-e.calendarBlock");
+    const featureEnabled = await isFeatureEnabledForToken("tier-e.calendarBlock", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Calendar block feature is not enabled" },

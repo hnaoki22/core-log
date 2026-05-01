@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/supabase";
 import { getParticipantByTokenFromSupabase } from "@/lib/supabase";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 import { findEfficacyMoments } from "@/lib/llm";
 
 export async function GET(req: NextRequest) {
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-d.efficacyBooster");
+    const featureEnabled = await isFeatureEnabledForToken("tier-d.efficacyBooster", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Efficacy booster feature is not enabled" },

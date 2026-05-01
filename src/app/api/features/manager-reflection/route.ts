@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/supabase";
 import { getManagerByTokenFromSupabase } from "@/lib/supabase";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 import { resolveManagerTenantStrict } from "@/lib/tenant-context";
 
 
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-a.managerSelfReflection");
+    const featureEnabled = await isFeatureEnabledForToken("tier-a.managerSelfReflection", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Manager self-reflection feature is not enabled" },
@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-a.managerSelfReflection");
+    const featureEnabled = await isFeatureEnabledForToken("tier-a.managerSelfReflection", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Manager self-reflection feature is not enabled" },

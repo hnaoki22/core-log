@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/supabase";
 import { getManagerByTokenFromSupabase } from "@/lib/supabase";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 import { resolveManagerTenantStrict } from "@/lib/tenant-context";
 
 type EnergyLevel = "excellent" | "good" | "okay" | "low" | null;
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-a.burnoutScore");
+    const featureEnabled = await isFeatureEnabledForToken("tier-a.burnoutScore", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Burnout score feature is not enabled" },

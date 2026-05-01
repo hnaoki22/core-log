@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getParticipantByTokenFromSupabase } from "@/lib/supabase";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 
 // Rotating set of double-loop questions
 const DOUBLE_LOOP_QUESTIONS = [
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-s.doubleLoopPrompt");
+    const featureEnabled = await isFeatureEnabledForToken("tier-s.doubleLoopPrompt", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Double-loop prompt feature is not enabled" },
