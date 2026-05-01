@@ -22,6 +22,13 @@ type FeatureFlag = {
 
 type Preset = { id: string; label: string; description: string };
 
+type TenantOption = {
+  id: string;
+  slug: string;
+  name: string;
+  companyName?: string;
+};
+
 type ApiData = {
   // tenantId is the canonical scope for these flags. tenantSlug/tenantName
   // are populated by the admin API for display. clientId is kept for older
@@ -29,6 +36,9 @@ type ApiData = {
   tenantId?: string;
   tenantSlug?: string | null;
   tenantName?: string | null;
+  isSuperAdmin?: boolean;
+  allTenants?: TenantOption[];
+  declinedSlug?: string | null;
   clientId: string;
   catalog: FeatureFlag[];
   presets: Preset[];
@@ -69,7 +79,14 @@ export default function FeatureFlagsAdminPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/api/admin/features?token=${token}`);
+        // Pass through ?tenant= from URL so super-admins can switch tenants.
+        const tenantSlug = typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("tenant")
+          : null;
+        const apiUrl = tenantSlug
+          ? `/api/admin/features?token=${token}&tenant=${encodeURIComponent(tenantSlug)}`
+          : `/api/admin/features?token=${token}`;
+        const res = await fetch(apiUrl);
         if (!res.ok) throw new Error("load failed");
         const d = (await res.json()) as ApiData;
         setData(d);
@@ -95,7 +112,14 @@ export default function FeatureFlagsAdminPage() {
     if (!confirm(`プリセット「${data?.presets.find(p => p.id === presetId)?.label}」を適用しますか?\n現在の設定は上書きされます。`)) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/admin/features?token=${token}`, {
+      // Same tenant scope as the GET, so admins editing tenant X save to tenant X.
+      const tenantSlugForPost = typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("tenant")
+        : null;
+      const postUrl = tenantSlugForPost
+        ? `/api/admin/features?token=${token}&tenant=${encodeURIComponent(tenantSlugForPost)}`
+        : `/api/admin/features?token=${token}`;
+      const res = await fetch(postUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ presetId }),
@@ -115,7 +139,14 @@ export default function FeatureFlagsAdminPage() {
   const saveFlags = async () => {
     setSaving(true);
     try {
-      const res = await fetch(`/api/admin/features?token=${token}`, {
+      // Same tenant scope as the GET, so admins editing tenant X save to tenant X.
+      const tenantSlugForPost = typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("tenant")
+        : null;
+      const postUrl = tenantSlugForPost
+        ? `/api/admin/features?token=${token}&tenant=${encodeURIComponent(tenantSlugForPost)}`
+        : `/api/admin/features?token=${token}`;
+      const res = await fetch(postUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ flags }),
@@ -170,12 +201,36 @@ export default function FeatureFlagsAdminPage() {
             <Link href={`/a/${token}`} className="text-indigo-200 text-xs hover:text-white transition">
               ← 管理画面に戻る
             </Link>
-            <span className="text-[10px] text-indigo-200 bg-white/10 px-2 py-1 rounded">
-              編集中のテナント: <strong className="text-white">{data.tenantName ?? data.tenantSlug ?? data.tenantId ?? data.clientId}</strong>
-              {data.tenantSlug && (
-                <span className="ml-1.5 text-indigo-300/70 font-mono">({data.tenantSlug})</span>
-              )}
-            </span>
+            {data.isSuperAdmin && data.allTenants && data.allTenants.length > 1 ? (
+              <div className="flex items-center gap-1.5 text-[11px] text-indigo-200 bg-white/10 px-2 py-1 rounded">
+                <span>編集中のテナント:</span>
+                <select
+                  className="bg-white/15 text-white border border-white/20 rounded px-1.5 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                  value={data.tenantSlug ?? ""}
+                  onChange={(e) => {
+                    const slug = e.target.value;
+                    const url = new URL(window.location.href);
+                    if (slug) url.searchParams.set("tenant", slug);
+                    else url.searchParams.delete("tenant");
+                    window.location.href = url.toString();
+                  }}
+                  aria-label="編集対象のテナントを選択"
+                >
+                  {data.allTenants.map((t) => (
+                    <option key={t.id} value={t.slug} className="text-black">
+                      {t.name} ({t.slug})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <span className="text-[10px] text-indigo-200 bg-white/10 px-2 py-1 rounded">
+                編集中のテナント: <strong className="text-white">{data.tenantName ?? data.tenantSlug ?? data.tenantId ?? data.clientId}</strong>
+                {data.tenantSlug && (
+                  <span className="ml-1.5 text-indigo-300/70 font-mono">({data.tenantSlug})</span>
+                )}
+              </span>
+            )}
           </div>
           <h1 className="text-2xl font-semibold tracking-tight mt-2">機能設定(Feature Flags)</h1>
           <p className="text-indigo-200 text-sm mt-1.5 leading-relaxed">
