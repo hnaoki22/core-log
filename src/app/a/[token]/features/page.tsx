@@ -333,11 +333,6 @@ export default function FeatureFlagsAdminPage() {
                                 準備中
                               </span>
                             )}
-                            {f.recommendedPhase && (
-                              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
-                                Phase {f.recommendedPhase}〜推奨
-                              </span>
-                            )}
                           </div>
                           <p className="text-xs text-[#5B5560] mt-1 leading-relaxed">{f.description}</p>
                           <div className="mt-1.5 flex items-center gap-3">
