@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/supabase";
 import { isAdminTokenFromSupabase } from "@/lib/supabase";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 
 export async function GET(req: NextRequest) {
   try {
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-g.multiTenant");
+    const featureEnabled = await isFeatureEnabledForToken("tier-g.multiTenant", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Multi-tenant feature is not enabled" },
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-g.multiTenant");
+    const featureEnabled = await isFeatureEnabledForToken("tier-g.multiTenant", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Multi-tenant feature is not enabled" },

@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/supabase";
 import { getManagerByTokenFromSupabase } from "@/lib/supabase";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 
 function validatePostRequest(body: unknown): body is {
   token: string;
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     const { token, consultantName, interventionType, date, participantIds, description, durationMinutes, notes } = body;
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-g.consultIntervention");
+    const featureEnabled = await isFeatureEnabledForToken("tier-g.consultIntervention", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Consult intervention feature is not enabled" },
@@ -114,7 +114,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-g.consultIntervention");
+    const featureEnabled = await isFeatureEnabledForToken("tier-g.consultIntervention", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Consult intervention feature is not enabled" },

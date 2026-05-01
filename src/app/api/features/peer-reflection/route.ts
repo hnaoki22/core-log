@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/supabase";
 import { getParticipantByToken } from "@/lib/participant-db";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 
 
 
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-b.peerReflection");
+    const featureEnabled = await isFeatureEnabledForToken("tier-b.peerReflection", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Peer reflection feature is not enabled" },
@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-b.peerReflection");
+    const featureEnabled = await isFeatureEnabledForToken("tier-b.peerReflection", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Peer reflection feature is not enabled" },
@@ -176,7 +176,7 @@ export async function PUT(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-b.peerReflection");
+    const featureEnabled = await isFeatureEnabledForToken("tier-b.peerReflection", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Peer reflection feature is not enabled" },

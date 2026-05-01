@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/supabase";
 import { getManagerByTokenFromSupabase, getAllLogsForTenant } from "@/lib/supabase";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 import { resolveAdminTenantContext } from "@/lib/tenant-context";
 import {
   generateConsultantSpotlight,
@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled(FEATURE_KEY);
+    const featureEnabled = await isFeatureEnabledForToken(FEATURE_KEY, token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Consultant spotlight feature is not enabled" },
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled(FEATURE_KEY);
+    const featureEnabled = await isFeatureEnabledForToken(FEATURE_KEY, token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Consultant spotlight feature is not enabled" },

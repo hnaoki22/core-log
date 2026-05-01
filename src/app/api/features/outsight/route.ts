@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/supabase";
 import { getParticipantByTokenFromSupabase, getManagerByTokenFromSupabase } from "@/lib/supabase";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 
 function getWeekString(date: Date): string {
   const jan4 = new Date(date.getFullYear(), 0, 4);
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-c.outsightTask");
+    const featureEnabled = await isFeatureEnabledForToken("tier-c.outsightTask", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Outsight task feature is not enabled" },
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-c.outsightTask");
+    const featureEnabled = await isFeatureEnabledForToken("tier-c.outsightTask", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Outsight task feature is not enabled" },
@@ -156,7 +156,7 @@ export async function PUT(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-c.outsightTask");
+    const featureEnabled = await isFeatureEnabledForToken("tier-c.outsightTask", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Outsight task feature is not enabled" },

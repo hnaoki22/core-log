@@ -7,10 +7,23 @@ let globalFlags: Record<string, boolean> | null = null;
 let globalPromise: Promise<Record<string, boolean>> | null = null;
 const listeners = new Set<(f: Record<string, boolean>) => void>();
 
+// Extract participant or admin token from the current URL.
+// Path patterns: /p/<token>, /a/<token>, /p/<token>/..., /a/<token>/...
+function tokenFromLocation(): string | null {
+  if (typeof window === "undefined") return null;
+  const path = window.location.pathname;
+  const match = path.match(/^\/(p|a)\/([^\/?#]+)/);
+  return match ? match[2] : null;
+}
+
 async function fetchFlags(): Promise<Record<string, boolean>> {
   if (globalFlags) return globalFlags;
   if (globalPromise) return globalPromise;
-  globalPromise = fetch("/api/features")
+  const token = tokenFromLocation();
+  const url = token
+    ? `/api/features?token=${encodeURIComponent(token)}`
+    : "/api/features";
+  globalPromise = fetch(url)
     .then((r) => r.json())
     .then((d) => {
       globalFlags = (d.flags || {}) as Record<string, boolean>;

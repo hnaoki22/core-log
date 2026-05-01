@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, getClientIp, buildRateLimitKey } from "@/lib/rate-limit";
 import { isSessionValid, getSessionCookieName, createSignedSessionValue, SESSION_MAX_AGE } from "@/lib/session";
 import { isFeatureEnabled } from "@/lib/feature-flags";
+import { DEFAULT_TENANT_ID } from "@/lib/supabase";
 import { checkSession } from "@/lib/session-store";
 import { validateEnv } from "@/lib/env";
 
@@ -77,7 +78,7 @@ export async function middleware(request: NextRequest) {
   // Falls back to OTP_ENABLED env var if feature flag check fails
   let otpEnabled = false;
   try {
-    otpEnabled = await isFeatureEnabled("feature.otpAuth");
+    otpEnabled = await isFeatureEnabled("feature.otpAuth", DEFAULT_TENANT_ID); // global toggle
   } catch {
     // Fallback to env var if Supabase is unreachable
     otpEnabled = process.env.OTP_ENABLED === "true";

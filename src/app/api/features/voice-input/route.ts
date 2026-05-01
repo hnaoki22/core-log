@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getParticipantByTokenFromSupabase } from "@/lib/supabase";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Token required" }, { status: 400 });
     }
 
-    const featureEnabled = await isFeatureEnabled("tier-e.voiceInput");
+    const featureEnabled = await isFeatureEnabledForToken("tier-e.voiceInput", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Voice input feature is not enabled" },

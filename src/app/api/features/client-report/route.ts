@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/supabase";
 import { getManagerByTokenFromSupabase } from "@/lib/supabase";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 import { generateReportSummary } from "@/lib/llm";
 
 export async function GET(req: NextRequest) {
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-f.clientReport");
+    const featureEnabled = await isFeatureEnabledForToken("tier-f.clientReport", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Client report feature is not enabled" },

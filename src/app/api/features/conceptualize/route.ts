@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/supabase";
 import { getParticipantByTokenFromSupabase, getLogsByParticipant } from "@/lib/supabase";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 import { generateWeeklyConcepts } from "@/lib/llm";
 
 export async function GET(req: NextRequest) {
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-s.weeklyConceptualization");
+    const featureEnabled = await isFeatureEnabledForToken("tier-s.weeklyConceptualization", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Weekly conceptualization feature is not enabled" },
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-s.weeklyConceptualization");
+    const featureEnabled = await isFeatureEnabledForToken("tier-s.weeklyConceptualization", token);
     if (!featureEnabled) {
       return NextResponse.json(
         { error: "Weekly conceptualization feature is not enabled" },

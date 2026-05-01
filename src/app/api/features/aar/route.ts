@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/supabase";
 import { getParticipantByTokenFromSupabase } from "@/lib/supabase";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 
 
 
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-b.aar");
+    const featureEnabled = await isFeatureEnabledForToken("tier-b.aar", token);
     if (!featureEnabled) {
       return NextResponse.json({ error: "AAR feature is not enabled" }, {
         status: 403,
@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-b.aar");
+    const featureEnabled = await isFeatureEnabledForToken("tier-b.aar", token);
     if (!featureEnabled) {
       return NextResponse.json({ error: "AAR feature is not enabled" }, {
         status: 403,
@@ -143,7 +143,7 @@ export async function PUT(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-b.aar");
+    const featureEnabled = await isFeatureEnabledForToken("tier-b.aar", token);
     if (!featureEnabled) {
       return NextResponse.json({ error: "AAR feature is not enabled" }, {
         status: 403,
@@ -200,7 +200,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Check feature flag
-    const featureEnabled = await isFeatureEnabled("tier-b.aar");
+    const featureEnabled = await isFeatureEnabledForToken("tier-b.aar", token);
     if (!featureEnabled) {
       return NextResponse.json({ error: "AAR feature is not enabled" }, {
         status: 403,

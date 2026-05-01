@@ -1269,6 +1269,27 @@ export async function getTenantBySlug(
   };
 }
 
+export async function getTenantById(
+  id: string
+): Promise<{ id: string; name: string; slug: string; companyName: string } | null> {
+  const { data, error } = await getClient()
+    .from("tenants")
+    .select("id, name, slug, company_name")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) {
+    logger.error("Query failed", { error: error.message, id });
+    return null;
+  }
+  if (!data) return null;
+  return {
+    id: data.id as string,
+    name: data.name as string,
+    slug: data.slug as string,
+    companyName: (data.company_name as string) || "",
+  };
+}
+
 export async function getAllTenants(): Promise<
   { id: string; name: string; slug: string; companyName: string; plan: string }[]
 > {

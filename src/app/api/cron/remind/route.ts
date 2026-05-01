@@ -10,6 +10,7 @@ import { hasLoggedToday, getAllTenants } from "@/lib/supabase";
 import { getAllParticipants } from "@/lib/participant-db";
 import { logger } from "@/lib/logger";
 import { isFeatureEnabled } from "@/lib/feature-flags";
+import { DEFAULT_TENANT_ID } from "@/lib/supabase";
 import { acquireCronLock, releaseCronLock } from "@/lib/cron-lock";
 
 // Vercel Cron secret for authentication
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Check if reminder mail feature is enabled
-  const reminderMailEnabled = await isFeatureEnabled("feature.reminderMail");
+  const reminderMailEnabled = await isFeatureEnabled("feature.reminderMail", DEFAULT_TENANT_ID); // TODO(phase-0.5): per-tenant reminder toggle
   if (!reminderMailEnabled) {
     logger.info("Reminder skipped: feature disabled", { date: todayStr });
     return NextResponse.json({

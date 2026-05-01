@@ -9,9 +9,7 @@
 //   import { isFeatureEnabled } from "@/lib/feature-flags";
 //   if (await isFeatureEnabled("feature.managerFeedback")) { ... }
 
-import { getClient, DEFAULT_TENANT_ID } from "@/lib/supabase";
-
-const DEFAULT_CLIENT = process.env.FEATURE_FLAGS_CLIENT || "default";
+import { getClient } from "@/lib/supabase";
 
 // ===== Catalog =====
 // Every feature (existing or new) is declared here. Adding a flag = one entry.
@@ -571,32 +569,55 @@ export const PRESETS: Preset[] = [
 ];
 
 // ===== Storage (Supabase ai_settings table) =====
+//
+// Per-tenant feature flags. Each tenant has its own row in ai_settings:
+//   tenant_id=<tid>, key='feature_flags', value=<flat JSON of flag→bool>
+//
+// Backwards compatibility: the read path also recognizes the legacy nested
+// shape ({ "default": {flag→bool} }) for the single-row Phase 0 era. After
+// the migration runs, only the flat shape will exist; this fallback can be
+// removed once all rows are confirmed flat.
 
-type FlagStore = Record<string, Record<string, boolean>>; // { clientId: { flagKey: bool } }
+type FlagMap = Record<string, boolean>;
 
-let cache: { data: FlagStore; at: number } | null = null;
+// Per-tenant cache so multiple tenants don't invalidate each other.
+const cacheByTenant = new Map<string, { data: FlagMap; at: number }>();
 const CACHE_TTL_MS = 5 * 1000;
 
-function defaultFlagsFor(): Record<string, boolean> {
-  const flags: Record<string, boolean> = {};
+function defaultFlagsFor(): FlagMap {
+  const flags: FlagMap = {};
   for (const f of FEATURE_CATALOG) {
     flags[f.key] = f.defaultEnabled;
   }
   return flags;
 }
 
-async function readStoreFromSupabase(): Promise<FlagStore> {
+async function readFlagsFromSupabase(tenantId: string): Promise<FlagMap> {
   try {
     const client = getClient();
     const { data, error } = await client
       .from("ai_settings")
       .select("value")
-      .eq("tenant_id", DEFAULT_TENANT_ID)
+      .eq("tenant_id", tenantId)
       .eq("key", "feature_flags")
       .maybeSingle();
     if (error || !data?.value) return {};
     try {
-      return JSON.parse(data.value) as FlagStore;
+      const parsed = JSON.parse(data.value) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        // Legacy nested shape: { "default": { flag→bool } }
+        const obj = parsed as Record<string, unknown>;
+        if (
+          obj.default &&
+          typeof obj.default === "object" &&
+          !Array.isArray(obj.default)
+        ) {
+          return obj.default as FlagMap;
+        }
+        // Flat shape: { flag→bool }
+        return parsed as FlagMap;
+      }
+      return {};
     } catch {
       return {};
     }
@@ -606,16 +627,22 @@ async function readStoreFromSupabase(): Promise<FlagStore> {
   }
 }
 
-async function writeStoreToSupabase(store: FlagStore): Promise<boolean> {
+async function writeFlagsToSupabase(
+  tenantId: string,
+  flags: FlagMap
+): Promise<boolean> {
   try {
     const client = getClient();
     const { error } = await client
       .from("ai_settings")
-      .upsert({
-        tenant_id: DEFAULT_TENANT_ID,
-        key: "feature_flags",
-        value: JSON.stringify(store),
-      }, { onConflict: "tenant_id,key" });
+      .upsert(
+        {
+          tenant_id: tenantId,
+          key: "feature_flags",
+          value: JSON.stringify(flags),
+        },
+        { onConflict: "tenant_id,key" }
+      );
     return !error;
   } catch (err) {
     console.error("Error writing feature flags to Supabase:", err);
@@ -623,46 +650,65 @@ async function writeStoreToSupabase(store: FlagStore): Promise<boolean> {
   }
 }
 
-async function getStore(): Promise<FlagStore> {
-  if (cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.data;
-  const data = await readStoreFromSupabase();
-  cache = { data, at: Date.now() };
+async function getFlagsCached(tenantId: string): Promise<FlagMap> {
+  const cached = cacheByTenant.get(tenantId);
+  if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.data;
+  const data = await readFlagsFromSupabase(tenantId);
+  cacheByTenant.set(tenantId, { data, at: Date.now() });
   return data;
 }
 
-export function invalidateFlagCache() {
-  cache = null;
+export function invalidateFlagCache(tenantId?: string) {
+  if (tenantId) cacheByTenant.delete(tenantId);
+  else cacheByTenant.clear();
 }
 
 // ===== Public API =====
 
-export async function getFlagsForClient(
-  clientId: string = DEFAULT_CLIENT
-): Promise<Record<string, boolean>> {
-  const store = await getStore();
+/**
+ * Get the effective flag map for a tenant (defaults merged with stored overrides).
+ * Always pass the actual tenant the request is for. Falling back to
+ * DEFAULT_TENANT_ID is reserved for genuinely global checks (e.g., site-wide
+ * OTP auth) and should be commented as such at the call site.
+ */
+export async function getFlagsForTenant(tenantId: string): Promise<FlagMap> {
+  const stored = await getFlagsCached(tenantId);
   const defaults = defaultFlagsFor();
-  return { ...defaults, ...(store[clientId] || {}) };
+  return { ...defaults, ...stored };
 }
 
 export async function isFeatureEnabled(
   key: string,
-  clientId: string = DEFAULT_CLIENT
+  tenantId: string
 ): Promise<boolean> {
-  const flags = await getFlagsForClient(clientId);
+  const flags = await getFlagsForTenant(tenantId);
   return flags[key] === true;
 }
 
-export async function setFlagsForClient(
-  clientId: string,
-  flags: Record<string, boolean>
+/**
+ * Convenience: resolve a participant or admin token to its tenant, then check
+ * the flag. Use this in API routes where the caller already has a token.
+ * Returns false if the token cannot be resolved (defense-in-depth: an
+ * unrecognized token never gets a feature it shouldn't).
+ */
+export async function isFeatureEnabledForToken(
+  key: string,
+  token: string | null | undefined
 ): Promise<boolean> {
-  const store = await readStoreFromSupabase();
-  store[clientId] = flags;
-  const ok = await writeStoreToSupabase(store);
-  if (ok) invalidateFlagCache();
+  if (!token) return false;
+  const { resolveTenantFromToken } = await import("./tenant-from-token");
+  const tenantId = await resolveTenantFromToken(token);
+  if (!tenantId) return false;
+  return isFeatureEnabled(key, tenantId);
+}
+
+export async function setFlagsForTenant(
+  tenantId: string,
+  flags: FlagMap
+): Promise<boolean> {
+  const ok = await writeFlagsToSupabase(tenantId, flags);
+  if (ok) invalidateFlagCache(tenantId);
   return ok;
 }
 
-export function getCurrentClientId(): string {
-  return DEFAULT_CLIENT;
-}
+// (No backwards-compat shims — all callers updated to per-tenant API.)

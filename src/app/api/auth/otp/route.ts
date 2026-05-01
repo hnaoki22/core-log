@@ -13,6 +13,7 @@ import { getSessionCookieName, createSignedSessionValue, SESSION_MAX_AGE } from 
 import { storeSession } from "@/lib/session-store";
 import { getParticipantByToken, getManagerByToken } from "@/lib/participant-db";
 import { isFeatureEnabled } from "@/lib/feature-flags";
+import { DEFAULT_TENANT_ID } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
@@ -137,7 +138,7 @@ async function handleSendOTP(token: string): Promise<NextResponse> {
   // If OTP is disabled via feature flag, return success with verified flag (bypass)
   let otpEnabled = false;
   try {
-    otpEnabled = await isFeatureEnabled("feature.otpAuth");
+    otpEnabled = await isFeatureEnabled("feature.otpAuth", DEFAULT_TENANT_ID); // global toggle
   } catch {
     otpEnabled = process.env.OTP_ENABLED === "true";
   }

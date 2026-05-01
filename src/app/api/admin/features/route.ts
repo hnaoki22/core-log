@@ -8,10 +8,11 @@ export const dynamic = "force-dynamic"; // Always fresh reads from Supabase
 import {
   FEATURE_CATALOG,
   PRESETS,
-  getFlagsForClient,
-  setFlagsForClient,
-  getCurrentClientId,
+  getFlagsForTenant,
+  setFlagsForTenant,
 } from "@/lib/feature-flags";
+import { getManagerByToken } from "@/lib/participant-db";
+import { getTenantById } from "@/lib/supabase";
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
@@ -20,11 +21,23 @@ export async function GET(request: NextRequest) {
   const authorized = await isAdminToken(token);
   if (!authorized) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
-  const clientId = getCurrentClientId();
-  const currentFlags = await getFlagsForClient(clientId);
+  // Resolve which tenant this admin manages — flags are scoped per-tenant.
+  const manager = await getManagerByToken(token);
+  if (!manager?.tenantId) {
+    return NextResponse.json(
+      { error: "Manager has no tenant context" },
+      { status: 403 }
+    );
+  }
+  const tenant = await getTenantById(manager.tenantId);
+  const currentFlags = await getFlagsForTenant(manager.tenantId);
 
   return NextResponse.json({
-    clientId,
+    tenantId: manager.tenantId,
+    tenantSlug: tenant?.slug ?? null,
+    tenantName: tenant?.name ?? null,
+    // Legacy field kept for older clients; new clients should read tenantId.
+    clientId: manager.tenantId,
     catalog: FEATURE_CATALOG,
     presets: PRESETS.map((p) => ({ id: p.id, label: p.label, description: p.description })),
     flags: currentFlags,
@@ -39,8 +52,15 @@ export async function POST(request: NextRequest) {
   const authorized = await isAdminToken(token);
   if (!authorized) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
+  const manager = await getManagerByToken(token);
+  if (!manager?.tenantId) {
+    return NextResponse.json(
+      { error: "Manager has no tenant context" },
+      { status: 403 }
+    );
+  }
+
   const body = await request.json();
-  const clientId = getCurrentClientId();
 
   let flagsToSave: Record<string, boolean> | null = null;
 
@@ -56,7 +76,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing flags or presetId" }, { status: 400 });
   }
 
-  const ok = await setFlagsForClient(clientId, flagsToSave);
+  const ok = await setFlagsForTenant(manager.tenantId, flagsToSave);
   if (!ok) {
     return NextResponse.json(
       {
@@ -66,5 +86,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({ success: true, flags: flagsToSave });
+  return NextResponse.json({
+    success: true,
+    tenantId: manager.tenantId,
+    flags: flagsToSave,
+  });
 }
