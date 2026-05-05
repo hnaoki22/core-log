@@ -805,20 +805,26 @@ export async function createManagerInSupabase(
     email?: string;
     department?: string;
     isAdmin?: boolean;
+    role?: "admin" | "manager" | "observer";
   },
   tenantId: string
 ): Promise<{ id: string; token: string } | null> {
   const token = generateToken("mgr_");
+  const insertData: Record<string, unknown> = {
+    tenant_id: tenantId,
+    token,
+    name: manager.name,
+    email: manager.email || "",
+    department: manager.department || "",
+    is_admin: manager.isAdmin || false,
+  };
+  // role は明示指定された場合のみ insert に含める。未指定時は DB 側のデフォルトに従う
+  if (manager.role !== undefined) {
+    insertData.role = manager.role;
+  }
   const { data, error } = await getClient()
     .from("managers")
-    .insert({
-      tenant_id: tenantId,
-      token,
-      name: manager.name,
-      email: manager.email || "",
-      department: manager.department || "",
-      is_admin: manager.isAdmin || false,
-    })
+    .insert(insertData)
     .select("id, token")
     .single();
   if (error) {
