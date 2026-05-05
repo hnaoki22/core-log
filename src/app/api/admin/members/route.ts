@@ -76,16 +76,27 @@ export async function POST(request: NextRequest) {
     }
 
     if (type === "manager") {
-      const { name, email, department, isAdmin } = data;
+      const { name, email, department, isAdmin, role } = data;
       if (!name || !email) {
         return NextResponse.json({ error: "名前とメールは必須です" }, { status: 400 });
       }
+
+      // role の入力検証。許可値以外は無視して既定値（manager 相当）にフォールバック
+      const allowedRoles = ["admin", "manager", "observer"] as const;
+      type AllowedRole = (typeof allowedRoles)[number];
+      const normalizedRole: AllowedRole | undefined =
+        typeof role === "string" && (allowedRoles as readonly string[]).includes(role)
+          ? (role as AllowedRole)
+          : undefined;
+      // role が "admin" の場合は isAdmin も連動させる（編集画面の挙動と整合）
+      const finalIsAdmin = normalizedRole === "admin" ? true : isAdmin ?? false;
 
       const result = await createManager({
         name,
         email,
         department: department || "",
-        isAdmin: isAdmin ?? false,
+        isAdmin: finalIsAdmin,
+        role: normalizedRole,
       }, tenantId);
 
       if (!result) {

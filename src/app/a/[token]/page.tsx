@@ -333,7 +333,14 @@ export default function AdminDashboard() {
     const form = e.currentTarget;
     const formData = new FormData(form);
     try {
-      const tenantParam = selectedTenantSlug ? `?tenant=${selectedTenantSlug}` : "";
+      // モーダル内で選択されたテナントを優先（admin が全テナント表示中に追加先を指定する用途）。
+      // 未指定時はページレベルで選択中のテナントへフォールバック。
+      const formTenantSlug = (formData.get("tenantSlug") as string | null) || "";
+      const effectiveTenantSlug = formTenantSlug || selectedTenantSlug;
+      const tenantParam = effectiveTenantSlug ? `?tenant=${effectiveTenantSlug}` : "";
+      // 役割は admin / manager / observer の 3 択。admin の場合は isAdmin も true に。
+      const role = (formData.get("role") as string | null) || "manager";
+      const isAdmin = role === "admin";
       const res = await fetch(`/api/admin/members${tenantParam}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -341,7 +348,9 @@ export default function AdminDashboard() {
           token, type: "manager",
           data: {
             name: formData.get("name"), email: formData.get("email"),
-            department: formData.get("department"), isAdmin: formData.get("isAdmin") === "on",
+            department: formData.get("department"),
+            isAdmin,
+            role,
           },
         }),
       });
@@ -1394,10 +1403,37 @@ export default function AdminDashboard() {
                 <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">部署</label>
                 <input name="department" placeholder="例: 人事部" className="input-field text-sm" />
               </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" name="isAdmin" id="isAdmin" className="rounded border-[#C9BDAE]" />
-                <label htmlFor="isAdmin" className="text-xs text-[#2C2C4A]">管理者権限を付与する</label>
+              <div>
+                <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">役割 *</label>
+                <select name="role" defaultValue="manager" className="input-field text-sm bg-white">
+                  <option value="manager">マネージャー</option>
+                  <option value="admin">管理者（管理画面アクセス可）</option>
+                  <option value="observer">閲覧者（オブザーバー）</option>
+                </select>
+                <p className="text-[11px] text-[#8B8489] mt-1">後から編集モーダルでも変更できます。</p>
               </div>
+              {/* テナント選択：admin が全テナント表示中で、テナントが 2 つ以上ある場合のみ表示 */}
+              {data?.viewerRole === "admin" && !selectedTenantSlug && data?.tenants && data.tenants.length > 1 && (
+                <div>
+                  <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">所属テナント *</label>
+                  <select name="tenantSlug" required defaultValue="" className="input-field text-sm bg-white">
+                    <option value="" disabled>選択してください</option>
+                    {data.tenants.map((t) => (
+                      <option key={t.slug} value={t.slug}>{t.companyName || t.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-[#8B8489] mt-1">「全テナント表示」中のため、追加先を選んでください。</p>
+                </div>
+              )}
+              {/* 特定テナント表示中の場合：追加先を明示（情報のみ） */}
+              {selectedTenantSlug && data?.tenants && (
+                <div className="bg-[#FBF8F4] rounded-lg px-3 py-2.5 text-xs text-[#5B5560]">
+                  <span className="font-medium">追加先テナント：</span>
+                  {data.tenants.find((t) => t.slug === selectedTenantSlug)?.companyName ||
+                    data.tenants.find((t) => t.slug === selectedTenantSlug)?.name ||
+                    selectedTenantSlug}
+                </div>
+              )}
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowAddManager(false)} className="btn-secondary flex-1 py-2.5 text-sm">キャンセル</button>
                 <button type="submit" disabled={submitting} className="btn-primary flex-1 py-2.5 text-sm">{submitting ? "追加中..." : "追加する"}</button>
