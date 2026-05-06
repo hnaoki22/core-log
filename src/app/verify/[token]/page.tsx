@@ -116,9 +116,14 @@ export default function OTPVerificationPage() {
   }
 
   // Determine where to redirect based on token type
+  // 優先順位:
+  //   1. participant (/api/logs が 200) → /p/[token]
+  //   2. admin / observer (/api/admin が 200) → /a/[token]
+  //   3. それ以外（pure manager） → /m/[token]
+  // 以前は admin / observer もすべて /m/[token] に飛ばしてしまい、
+  // 観察者が「部下 0 の上司画面」に着地してしまうバグがあった。
   async function determineRedirectPath(): Promise<string> {
     try {
-      // Try to fetch logs to determine if participant
       const res = await fetch(`/api/logs?token=${token}`);
       if (res.ok) {
         return `/p/${token}`;
@@ -127,7 +132,17 @@ export default function OTPVerificationPage() {
       console.error(err);
     }
 
-    // Default to manager page (or could be admin)
+    try {
+      // admin / observer は /api/admin が 200 を返す。
+      // pure manager は 403 を返す（admin authorization で弾かれる）。
+      const adminRes = await fetch(`/api/admin?token=${token}`);
+      if (adminRes.ok) {
+        return `/a/${token}`;
+      }
+    } catch (err) {
+      console.error(err);
+    }
+
     return `/m/${token}`;
   }
 
