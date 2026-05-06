@@ -64,6 +64,18 @@ export default function InputPage() {
   const eveningTextareaRef = useRef<HTMLTextAreaElement>(null);
   const morningTextareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // 記入所要時間の計測:
+  //   textarea に最初にフォーカスした時刻を保存し、submit 時に経過秒数を計算する。
+  //   - 最初のフォーカス時刻のみ記録（再フォーカスは無視 → 「考え始めから出すまで」を測る）
+  //   - 提出後の振り返りで「N 分 N 秒で書きました」と表示するために durationSec を保持
+  const focusedAtRef = useRef<number | null>(null);
+  const [completedDurationSec, setCompletedDurationSec] = useState<number | null>(null);
+  const handleFocus = () => {
+    if (focusedAtRef.current === null) {
+      focusedAtRef.current = Date.now();
+    }
+  };
+
   const useStructured = isOn("tier-s.structuredInput");
   const useDoubleLoop = isOn("tier-s.doubleLoopPrompt");
   const useRumination = isOn("tier-e.ruminationTimer");
@@ -170,6 +182,18 @@ export default function InputPage() {
     setIsSubmitting(true);
     setSubmitError("");
 
+    // 記入所要時間を計算（focus → 提出ボタン押下までの経過秒数）
+    // 最大 1800 秒（30 分）でクリップ。focus が取れていない場合は null。
+    let durationSec: number | null = null;
+    if (focusedAtRef.current !== null) {
+      const elapsed = Math.round((Date.now() - focusedAtRef.current) / 1000);
+      if (elapsed >= 0 && elapsed <= 1800) {
+        durationSec = elapsed;
+      } else if (elapsed > 1800) {
+        durationSec = 1800;
+      }
+    }
+
     try {
       // Prepare evening insight text
       let eveningText = evening;
@@ -189,6 +213,7 @@ export default function InputPage() {
           energy,
           dojoPhase: participant.dojoPhase || "守",
           weekNum: participant.weekNum || 1,
+          morningDurationSec: durationSec,
         };
       } else if (morningClosed && !todayLog) {
         // 朝未記入・12:00過ぎ → 夕方のみの新規エントリー
@@ -201,6 +226,7 @@ export default function InputPage() {
           energy,
           dojoPhase: participant.dojoPhase || "守",
           weekNum: participant.weekNum || 1,
+          eveningDurationSec: durationSec,
         };
       } else {
         body = {
@@ -209,6 +235,7 @@ export default function InputPage() {
           pageId: todayLog?.id || "",
           eveningInsight: eveningText,
           energy,
+          eveningDurationSec: durationSec,
         };
       }
 
@@ -219,6 +246,8 @@ export default function InputPage() {
       });
 
       if (res.ok) {
+        // 完了画面で「N 分 N 秒で書きました」表示用に保持
+        setCompletedDurationSec(durationSec);
         setCompleted(true);
       } else {
         const data = await res.json();
@@ -229,6 +258,19 @@ export default function InputPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  /**
+   * 経過秒数を「3 分 12 秒」「45 秒」のような日本語表記に変換。
+   * 5 秒未満は表示しない（誤フォーカスの可能性）。
+   */
+  const formatDurationJP = (sec: number | null): string | null => {
+    if (sec === null || sec < 5) return null;
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    if (m === 0) return `${s} 秒`;
+    if (s === 0) return `${m} 分`;
+    return `${m} 分 ${s} 秒`;
   };
 
   const handleNext = () => {
@@ -258,6 +300,7 @@ export default function InputPage() {
   };
 
   if (completed) {
+    const durationLabel = formatDurationJP(completedDurationSec);
     return (
       <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
         <div className="max-w-md mx-auto text-center animate-scale-in">
@@ -267,9 +310,15 @@ export default function InputPage() {
             </svg>
           </div>
           <h2 className="text-xl font-semibold text-[#1A1A2E] mb-2">記入完了</h2>
-          <p className="text-[#5B5560] text-sm mb-8">
+          <p className="text-[#5B5560] text-sm mb-4">
             {isMorning ? "今日の意図が設定されました" : "今日の振り返りが記録されました"}
           </p>
+          {durationLabel && (
+            <p className="text-[#8B8489] text-xs mb-8 font-light">
+              {isMorning ? "朝の意図" : "本日の振り返り"}を <span className="text-[#1A1A2E] font-medium">{durationLabel}</span> で書きました
+            </p>
+          )}
+          {!durationLabel && <div className="mb-8" />}
           <button
             onClick={() => router.push(`/p/${token}`)}
             className="btn-primary w-full py-3.5 text-sm"
@@ -344,6 +393,7 @@ export default function InputPage() {
                 value={structuredInput}
                 onChange={setStructuredInput}
                 isMorning={isMorning}
+                onFirstFocus={handleFocus}
               />
             ) : (
               <div className="space-y-4">
@@ -352,6 +402,7 @@ export default function InputPage() {
                     ref={isMorning ? morningTextareaRef : eveningTextareaRef}
                     value={isMorning ? morning : evening}
                     onChange={(e) => (isMorning ? setMorning(e.target.value) : setEvening(e.target.value))}
+                    onFocus={handleFocus}
                     placeholder={getPlaceholderExample({
                       token,
                       dojoPhase: participant.dojoPhase,
