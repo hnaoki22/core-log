@@ -36,7 +36,7 @@ import {
   type Participant,
   type Manager,
 } from "./mock-data";
-import { isMockFallbackEnabled, isProductionMode } from "./env";
+import { isMockFallbackEnabled } from "./env";
 import { logger } from "./logger";
 
 // Check backend availability
@@ -386,21 +386,14 @@ export async function isAdminToken(token: string): Promise<boolean> {
       // Continue to fallback
     }
   }
-  // Env-var fallback. In production, REQUIRE process.env.ADMIN_TOKENS —
-  // hardcoded tokens "munetomo-admin,UE8m8SSJAgRBwsSZ" are a development
-  // convenience and MUST NOT be valid against real tenants.
+  // Env-var fallback. ADMIN_TOKENS is required in every environment, including
+  // preview deployments — previous hardcoded tokens leaked into the JS bundle
+  // and remained valid on preview URLs. Treat the previously embedded values as
+  // compromised and rotate before re-enabling them via the env var.
   const envTokens = process.env.ADMIN_TOKENS;
-  if (isProductionMode()) {
-    if (!envTokens) return false;
-    const allowed = envTokens.split(",").map((t) => t.trim()).filter(Boolean);
-    return allowed.includes(token);
-  }
-
-  // Non-production: allow legacy hardcoded tokens for local development.
-  const ADMIN_TOKENS = (envTokens || "munetomo-admin,UE8m8SSJAgRBwsSZ")
-    .split(",")
-    .map((t) => t.trim());
-  return ADMIN_TOKENS.includes(token);
+  if (!envTokens) return false;
+  const allowed = envTokens.split(",").map((t) => t.trim()).filter(Boolean);
+  return allowed.includes(token);
 }
 
 /**

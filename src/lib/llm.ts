@@ -8,7 +8,11 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "" });
 
-const MODEL = "claude-sonnet-4-20250514";
+// Default to Sonnet 4.6 (current generation). Allow override via env so we can
+// route specific call sites to Haiku 4.5 (cheap detection) or Opus 4.7
+// (executive summarization) without code changes. The prior pin
+// "claude-sonnet-4-20250514" is an older Sonnet 4.0 snapshot.
+const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 
 // ---------------------------------------------------------------------------
 // Generic helper

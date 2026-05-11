@@ -181,8 +181,13 @@ export async function PATCH(req: NextRequest) {
     if (!participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    if (!participant.tenantId) {
+      return NextResponse.json({ error: "Tenant unresolved" }, { status: 500 });
+    }
 
-    const success = await markFeedbackAsRead(feedbackId);
+    // Restrict the read-mark to the participant's own feedback so they cannot
+    // clear unread counters for other tenants/peers by guessing feedback ids.
+    const success = await markFeedbackAsRead(feedbackId, participant.tenantId, participant.name);
     return NextResponse.json({ success });
   } catch (error) {
     console.error("Feedback PATCH error:", error);

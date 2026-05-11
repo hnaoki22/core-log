@@ -88,6 +88,7 @@ export type NotionManager = {
 
 export type MissionEntry = {
   id: string;
+  tenantId: string;
   title: string;
   participantName: string;
   setDate: string;
@@ -198,6 +199,7 @@ function rowToManager(r: any): NotionManager & { role?: string } {
 function rowToMission(r: any): MissionEntry {
   return {
     id: r.id,
+    tenantId: r.tenant_id,
     title: r.title,
     participantName: r.participant_name,
     setDate: r.set_date || "",
@@ -317,15 +319,17 @@ export async function hasLoggedToday(
 }
 
 export async function getLogEntryOwner(
-  pageId: string
+  pageId: string,
+  tenantId: string
 ): Promise<string | null> {
   const { data, error } = await getClient()
     .from("logs")
     .select("participant_name")
     .eq("id", pageId)
-    .single();
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
   if (error) {
-    logger.error("Query failed", { error: error.message, pageId });
+    logger.error("Query failed", { error: error.message, pageId, tenantId });
   }
   return data?.participant_name ?? null;
 }
@@ -470,7 +474,8 @@ export async function createEveningOnlyEntry(
 
 export async function addManagerComment(
   pageId: string,
-  comment: string
+  comment: string,
+  tenantId: string
 ): Promise<boolean> {
   const now = new Date();
   const updateData = {
@@ -481,13 +486,14 @@ export async function addManagerComment(
     .from("logs")
     .update(updateData)
     .eq("id", pageId)
+    .eq("tenant_id", tenantId)
     .select("id");
   if (error) {
     logger.error("Update failed", { error: error.message, pageId });
     return false;
   }
   if (!updated || updated.length === 0) {
-    logger.warn("Update matched 0 rows", { pageId });
+    logger.warn("Update matched 0 rows", { pageId, tenantId });
     return false;
   }
   return true;
@@ -495,16 +501,18 @@ export async function addManagerComment(
 
 export async function toggleManagerReaction(
   logId: string,
-  emoji: string
+  emoji: string,
+  tenantId: string
 ): Promise<{ success: boolean; reactions: string | null }> {
-  // 1. Read current reactions
+  // 1. Read current reactions (scoped to tenant)
   const { data: row, error: readErr } = await getClient()
     .from("logs")
     .select("manager_reaction")
     .eq("id", logId)
-    .single();
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
   if (readErr || !row) {
-    logger.error("Read failed for reaction toggle", { error: readErr?.message, logId });
+    logger.error("Read failed for reaction toggle", { error: readErr?.message, logId, tenantId });
     return { success: false, reactions: null };
   }
 
@@ -520,18 +528,22 @@ export async function toggleManagerReaction(
   }
   const newValue = current.length > 0 ? current.join(",") : null;
 
-  // 3. Write back
+  // 3. CAS write back — only update if reactions are still what we read, to
+  // avoid lost updates under concurrent toggles. Defends in depth alongside
+  // tenant filter.
   const { error: writeErr, data: updated } = await getClient()
     .from("logs")
     .update({ manager_reaction: newValue })
     .eq("id", logId)
+    .eq("tenant_id", tenantId)
+    .eq("manager_reaction", row.manager_reaction ?? null)
     .select("id");
   if (writeErr) {
     logger.error("Update failed for reaction", { error: writeErr.message, logId });
     return { success: false, reactions: null };
   }
   if (!updated || updated.length === 0) {
-    logger.warn("Reaction update matched 0 rows", { logId });
+    logger.warn("Reaction update matched 0 rows (raced or cross-tenant)", { logId, tenantId });
     return { success: false, reactions: null };
   }
   return { success: true, reactions: newValue };
@@ -990,7 +1002,8 @@ export async function createMission(
 export async function updateMissionStatus(
   missionId: string,
   status: string,
-  finalReview: string | null
+  finalReview: string | null,
+  tenantId: string
 ): Promise<boolean> {
   const update: Record<string, unknown> = { status };
   if (finalReview !== null) update.final_review = finalReview;
@@ -998,13 +1011,14 @@ export async function updateMissionStatus(
     .from("missions")
     .update(update)
     .eq("id", missionId)
+    .eq("tenant_id", tenantId)
     .select("id");
   if (error) {
     logger.error("Update failed", { error: error.message, missionId });
     return false;
   }
   if (!updated || updated.length === 0) {
-    logger.warn("Update matched 0 rows", { missionId });
+    logger.warn("Update matched 0 rows", { missionId, tenantId });
     return false;
   }
   return true;
@@ -1012,7 +1026,8 @@ export async function updateMissionStatus(
 
 export async function updateMissionFields(
   missionId: string,
-  fields: { title?: string; purpose?: string; deadline?: string }
+  fields: { title?: string; purpose?: string; deadline?: string },
+  tenantId: string
 ): Promise<boolean> {
   const update: Record<string, unknown> = {};
   if (fields.title !== undefined) update.title = fields.title;
@@ -1023,22 +1038,61 @@ export async function updateMissionFields(
     .from("missions")
     .update(update)
     .eq("id", missionId)
+    .eq("tenant_id", tenantId)
     .select("id");
   if (error) {
     logger.error("Mission field update failed", { error: error.message, missionId });
     return false;
   }
   if (!updated || updated.length === 0) {
-    logger.warn("Mission field update matched 0 rows", { missionId });
+    logger.warn("Mission field update matched 0 rows", { missionId, tenantId });
     return false;
   }
   return true;
 }
 
+/**
+ * Find the comment's parent mission tenant + author. Used by routes that
+ * mutate a comment to verify the caller's tenant matches and that the caller
+ * is the original author (only authors can edit/delete their own comments).
+ */
+export async function getMissionCommentMeta(
+  commentId: string
+): Promise<{ missionId: string; tenantId: string; authorName: string; authorRole: string } | null> {
+  const { data, error } = await getClient()
+    .from("mission_comments")
+    .select("mission_id, author_name, author_role, missions!inner(tenant_id)")
+    .eq("id", commentId)
+    .maybeSingle();
+  if (error) {
+    logger.error("Mission comment meta lookup failed", { error: error.message, commentId });
+    return null;
+  }
+  if (!data) return null;
+  // Supabase returns the joined `missions` as either an object or array depending on relation shape.
+  const missions = (data as { missions?: { tenant_id?: string } | { tenant_id?: string }[] }).missions;
+  const tenantId = Array.isArray(missions) ? missions[0]?.tenant_id : missions?.tenant_id;
+  if (!tenantId) return null;
+  return {
+    missionId: (data as { mission_id: string }).mission_id,
+    tenantId,
+    authorName: (data as { author_name: string }).author_name,
+    authorRole: (data as { author_role: string }).author_role,
+  };
+}
+
 export async function updateMissionComment(
   commentId: string,
-  newBody: string
+  newBody: string,
+  tenantId: string,
+  authorName: string
 ): Promise<boolean> {
+  // Look up the comment's mission to enforce tenant scoping, then update only
+  // when the caller is the original author and the tenant matches.
+  const meta = await getMissionCommentMeta(commentId);
+  if (!meta) return false;
+  if (meta.tenantId !== tenantId) return false;
+  if (meta.authorName !== authorName) return false;
   const { error, data: updated } = await getClient()
     .from("mission_comments")
     .update({ body: newBody })
@@ -1052,8 +1106,14 @@ export async function updateMissionComment(
 }
 
 export async function deleteMissionComment(
-  commentId: string
+  commentId: string,
+  tenantId: string,
+  authorName: string
 ): Promise<boolean> {
+  const meta = await getMissionCommentMeta(commentId);
+  if (!meta) return false;
+  if (meta.tenantId !== tenantId) return false;
+  if (meta.authorName !== authorName) return false;
   const { error } = await getClient()
     .from("mission_comments")
     .delete()
@@ -1069,8 +1129,18 @@ export async function addMissionComment(
   missionId: string,
   authorName: string,
   authorRole: "manager" | "participant",
-  commentText: string
+  commentText: string,
+  tenantId: string
 ): Promise<boolean> {
+  // Verify the mission belongs to the caller's tenant before inserting,
+  // otherwise an attacker could comment cross-tenant by guessing missionId.
+  const { data: missionRow, error: missionErr } = await getClient()
+    .from("missions")
+    .select("id")
+    .eq("id", missionId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  if (missionErr || !missionRow) return false;
   const { error } = await getClient()
     .from("mission_comments")
     .insert({
@@ -1193,19 +1263,26 @@ export async function createFeedback(
 }
 
 export async function markFeedbackAsRead(
-  feedbackId: string
+  feedbackId: string,
+  tenantId: string,
+  participantName: string
 ): Promise<boolean> {
+  // Restrict to the caller's own tenant AND own participant_name so a
+  // participant cannot mark another tenant's (or another peer's) feedback as
+  // read by guessing the feedback row id.
   const { error, data: updated } = await getClient()
     .from("feedback")
     .update({ is_read: true })
     .eq("id", feedbackId)
+    .eq("tenant_id", tenantId)
+    .eq("participant_name", participantName)
     .select("id");
   if (error) {
     logger.error("Update failed", { error: error.message, feedbackId });
     return false;
   }
   if (!updated || updated.length === 0) {
-    logger.warn("Update matched 0 rows", { feedbackId });
+    logger.warn("Update matched 0 rows", { feedbackId, tenantId });
     return false;
   }
   return true;

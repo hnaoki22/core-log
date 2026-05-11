@@ -16,29 +16,50 @@
 
 const DEV_FALLBACK_KEY = "dev-session-secret-do-not-use-in-production";
 
+function isProd(): boolean {
+  return process.env.NODE_ENV === "production"
+    && process.env.NEXT_PUBLIC_ENV_NAME !== "preview"
+    && process.env.NEXT_PUBLIC_ENV_NAME !== "development";
+}
+
 /**
  * Collect all candidate signing keys in priority order.
  * The first key is used for signing new cookies.
  * All keys are tried when validating existing cookies.
+ *
+ * Production: only SESSION_SECRET (or SESSION_SECRET_PREV for rotation).
+ * The CRON_SECRET and DEV_FALLBACK_KEY were previously fallbacks but are
+ * security hazards: CRON_SECRET mixed signing roles, and DEV_FALLBACK_KEY
+ * is a well-known constant in this public repo that would allow session
+ * forgery if it ever validated in production.
  */
 function getAllSigningKeys(): string[] {
   const keys: string[] = [];
   if (process.env.SESSION_SECRET) keys.push(process.env.SESSION_SECRET);
-  if (process.env.CRON_SECRET) keys.push(process.env.CRON_SECRET);
-  // Deduplicate (in case both vars point to same value)
-  const unique = keys.filter((k, i) => keys.indexOf(k) === i);
-  // Always include dev fallback last (matches cookies signed when neither var was set)
-  if (!unique.includes(DEV_FALLBACK_KEY)) {
-    unique.push(DEV_FALLBACK_KEY);
+  if (process.env.SESSION_SECRET_PREV) keys.push(process.env.SESSION_SECRET_PREV);
+  if (!isProd()) {
+    // Non-prod only: tolerate CRON_SECRET-signed cookies and the dev fallback,
+    // so local development keeps working without configuring SESSION_SECRET.
+    if (process.env.CRON_SECRET) keys.push(process.env.CRON_SECRET);
+    keys.push(DEV_FALLBACK_KEY);
   }
-  return unique;
+  // Deduplicate
+  return keys.filter((k, i) => keys.indexOf(k) === i);
 }
 
 /**
  * Get the primary signing key (used for new cookie signatures).
+ * In production, SESSION_SECRET MUST be configured or signing fails.
  */
 function getPrimaryKey(): string {
-  return getAllSigningKeys()[0];
+  const keys = getAllSigningKeys();
+  if (keys.length === 0) {
+    throw new Error(
+      "SESSION_SECRET is not configured. Set the SESSION_SECRET environment variable " +
+      "to a high-entropy random string before serving traffic in production."
+    );
+  }
+  return keys[0];
 }
 
 /**
@@ -146,12 +167,11 @@ export async function isSessionValid(token: string, cookieHeader: string | null)
     return false;
   }
 
-  // Support legacy unsigned "verified" cookies during migration
-  if (cookieValue === "verified") {
-    return true;
-  }
-
   // Validate signed cookie: "verified:<token>.<signature>"
+  // Legacy unsigned "verified" cookies are NO LONGER accepted — any client
+  // still holding one will be redirected through OTP and reissued a signed
+  // cookie. Accepting the bare "verified" string allowed full session
+  // forgery for anyone who knew (or could guess) a token.
   const lastDotIndex = cookieValue.lastIndexOf(".");
   if (lastDotIndex === -1) {
     return false;

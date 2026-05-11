@@ -8,11 +8,22 @@ import {
   updateMissionStatus,
   updateMissionFields,
   getMissionsByParticipant,
+  getMissionById,
 } from "@/lib/supabase";
 import { getManagerByToken, getParticipantByToken, getParticipantByName } from "@/lib/participant-db";
 import { getTodayJST } from "@/lib/date-utils";
 import { sendNotificationEmail } from "@/lib/email";
 import { sanitizeInput } from "@/lib/sanitize";
+
+// Allowed mission status values. Persisting arbitrary strings caused enum drift
+// across UI/DB; whitelist at the API boundary.
+const ALLOWED_MISSION_STATUS = new Set([
+  "未着手",
+  "進行中",
+  "完了",
+  "保留",
+  "中止",
+]);
 
 export async function GET(request: NextRequest) {
   const participantName = request.nextUrl.searchParams.get("participantName");
@@ -26,21 +37,18 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Resolve tenant strictly from token (manager or participant). No default fallback —
-    // returning the master tenant's missions to an unauthenticated caller is a leak.
-    let tenantId: string | null = null;
     const manager = await getManagerByToken(token);
-    if (manager?.tenantId) {
-      tenantId = manager.tenantId;
-    } else {
-      const participant = await getParticipantByToken(token);
-      if (participant?.tenantId) {
-        tenantId = participant.tenantId;
-      }
-    }
-
+    const participant = !manager ? await getParticipantByToken(token) : null;
+    const tenantId = manager?.tenantId || participant?.tenantId;
     if (!tenantId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Authorization: a participant can only read their own missions. A manager
+    // can read missions for anyone in their tenant (a fuller fix would scope to
+    // their direct reports, but that breaks today's admin overview).
+    if (participant && participant.name !== participantName) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const missions = await getMissionsByParticipant(participantName, tenantId);
@@ -150,6 +158,24 @@ export async function PATCH(request: NextRequest) {
     if (!manager && !participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
+    const tenantId = manager?.tenantId || participant?.tenantId;
+    if (!tenantId) {
+      return NextResponse.json({ error: "Tenant unresolved" }, { status: 500 });
+    }
+
+    // Confirm the mission belongs to the caller's tenant AND that a participant
+    // caller owns the mission. Previously these checks were missing, letting
+    // anyone with any valid token rewrite any mission row by guessing its id.
+    const mission = await getMissionById(missionId);
+    if (!mission) {
+      return NextResponse.json({ error: "Mission not found" }, { status: 404 });
+    }
+    if (mission.tenantId !== tenantId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (participant && mission.participantName !== participant.name) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     // Field edit (title/purpose/deadline)
     if (title !== undefined) {
@@ -159,7 +185,7 @@ export async function PATCH(request: NextRequest) {
         title: sanitizedTitle,
         purpose: sanitizedPurpose,
         deadline,
-      });
+      }, tenantId);
       if (!success) {
         return NextResponse.json({ error: "Failed to update mission" }, { status: 500 });
       }
@@ -170,8 +196,11 @@ export async function PATCH(request: NextRequest) {
     if (!status) {
       return NextResponse.json({ error: "status or title required" }, { status: 400 });
     }
+    if (!ALLOWED_MISSION_STATUS.has(status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
 
-    const success = await updateMissionStatus(missionId, status, finalReview);
+    const success = await updateMissionStatus(missionId, status, finalReview, tenantId);
 
     if (!success) {
       return NextResponse.json({ error: "Failed to update mission" }, { status: 500 });
