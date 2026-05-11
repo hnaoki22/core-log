@@ -7,7 +7,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/supabase";
 import { getParticipantByTokenFromSupabase } from "@/lib/supabase";
 import { isFeatureEnabledForToken } from "@/lib/feature-flags";
-import { analyzeRumination } from "@/lib/llm";
+import { analyzeRumination, truncateForLLM } from "@/lib/llm";
+
+// Cap evening text fed to the LLM. 4 KB is generous for a daily reflection
+// and bounds prompt cost / DoS risk from a megabyte paste.
+const MAX_EVENING_TEXT_CHARS = 4000;
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,8 +40,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Analyze rumination using LLM
-    const analysis = await analyzeRumination(eveningText);
+    // Analyze rumination using LLM (input is capped + control-char stripped
+    // to bound cost and harden against pseudo-role injection markers)
+    const safeText = truncateForLLM(eveningText, MAX_EVENING_TEXT_CHARS);
+    const analysis = await analyzeRumination(safeText);
 
     // Store result in rumination_analyses table
     const client = getClient();

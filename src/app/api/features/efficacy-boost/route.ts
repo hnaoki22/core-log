@@ -32,14 +32,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Fetch recent logs from logs table (Notion integration)
-    // This assumes logs are stored in Supabase logs table
+    // Fetch recent logs by participant_id (not name) so coworkers with the
+    // same name don't bleed into another's efficacy analysis.
     const client = getClient();
     const { data: logsData, error: logsError } = await client
       .from("logs")
       .select("date, morning_intent, evening_insight")
       .eq("tenant_id", participant.tenantId)
-      .eq("participant_name", participant.name)
+      .eq("participant_id", participant.id)
       .order("date", { ascending: false })
       .limit(30);
 

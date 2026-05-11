@@ -185,6 +185,11 @@ export class RuminationTimerManager {
   private lastInputTime: number = Date.now();
   private hasTriggered: boolean = false;
   private stallCallbacks: Array<() => void> = [];
+  // Bind once so addEventListener and removeEventListener see the same
+  // function reference. Previously `this.handleInput.bind(this)` returned a
+  // new function on each call, so listeners were never removed — every
+  // start()/stop() cycle leaked one set of handlers.
+  private readonly boundHandleInput: () => void;
 
   constructor(
     private inputElement: HTMLTextAreaElement | HTMLInputElement,
@@ -195,6 +200,7 @@ export class RuminationTimerManager {
     this.config.stallDurationMs = stallDurationMs;
     this.config.debounceMs = debounceMs;
     this.config.enabled = enabled;
+    this.boundHandleInput = this.handleInput.bind(this);
   }
 
   onStall(callback: () => void): void {
@@ -205,22 +211,16 @@ export class RuminationTimerManager {
     if (!this.config.enabled || this.isMonitoring) return;
 
     this.isMonitoring = true;
-    this.inputElement.addEventListener("input", this.handleInput.bind(this));
-    this.inputElement.addEventListener("change", this.handleInput.bind(this));
+    this.inputElement.addEventListener("input", this.boundHandleInput);
+    this.inputElement.addEventListener("change", this.boundHandleInput);
     this.startStallTimer();
   }
 
   stop(): void {
     this.isMonitoring = false;
     this.clearAllTimers();
-    this.inputElement.removeEventListener(
-      "input",
-      this.handleInput.bind(this)
-    );
-    this.inputElement.removeEventListener(
-      "change",
-      this.handleInput.bind(this)
-    );
+    this.inputElement.removeEventListener("input", this.boundHandleInput);
+    this.inputElement.removeEventListener("change", this.boundHandleInput);
   }
 
   reset(): void {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 // Global cache — shared across all components in the same SPA session
 let globalFlags: Record<string, boolean> | null = null;
@@ -62,9 +62,13 @@ export function useFeatures(): { flags: Record<string, boolean>; loaded: boolean
     };
   }, []);
 
-  return {
-    flags,
-    loaded,
-    isOn: (key: string) => flags[key] === true,
-  };
+  // Memoize `isOn` so consumers can safely list it as a useEffect dependency
+  // without triggering a new effect on every render. Previously this returned
+  // a fresh closure each render, which caused multiple pages to re-fetch
+  // (and re-redirect) on every state update — visible as infinite-fetch
+  // loops in the network tab. The closure captures `flags`, so the
+  // dependency on `flags` correctly invalidates when flags change.
+  const isOn = useCallback((key: string) => flags[key] === true, [flags]);
+
+  return { flags, loaded, isOn };
 }

@@ -179,7 +179,7 @@ async function handleSendOTP(token: string): Promise<NextResponse> {
 /**
  * Handle "verify" action
  */
-async function handleVerifyOTP(token: string, code: string): Promise<NextResponse> {
+async function handleVerifyOTP(token: string, code: string, isSecure: boolean): Promise<NextResponse> {
   // Verify the OTP code
   const result = await verifyOTP(token, code);
 
@@ -209,7 +209,9 @@ async function handleVerifyOTP(token: string, code: string): Promise<NextRespons
     name: cookieName,
     value: signedValue,
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    // Set Secure whenever the request was served over HTTPS, not just when
+    // NODE_ENV=production — preview deployments are also HTTPS.
+    secure: isSecure,
     sameSite: "lax",
     maxAge: SESSION_MAX_AGE, // 30 days (sliding — renewed on each visit via middleware)
     path: "/",
@@ -265,7 +267,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           { status: 400 }
         );
       }
-      return await handleVerifyOTP(token, code);
+      const isSecure =
+        request.nextUrl.protocol === "https:" ||
+        request.headers.get("x-forwarded-proto") === "https";
+      return await handleVerifyOTP(token, code, isSecure);
     } else {
       return NextResponse.json(
         { success: false, error: "Invalid action" },

@@ -17,6 +17,22 @@ import { validateEnv } from "@/lib/env";
 // Validate environment variables on cold start
 validateEnv();
 
+/**
+ * Decide whether to set the `Secure` cookie attribute.
+ *
+ * Previously this was gated on `NODE_ENV === "production"`, which means
+ * preview and other non-prod-but-HTTPS deployments served session cookies
+ * without the Secure flag. Use the request scheme instead — browsers
+ * silently accept `Secure` on https://localhost too, so this is safe in
+ * dev as well.
+ */
+function isSecureRequest(request: NextRequest): boolean {
+  return (
+    request.nextUrl.protocol === "https:" ||
+    request.headers.get("x-forwarded-proto") === "https"
+  );
+}
+
 // Security headers to add to all responses
 const securityHeaders = {
   "X-Frame-Options": "DENY",
@@ -113,7 +129,7 @@ export async function middleware(request: NextRequest) {
             name: cookieName,
             value: signedValue,
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
+            secure: isSecureRequest(request),
             sameSite: "lax",
             maxAge: SESSION_MAX_AGE,
             path: "/",
@@ -163,7 +179,7 @@ export async function middleware(request: NextRequest) {
           name: cookieName,
           value: cookieValue,
           httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
+          secure: isSecureRequest(request),
           sameSite: "lax",
           maxAge: SESSION_MAX_AGE,
           path: "/",
@@ -196,8 +212,27 @@ export async function middleware(request: NextRequest) {
     // Only apply rate limiting if we have a valid IP
     // Skip for "unknown" IPs to avoid incorrectly rate-limiting them together
     if (clientIp !== "unknown") {
-      // Build composite key: `${tokenPrefix}:${ip}` when authenticated, else `${ip}`.
-      // This keeps tenants sharing a NAT from draining each other's bucket.
+      // Check a global per-IP cap FIRST so an attacker rotating tokens cannot
+      // create unlimited composite buckets. The composite token+IP bucket
+      // (below) keeps legitimate tenants behind a shared NAT from interfering
+      // with each other, but on its own it could be bypassed by varying the
+      // token prefix per request.
+      const ipBucketKey = `ip:${clientIp}`;
+      const ipBucketResult = rateLimit(ipBucketKey, 240, 60000);
+      if (!ipBucketResult.success) {
+        logApiRequest(method, pathname, clientIp, ipBucketResult, ipBucketKey);
+        return new NextResponse("Too Many Requests", {
+          status: 429,
+          headers: {
+            "Retry-After": "60",
+            "X-RateLimit-Remaining": "0",
+            ...securityHeaders,
+          },
+        });
+      }
+
+      // Composite key: `${tokenPrefix}:${ip}` when a token appears, else `${ip}`.
+      // Keeps tenants sharing a NAT from draining each other's bucket.
       const rateLimitKey = buildRateLimitKey(request, clientIp);
       const rateLimitResult = rateLimit(rateLimitKey, 60, 60000);
 

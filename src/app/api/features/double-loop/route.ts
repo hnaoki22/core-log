@@ -54,9 +54,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get current day (0=Sunday, 1=Monday, etc.)
-    const now = new Date();
-    const dayOfWeek = now.getDay();
+    // Compute "today in JST" so the Monday check matches the user's local
+    // week boundary rather than the server's UTC reference. Previously
+    // `now.getDay()` on UTC Vercel could report Sunday during JST Monday.
+    const jstDateString = new Date(Date.now() + 9 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10); // YYYY-MM-DD in JST
+    const [y, m, d] = jstDateString.split("-").map((n) => parseInt(n, 10));
+    const jstDate = new Date(Date.UTC(y, m - 1, d));
+    const dayOfWeek = jstDate.getUTCDay(); // 0=Sunday in JST
     const isMonday = dayOfWeek === 1;
 
     if (!isMonday) {
@@ -67,14 +73,17 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Select a rotating question based on week number
-    // Use ISO week number for consistency
-    const jan4 = new Date(now.getFullYear(), 0, 4);
-    const weekStart = new Date(jan4);
-    weekStart.setDate(jan4.getDate() - jan4.getDay());
-    const weekNum =
-      Math.floor((now.getTime() - weekStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
-    const questionIndex = (weekNum - 1) % DOUBLE_LOOP_QUESTIONS.length;
+    // ISO week number anchored to JST (Thursday-of-week rule).
+    const target = new Date(jstDate);
+    const dayNum = target.getUTCDay() || 7;
+    target.setUTCDate(target.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
+    const weekNum = Math.ceil(
+      ((target.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
+    );
+    // Use a modulo guarded against negative values (year-edge weeks).
+    const len = DOUBLE_LOOP_QUESTIONS.length;
+    const questionIndex = ((weekNum - 1) % len + len) % len;
     const selectedQuestion = DOUBLE_LOOP_QUESTIONS[questionIndex];
 
     return NextResponse.json({
@@ -83,7 +92,8 @@ export async function GET(req: NextRequest) {
       weekNumber: weekNum,
       title: selectedQuestion.title,
       question: selectedQuestion.question,
-      allQuestions: DOUBLE_LOOP_QUESTIONS.map((q) => q.question),
+      // Removed `allQuestions` — previously shipped the full rotation to the
+      // client every request, which leaked the surprise of the weekly prompt.
     });
   } catch (error) {
     console.error("Double-loop prompt error:", error);

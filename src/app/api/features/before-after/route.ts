@@ -136,12 +136,15 @@ export async function GET(req: NextRequest) {
 
     // Fetch assessments for this participant
     const client = getClient();
+    // Order DESC so .find() returns the MOST RECENT before/after assessment
+    // (previously ascending order meant a retake was shadowed by the original
+    // and the delta compared the oldest pair instead of the latest).
     const { data, error } = await client
       .from("before_after_assessments")
       .select("*")
       .eq("tenant_id", participant.tenantId)
       .eq("participant_id", participant.id)
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: false });
 
     if (error) {
       console.error("Before-after assessment fetch error:", error);
@@ -151,7 +154,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Separate before and after assessments
+    // Separate before and after assessments (most recent of each type)
     const assessments = data || [];
     const beforeAssessment = assessments.find(a => a.assessment_type === "before");
     const afterAssessment = assessments.find(a => a.assessment_type === "after");

@@ -126,14 +126,20 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Participant not found" }, { status: 404 });
     }
 
-    // Fetch logs from last 7 days
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    // Fetch logs from the last 7 JST business days. Filter by `date` (the
+    // business date the log represents) rather than `created_at` (the insert
+    // timestamp), so back-dated or late-arriving rows are still windowed
+    // consistently with how they're displayed to the manager.
+    const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const sevenDaysAgoDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
     const { data: logs, error: logsError } = await client
       .from("logs")
       .select("date, morning_intent, evening_insight, energy")
       .eq("tenant_id", tenantId)
       .eq("participant_id", participantId)
-      .gte("created_at", sevenDaysAgo)
+      .gte("date", sevenDaysAgoDate)
       .order("date", { ascending: true });
 
     if (logsError) {
@@ -151,13 +157,15 @@ export async function GET(req: NextRequest) {
       energy: log.energy || null,
     }));
 
-    // Get rumination scores if available
+    // Get rumination scores if available (analyses are not date-keyed, so
+    // we keep filtering by created_at here — the timing reflects when the
+    // analysis was actually performed).
     const { data: ruminationData } = await client
       .from("rumination_analyses")
       .select("score")
       .eq("tenant_id", tenantId)
       .eq("participant_id", participantId)
-      .gte("created_at", sevenDaysAgo)
+      .gte("created_at", sevenDaysAgoIso)
       .order("created_at", { ascending: true });
 
     const ruminationScores = (ruminationData || []).map((r: RuminationData) => r.score);
