@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
         name,
         email,
         department: department || "",
-        dojoPhase: dojoPhase || "道場1 覚醒",
+        dojoPhase: dojoPhase || "",
         managerId: managerId || undefined,
         fbPolicy: "",
       }, tenantId);

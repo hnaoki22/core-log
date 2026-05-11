@@ -156,6 +156,13 @@ export default function AdminDashboard() {
   const [fbHistoryList, setFbHistoryList] = useState<{ id: string; content: string; authorName: string; type: string; period: string; weekNum: number; date: string; isRead: boolean }[]>([]);
   const [fbHistoryLoading, setFbHistoryLoading] = useState(false);
 
+  // Phase label settings state
+  const [phaseLabels, setPhaseLabels] = useState<string[]>([]);
+  const [showPhaseSettings, setShowPhaseSettings] = useState(false);
+  const [phaseEditLabels, setPhaseEditLabels] = useState<string[]>([]);
+  const [phaseSaving, setPhaseSaving] = useState(false);
+  const [phaseSaved, setPhaseSaved] = useState(false);
+
   const handleExport = async () => {
     setExporting(true);
     try {
@@ -285,6 +292,11 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchAdminData(selectedTenantSlug || undefined);
+    // Fetch phase labels for this tenant
+    fetch(`/api/admin/phase-labels?token=${token}`)
+      .then((r) => r.json())
+      .then((d) => { if (d.labels && d.labels.length > 0) setPhaseLabels(d.labels); })
+      .catch(() => {/* keep empty */});
   }, [token, selectedTenantSlug]);
 
   useEffect(() => {
@@ -311,7 +323,7 @@ export default function AdminDashboard() {
           token, type: "participant",
           data: {
             name: formData.get("name"), email: formData.get("email"),
-            department: formData.get("department"), dojoPhase: formData.get("dojoPhase") || "道場1 覚醒",
+            department: formData.get("department"), dojoPhase: formData.get("dojoPhase") || phaseLabels[0] || "",
             role: formData.get("role") || "参加者", managerId: formData.get("managerId") || "",
             emailEnabled: formData.get("emailEnabled") === "on",
           },
@@ -479,6 +491,36 @@ export default function AdminDashboard() {
     }
   };
 
+  const openPhaseSettings = () => {
+    setPhaseEditLabels(phaseLabels.length > 0 ? [...phaseLabels] : []);
+    setPhaseSaved(false);
+    setShowPhaseSettings(true);
+  };
+
+  const handleSavePhaseLabels = async () => {
+    setPhaseSaving(true);
+    try {
+      const res = await fetch("/api/admin/phase-labels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, labels: phaseEditLabels }),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setPhaseLabels(d.labels || phaseEditLabels);
+        setPhaseSaved(true);
+        setTimeout(() => setPhaseSaved(false), 2000);
+      } else {
+        const err = await res.json();
+        alert(err.error || "保存に失敗しました");
+      }
+    } catch {
+      alert("保存に失敗しました");
+    } finally {
+      setPhaseSaving(false);
+    }
+  };
+
   const openAnalytics = async () => {
     setShowAnalytics(true);
     // Always re-fetch — analytics depends on selected tenant
@@ -608,6 +650,14 @@ export default function AdminDashboard() {
                 <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
               </svg>
               AI設定
+            </button>
+          )}
+          {!isObserver && (
+            <button onClick={openPhaseSettings} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/10">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>
+              </svg>
+              フェーズ設定
             </button>
           )}
           {!isObserver && (
@@ -1141,15 +1191,13 @@ export default function AdminDashboard() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">道場フェーズ</label>
+                  <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">フェーズ</label>
                   <select name="dojoPhase" className="input-field text-sm">
-                    <option value="道場1 覚醒">道場1 覚醒</option>
-                    <option value="道場2 武装">道場2 武装</option>
-                    <option value="道場3 実践">道場3 実践</option>
-                    <option value="道場4 深化">道場4 深化</option>
-                    <option value="道場5 統合">道場5 統合</option>
-                    <option value="道場6 継承">道場6 継承</option>
-                    <option value="道場7 卒業">道場7 卒業</option>
+                    {phaseLabels.length > 0 ? (
+                      phaseLabels.map((ph) => (<option key={ph} value={ph}>{ph}</option>))
+                    ) : (
+                      <option value="">（未設定）</option>
+                    )}
                   </select>
                 </div>
                 <div>
@@ -1377,6 +1425,99 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* Phase Label Settings Modal */}
+      {!isObserver && showPhaseSettings && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="p-5 border-b border-[#EFE8DD]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-[#1A1A2E]">フェーズ設定</h3>
+                    <p className="text-[10px] text-[#8B8489]">参加者の所属フェーズを自由に設定できます</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowPhaseSettings(false)} className="text-[#8B8489] hover:text-[#5B5560]">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+            </div>
+            <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
+              {phaseEditLabels.map((label, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <span className="text-xs text-[#8B8489] w-5 text-right">{idx + 1}.</span>
+                  <input
+                    type="text"
+                    value={label}
+                    onChange={(e) => {
+                      const updated = [...phaseEditLabels];
+                      updated[idx] = e.target.value;
+                      setPhaseEditLabels(updated);
+                    }}
+                    className="flex-1 text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none"
+                    placeholder={`フェーズ${idx + 1}の名称`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (idx > 0) {
+                        const updated = [...phaseEditLabels];
+                        [updated[idx - 1], updated[idx]] = [updated[idx], updated[idx - 1]];
+                        setPhaseEditLabels(updated);
+                      }
+                    }}
+                    disabled={idx === 0}
+                    className="text-[#8B8489] hover:text-[#2C2C4A] disabled:opacity-30 p-1"
+                    title="上に移動"
+                  >▲</button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (idx < phaseEditLabels.length - 1) {
+                        const updated = [...phaseEditLabels];
+                        [updated[idx], updated[idx + 1]] = [updated[idx + 1], updated[idx]];
+                        setPhaseEditLabels(updated);
+                      }
+                    }}
+                    disabled={idx === phaseEditLabels.length - 1}
+                    className="text-[#8B8489] hover:text-[#2C2C4A] disabled:opacity-30 p-1"
+                    title="下に移動"
+                  >▼</button>
+                  <button
+                    type="button"
+                    onClick={() => setPhaseEditLabels(phaseEditLabels.filter((_, i) => i !== idx))}
+                    className="text-red-400 hover:text-red-600 p-1"
+                    title="削除"
+                  >✕</button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setPhaseEditLabels([...phaseEditLabels, ""])}
+                className="w-full py-2 text-xs text-amber-600 hover:text-amber-700 border border-dashed border-amber-300 rounded-xl hover:bg-amber-50 transition-colors"
+              >
+                ＋ フェーズを追加
+              </button>
+              <div className="bg-amber-50 rounded-xl p-3 border border-amber-100 mt-2">
+                <p className="text-[10px] text-amber-700 leading-relaxed">テナントごとにフェーズ名を自由に設定できます。例: 「道場1 覚悟」「ステップ1 基礎」など。参加者の登録・編集時にこのリストが選択肢として表示されます。</p>
+              </div>
+            </div>
+            <div className="p-5 border-t border-[#EFE8DD] flex items-center gap-3">
+              <button onClick={() => setShowPhaseSettings(false)} className="btn-secondary flex-1 py-2.5 text-sm">閉じる</button>
+              <button onClick={handleSavePhaseLabels} disabled={phaseSaving}
+                className="flex-1 py-2.5 text-sm font-medium rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white hover:from-amber-600 hover:to-orange-700 disabled:from-gray-300 disabled:to-gray-400 disabled:text-gray-500 transition-all">
+                {phaseSaving ? "保存中..." : phaseSaved ? "保存しました ✓" : "保存する"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Add Manager Modal */}
       {!isObserver && showAddManager && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -1462,7 +1603,7 @@ export default function AdminDashboard() {
                     <p>1行目はヘッダー行です。以下の列名が使えます:</p>
                     <p className="font-mono bg-white rounded px-2 py-1">name, email, department, role, dojoPhase, managerName</p>
                     <p><strong>role</strong>の選択肢: 参加者（デフォルト）/ マネージャー / 管理者 / 閲覧者</p>
-                    <p><strong>dojoPhase</strong>の選択肢: 道場1 覚醒 〜 道場7 卒業（参加者のみ。省略時は「道場1 覚醒」）</p>
+                    <p><strong>dojoPhase</strong>: {phaseLabels.length > 0 ? `選択肢: ${phaseLabels.join(" / ")}` : "フェーズ設定で事前に登録してください"}（参加者のみ）</p>
                     <p><strong>managerName</strong>: 上司の名前（参加者のみ）。マネージャー行を参加者行より上に配置してください</p>
                     <p className="text-[#8B7355]">日本語ヘッダー（名前, メール, 部署, 役割, 道場, 上司）にも対応しています</p>
                   </div>
@@ -1475,7 +1616,7 @@ export default function AdminDashboard() {
                       value={csvText}
                       onChange={(e) => setCsvText(e.target.value)}
                       rows={10}
-                      placeholder={"name,email,department,role,dojoPhase,managerName\n田中太郎,tanaka@example.com,営業部,マネージャー,,\n佐藤花子,sato@example.com,営業部,参加者,道場1 覚醒,田中太郎"}
+                      placeholder={`name,email,department,role,dojoPhase,managerName\n田中太郎,tanaka@example.com,営業部,マネージャー,,\n佐藤花子,sato@example.com,営業部,参加者,${phaseLabels[0] || "フェーズ1"},田中太郎`}
                       className="input-field text-sm font-mono w-full"
                     />
                     <p className="text-xs text-[#8B8489] mt-1">CSVファイルの内容をペーストするか、直接入力してください</p>
@@ -1670,12 +1811,14 @@ export default function AdminDashboard() {
                   className="w-full text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none" />
               </div>
               <div>
-                <label className="text-xs font-medium text-[#5B5560] block mb-1">道場フェーズ</label>
+                <label className="text-xs font-medium text-[#5B5560] block mb-1">フェーズ</label>
                 <select value={editForm.dojoPhase} onChange={(e) => setEditForm({ ...editForm, dojoPhase: e.target.value })}
                   className="w-full text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none">
-                  {["道場1 覚醒","道場2 探究","道場3 挑戦","道場4 変容","道場5 統合","道場6 共創","道場7 卒業"].map((ph) => (
-                    <option key={ph} value={ph}>{ph}</option>
-                  ))}
+                  {phaseLabels.length > 0 ? (
+                    phaseLabels.map((ph) => (<option key={ph} value={ph}>{ph}</option>))
+                  ) : (
+                    <option value={editForm.dojoPhase}>{editForm.dojoPhase || "（未設定）"}</option>
+                  )}
                 </select>
               </div>
               <div>
