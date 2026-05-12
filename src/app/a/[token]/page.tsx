@@ -641,7 +641,11 @@ export default function AdminDashboard() {
             </div>
           )}
         </div>
-        <div className="absolute top-0 right-0 mt-1 flex items-center gap-2">
+        {/* Action buttons: stacked below the title on mobile (relative
+            position lets them wrap properly), absolutely top-right on
+            sm+ where there is room. Previously these were always absolutely
+            positioned and overlapped the title text on narrow viewports. */}
+        <div className="relative sm:absolute sm:top-0 sm:right-0 mt-3 sm:mt-1 flex flex-wrap items-center gap-2 max-w-4xl mx-auto sm:mx-0 sm:max-w-none px-1 sm:px-0">
           <button onClick={handleExport} disabled={exporting} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/10 disabled:opacity-50">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
@@ -848,14 +852,14 @@ export default function AdminDashboard() {
 
         {/* Participants Table */}
         <div className="card overflow-hidden mb-5">
-          <div className="px-5 py-4 border-b border-[#EFE8DD] flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-[#1A1A2E]">参加者一覧</h2>
+          <div className="px-5 py-4 border-b border-[#EFE8DD] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h2 className="text-sm font-semibold text-[#1A1A2E] whitespace-nowrap">参加者一覧</h2>
             {!isObserver && (
-              <div className="flex items-center gap-2">
-                <button onClick={() => { setShowImportModal(true); setImportStep("input"); setCsvText(""); setImportPreview(null); setImportResult(null); setImportError(null); }} className="text-xs px-4 py-2 rounded-xl border border-[#C4A882] text-[#8B7355] hover:bg-[#FBF8F4] transition-colors">
+              <div className="flex items-center gap-2 flex-wrap">
+                <button onClick={() => { setShowImportModal(true); setImportStep("input"); setCsvText(""); setImportPreview(null); setImportResult(null); setImportError(null); }} className="text-xs px-4 py-2 rounded-xl border border-[#C4A882] text-[#8B7355] hover:bg-[#FBF8F4] transition-colors whitespace-nowrap">
                   📄 CSV一括インポート
                 </button>
-                <button onClick={() => setShowAddParticipant(true)} className="btn-accent text-xs px-4 py-2">
+                <button onClick={() => setShowAddParticipant(true)} className="btn-accent text-xs px-4 py-2 whitespace-nowrap">
                   + 参加者を追加
                 </button>
               </div>
@@ -871,25 +875,31 @@ export default function AdminDashboard() {
                 : (p.todayStatus === "morning_only" || p.todayStatus === "evening_only") ? "text-amber-500" : "";
               return (
                 <div key={p.id} className="p-4 hover:bg-[#FBF8F4] transition-colors">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className={`w-2 h-2 rounded-full ${status.color}`}></div>
+                  {/* Stack vertically on mobile to avoid the right-side button
+                      group from crushing the left column into single-character
+                      width. Above sm breakpoint (≥640px) the cards lay out
+                      side-by-side like before. */}
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${status.color}`}></div>
                         <Link
                           href={`/a/${token}/participant/${encodeURIComponent(p.name)}`}
-                          className="font-medium text-sm text-[#1A1A2E] hover:text-amber-700 hover:underline underline-offset-2 transition-colors"
+                          className="font-medium text-sm text-[#1A1A2E] hover:text-amber-700 hover:underline underline-offset-2 transition-colors whitespace-nowrap"
                         >{p.name}</Link>
-                        <span className="text-[10px] font-medium bg-indigo-50 text-[#1A1A2E] px-1.5 py-0.5 rounded-md">{p.dojoPhase}</span>
+                        <span className="text-[10px] font-medium bg-indigo-50 text-[#1A1A2E] px-1.5 py-0.5 rounded-md whitespace-nowrap">{p.dojoPhase}</span>
                         {todayIcon && (
                           <span className={`text-sm font-bold ${todayColor}`}>{todayIcon}</span>
                         )}
                       </div>
                       <p className="text-[11px] text-[#8B8489] mb-1.5 ml-4">{p.department}</p>
-                      <div className="flex gap-4 text-xs text-[#8B8489] ml-4">
-                        <span>完了率: <strong className="text-[#1A1A2E]">{cRate}%</strong></span>
-                        <span>連続: <strong className="text-[#1A1A2E]">{p.streak}日</strong></span>
-                        <span className="text-[#A09898]">朝<strong className="text-[#1A1A2E]">{p.morningCount ?? "?"}</strong> 夕<strong className="text-[#1A1A2E]">{p.eveningCount ?? "?"}</strong></span>
-                        <span>FB: <strong className="text-[#1A1A2E]">{p.fbCount}回</strong></span>
+                      {/* flex-wrap so the 4 stats wrap onto a second row instead
+                          of crushing each <span> to single-character width. */}
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#8B8489] ml-4">
+                        <span className="whitespace-nowrap">完了率: <strong className="text-[#1A1A2E]">{cRate}%</strong></span>
+                        <span className="whitespace-nowrap">連続: <strong className="text-[#1A1A2E]">{p.streak}日</strong></span>
+                        <span className="text-[#A09898] whitespace-nowrap">朝<strong className="text-[#1A1A2E]">{p.morningCount ?? "?"}</strong> 夕<strong className="text-[#1A1A2E]">{p.eveningCount ?? "?"}</strong></span>
+                        <span className="whitespace-nowrap">FB: <strong className="text-[#1A1A2E]">{p.fbCount}回</strong></span>
                       </div>
                       {p.latestLog && (p.latestLog.morningIntent || p.latestLog.eveningInsight) && (
                         <div className="mt-2 ml-4 text-xs text-[#5B5560] bg-[#F5F0EB] rounded-xl p-2 border border-[#EFE8DD]">
@@ -897,17 +907,20 @@ export default function AdminDashboard() {
                         </div>
                       )}
                     </div>
-                    <div className="flex flex-col items-end gap-1.5 ml-4">
-                      <div className="flex gap-1.5">
+                    {/* Button column: row layout with wrap on mobile, vertical
+                        on sm+. flex-wrap prevents overflow when 4 buttons
+                        won't fit on one row. */}
+                    <div className="flex flex-row sm:flex-col items-start sm:items-end gap-1.5 sm:ml-4 flex-shrink-0">
+                      <div className="flex flex-wrap gap-1.5">
                         <Link
                           href={`/a/${token}/participant/${encodeURIComponent(p.name)}`}
-                          className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-[#1A1A2E] text-white hover:bg-[#2C2C4A] transition-colors"
+                          className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-[#1A1A2E] text-white hover:bg-[#2C2C4A] transition-colors whitespace-nowrap"
                         >
                           ログ
                         </Link>
                         <button
                           onClick={() => openFbHistory(p.name)}
-                          className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
+                          className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors whitespace-nowrap"
                         >
                           FB履歴
                         </button>
@@ -915,20 +928,20 @@ export default function AdminDashboard() {
                           <>
                             <button
                               onClick={() => openEditParticipant(p)}
-                              className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-[#EFE8DD] text-[#5B5560] hover:bg-[#E5DDD3] transition-colors"
+                              className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-[#EFE8DD] text-[#5B5560] hover:bg-[#E5DDD3] transition-colors whitespace-nowrap"
                             >
                               編集
                             </button>
                             <button
                               onClick={() => openFeedbackModal(p.name)}
-                              className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+                              className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors whitespace-nowrap"
                             >
                               FB送信
                             </button>
                           </>
                         )}
                       </div>
-                      <span className="text-[10px] text-[#8B8489]">{status.label}</span>
+                      <span className="text-[10px] text-[#8B8489] whitespace-nowrap">{status.label}</span>
                       {p.recentEnergy.length > 0 && (
                         <div className="flex gap-0.5 mt-0.5">
                           {p.recentEnergy.map((energy, i) => (
@@ -948,14 +961,14 @@ export default function AdminDashboard() {
 
         {/* Managers Table */}
         <div className="card overflow-hidden mb-5">
-          <div className="px-5 py-4 border-b border-[#EFE8DD] flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-[#1A1A2E]">マネージャー一覧</h2>
+          <div className="px-5 py-4 border-b border-[#EFE8DD] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h2 className="text-sm font-semibold text-[#1A1A2E] whitespace-nowrap">マネージャー一覧</h2>
             {!isObserver && (
-              <div className="flex items-center gap-2">
-                <button onClick={() => { setShowManagerImport(true); setManagerImportStep("input"); setManagerCsvText(""); setManagerImportPreview(null); setManagerImportResult(null); setManagerImportError(null); }} className="text-xs px-4 py-2 rounded-xl border border-[#C4A882] text-[#8B7355] hover:bg-[#FBF8F4] transition-colors">
+              <div className="flex items-center gap-2 flex-wrap">
+                <button onClick={() => { setShowManagerImport(true); setManagerImportStep("input"); setManagerCsvText(""); setManagerImportPreview(null); setManagerImportResult(null); setManagerImportError(null); }} className="text-xs px-4 py-2 rounded-xl border border-[#C4A882] text-[#8B7355] hover:bg-[#FBF8F4] transition-colors whitespace-nowrap">
                   📄 CSVインポート
                 </button>
-                <button onClick={() => setShowAddManager(true)} className="text-xs font-medium px-4 py-2 rounded-xl bg-amber-500 text-white hover:bg-amber-600 transition-colors">
+                <button onClick={() => setShowAddManager(true)} className="text-xs font-medium px-4 py-2 rounded-xl bg-amber-500 text-white hover:bg-amber-600 transition-colors whitespace-nowrap">
                   + マネージャーを追加
                 </button>
               </div>
@@ -964,28 +977,28 @@ export default function AdminDashboard() {
           <div className="divide-y divide-[#EFE8DD]">
             {managers.map((m) => (
               <div key={m.id} className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm text-[#1A1A2E]">{m.name}</span>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-sm text-[#1A1A2E] whitespace-nowrap">{m.name}</span>
                       {m.isAdmin && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">管理者</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium whitespace-nowrap">管理者</span>
                       )}
                       {m.role === "observer" && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">閲覧者</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium whitespace-nowrap">閲覧者</span>
                       )}
                     </div>
-                    <div className="text-[11px] text-[#8B8489] mt-0.5">{m.department}{m.email ? ` · ${m.email}` : ""}</div>
+                    <div className="text-[11px] text-[#8B8489] mt-0.5 break-all">{m.department}{m.email ? ` · ${m.email}` : ""}</div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <div className="text-xs text-[#1A1A2E] font-medium">担当: {m.participantNames.length}名</div>
-                      <div className="text-[11px] text-[#8B8489] mt-0.5">{m.participantNames.join("、")}</div>
+                  <div className="flex items-start gap-3 flex-shrink-0">
+                    <div className="text-left sm:text-right min-w-0">
+                      <div className="text-xs text-[#1A1A2E] font-medium whitespace-nowrap">担当: {m.participantNames.length}名</div>
+                      <div className="text-[11px] text-[#8B8489] mt-0.5 break-all">{m.participantNames.join("、")}</div>
                     </div>
                     {!isObserver && (
                       <button
                         onClick={() => openEditManager(m)}
-                        className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-[#EFE8DD] text-[#5B5560] hover:bg-[#E5DDD3] transition-colors shrink-0"
+                        className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-[#EFE8DD] text-[#5B5560] hover:bg-[#E5DDD3] transition-colors shrink-0 whitespace-nowrap"
                       >
                         編集
                       </button>
