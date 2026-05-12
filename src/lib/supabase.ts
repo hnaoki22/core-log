@@ -255,12 +255,38 @@ function rowToFeedback(r: any): NotionFeedback {
 // ---------------------------------------------------------------------------
 // Tenant resolution helper — every query is scoped by tenant_id
 // ---------------------------------------------------------------------------
+//
+// Tenant rows almost never change — slug ↔ id mapping is essentially static
+// for the lifetime of a deploy. The hot path (every protected request runs
+// through tenant resolution) used to issue one Supabase round trip per call.
+// A small in-process cache cuts that to ~one per cold start per tenant.
+//
+// `getClient()` enforces `cache: "no-store"` so we can't lean on Next.js'
+// fetch cache. The TTL here is short enough that admin-side rename ops
+// surface within a minute on a serverless instance.
+const TENANT_CACHE_TTL_MS = 60 * 1000;
+const tenantIdBySlugCache = new Map<string, { id: string | null; at: number }>();
+const tenantBySlugCache = new Map<
+  string,
+  { value: { id: string; name: string; slug: string; companyName: string; featureFlags: Record<string, boolean> } | null; at: number }
+>();
+const tenantByIdCache = new Map<
+  string,
+  { value: { id: string; name: string; slug: string; companyName: string } | null; at: number }
+>();
+let allTenantsCache: { value: { id: string; name: string; slug: string; companyName: string; plan: string }[]; at: number } | null = null;
+
 async function getTenantIdBySlug(slug: string): Promise<string | null> {
+  const hit = tenantIdBySlugCache.get(slug);
+  if (hit && Date.now() - hit.at < TENANT_CACHE_TTL_MS) return hit.id;
+
   const { data, error } = await getClient().from("tenants").select("id").eq("slug", slug).single();
   if (error) {
     logger.error("Query failed", { error: error.message, slug });
   }
-  return data?.id ?? null;
+  const id = data?.id ?? null;
+  tenantIdBySlugCache.set(slug, { id, at: Date.now() });
+  return id;
 }
 
 // ---------------------------------------------------------------------------
@@ -1426,6 +1452,8 @@ export async function createTenant(
 export async function getTenantBySlug(
   slug: string
 ): Promise<{ id: string; name: string; slug: string; companyName: string; featureFlags: Record<string, boolean> } | null> {
+  const hit = tenantBySlugCache.get(slug);
+  if (hit && Date.now() - hit.at < TENANT_CACHE_TTL_MS) return hit.value;
   const { data, error } = await getClient()
     .from("tenants")
     .select("*")
@@ -1434,19 +1462,24 @@ export async function getTenantBySlug(
   if (error) {
     logger.error("Query failed", { error: error.message, slug });
   }
-  if (!data) return null;
-  return {
-    id: data.id,
-    name: data.name,
-    slug: data.slug,
-    companyName: data.company_name,
-    featureFlags: data.feature_flags || {},
-  };
+  const value = data
+    ? {
+        id: data.id,
+        name: data.name,
+        slug: data.slug,
+        companyName: data.company_name,
+        featureFlags: data.feature_flags || {},
+      }
+    : null;
+  tenantBySlugCache.set(slug, { value, at: Date.now() });
+  return value;
 }
 
 export async function getTenantById(
   id: string
 ): Promise<{ id: string; name: string; slug: string; companyName: string } | null> {
+  const hit = tenantByIdCache.get(id);
+  if (hit && Date.now() - hit.at < TENANT_CACHE_TTL_MS) return hit.value;
   const { data, error } = await getClient()
     .from("tenants")
     .select("id, name, slug, company_name")
@@ -1456,18 +1489,24 @@ export async function getTenantById(
     logger.error("Query failed", { error: error.message, id });
     return null;
   }
-  if (!data) return null;
-  return {
-    id: data.id as string,
-    name: data.name as string,
-    slug: data.slug as string,
-    companyName: (data.company_name as string) || "",
-  };
+  const value = data
+    ? {
+        id: data.id as string,
+        name: data.name as string,
+        slug: data.slug as string,
+        companyName: (data.company_name as string) || "",
+      }
+    : null;
+  tenantByIdCache.set(id, { value, at: Date.now() });
+  return value;
 }
 
 export async function getAllTenants(): Promise<
   { id: string; name: string; slug: string; companyName: string; plan: string }[]
 > {
+  if (allTenantsCache && Date.now() - allTenantsCache.at < TENANT_CACHE_TTL_MS) {
+    return allTenantsCache.value;
+  }
   const { data, error } = await getClient()
     .from("tenants")
     .select("id, name, slug, company_name, plan")
@@ -1475,13 +1514,15 @@ export async function getAllTenants(): Promise<
   if (error) {
     logger.error("Query failed", { error: error.message });
   }
-  return (data || []).map((t) => ({
+  const value = (data || []).map((t) => ({
     id: t.id,
     name: t.name,
     slug: t.slug,
     companyName: t.company_name,
     plan: t.plan,
   }));
+  allTenantsCache = { value, at: Date.now() };
+  return value;
 }
 
 // Re-export for convenience

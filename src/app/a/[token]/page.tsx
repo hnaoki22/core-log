@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useFeatures } from "@/lib/use-features";
 
 type ParticipantData = {
@@ -620,13 +621,13 @@ export default function AdminDashboard() {
             </button>
           )}
           {!isObserver && (
-            <a href={`/a/${token}/features`} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/10">
+            <Link href={`/a/${token}/features`} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/10">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="3"/>
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
               </svg>
               機能設定
-            </a>
+            </Link>
           )}
         </div>
       </div>
@@ -824,10 +825,10 @@ export default function AdminDashboard() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <div className={`w-2 h-2 rounded-full ${status.color}`}></div>
-                        <a
+                        <Link
                           href={`/a/${token}/participant/${encodeURIComponent(p.name)}`}
                           className="font-medium text-sm text-[#1A1A2E] hover:text-amber-700 hover:underline underline-offset-2 transition-colors"
-                        >{p.name}</a>
+                        >{p.name}</Link>
                         <span className="text-[10px] font-medium bg-indigo-50 text-[#1A1A2E] px-1.5 py-0.5 rounded-md">{p.dojoPhase}</span>
                         {todayIcon && (
                           <span className={`text-sm font-bold ${todayColor}`}>{todayIcon}</span>
@@ -848,12 +849,12 @@ export default function AdminDashboard() {
                     </div>
                     <div className="flex flex-col items-end gap-1.5 ml-4">
                       <div className="flex gap-1.5">
-                        <a
+                        <Link
                           href={`/a/${token}/participant/${encodeURIComponent(p.name)}`}
                           className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-[#1A1A2E] text-white hover:bg-[#2C2C4A] transition-colors"
                         >
                           ログ
-                        </a>
+                        </Link>
                         <button
                           onClick={() => openFbHistory(p.name)}
                           className="text-[10px] font-medium px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
@@ -979,25 +980,25 @@ export default function AdminDashboard() {
                 <h2 className="text-sm font-semibold text-[#5B5560] uppercase tracking-wide px-1 mb-3">組織分析</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {isOn("tier-b.cultureScore") && (
-                    <a href={`/a/${token}/features/culture`} className="card p-4 hover:shadow-md transition-shadow">
+                    <Link href={`/a/${token}/features/culture`} className="card p-4 hover:shadow-md transition-shadow">
                       <div className="text-2xl mb-2">📊</div>
                       <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">カルチャースコア</h3>
                       <p className="text-xs text-[#8B8489]">組織文化メトリクス</p>
-                    </a>
+                    </Link>
                   )}
                   {isOn("tier-f.growthRoi") && (
-                    <a href={`/a/${token}/features/growth-roi`} className="card p-4 hover:shadow-md transition-shadow">
+                    <Link href={`/a/${token}/features/growth-roi`} className="card p-4 hover:shadow-md transition-shadow">
                       <div className="text-2xl mb-2">📈</div>
                       <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">成長ROI</h3>
                       <p className="text-xs text-[#8B8489]">学習効果を可視化</p>
-                    </a>
+                    </Link>
                   )}
                   {isOn("tier-e.microRitualOptimizer") && (
-                    <a href={`/a/${token}/features/ritual-metrics`} className="card p-4 hover:shadow-md transition-shadow">
+                    <Link href={`/a/${token}/features/ritual-metrics`} className="card p-4 hover:shadow-md transition-shadow">
                       <div className="text-2xl mb-2">🔄</div>
                       <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">リチュアルメトリクス</h3>
                       <p className="text-xs text-[#8B8489]">実施統計</p>
-                    </a>
+                    </Link>
                   )}
                 </div>
               </div>
@@ -1009,18 +1010,18 @@ export default function AdminDashboard() {
                 <h2 className="text-sm font-semibold text-[#5B5560] uppercase tracking-wide px-1 mb-3">レポート生成</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {isOn("tier-f.clientReport") && (
-                    <a href={`/a/${token}/features/client-report`} className="card p-4 hover:shadow-md transition-shadow">
+                    <Link href={`/a/${token}/features/client-report`} className="card p-4 hover:shadow-md transition-shadow">
                       <div className="text-2xl mb-2">📄</div>
                       <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">クライアントレポート</h3>
                       <p className="text-xs text-[#8B8489]">成果報告書生成</p>
-                    </a>
+                    </Link>
                   )}
                   {isOn("tier-g.pitchGenerator") && (
-                    <a href={`/a/${token}/features/pitch`} className="card p-4 hover:shadow-md transition-shadow">
+                    <Link href={`/a/${token}/features/pitch`} className="card p-4 hover:shadow-md transition-shadow">
                       <div className="text-2xl mb-2">🎯</div>
                       <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">ピッチ生成</h3>
                       <p className="text-xs text-[#8B8489]">営業提案書</p>
-                    </a>
+                    </Link>
                   )}
                 </div>
               </div>
@@ -1032,33 +1033,33 @@ export default function AdminDashboard() {
                 <h2 className="text-sm font-semibold text-[#5B5560] uppercase tracking-wide px-1 mb-3">運用管理</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {isOn("tier-g.multiTenant") && (
-                    <a href={`/a/${token}/features/tenants`} className="card p-4 hover:shadow-md transition-shadow">
+                    <Link href={`/a/${token}/features/tenants`} className="card p-4 hover:shadow-md transition-shadow">
                       <div className="text-2xl mb-2">🏢</div>
                       <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">マルチテナント</h3>
                       <p className="text-xs text-[#8B8489]">複数組織管理</p>
-                    </a>
+                    </Link>
                   )}
                   {isOn("tier-g.consultIntervention") && (
-                    <a href={`/a/${token}/features/consult`} className="card p-4 hover:shadow-md transition-shadow">
+                    <Link href={`/a/${token}/features/consult`} className="card p-4 hover:shadow-md transition-shadow">
                       <div className="text-2xl mb-2">👥</div>
                       <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">介入ログ</h3>
                       <p className="text-xs text-[#8B8489]">コーチング記録</p>
-                    </a>
+                    </Link>
                   )}
 
                   {isOn("tier-a.consultantSpotlight") && (
-                    <a href={`/a/${token}/features/spotlight`} className="card p-4 hover:shadow-md transition-shadow">
+                    <Link href={`/a/${token}/features/spotlight`} className="card p-4 hover:shadow-md transition-shadow">
                       <div className="text-2xl mb-2">🔍</div>
                       <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">スポットライト</h3>
                       <p className="text-xs text-[#8B8489]">注目参加者AI分析</p>
-                    </a>
+                    </Link>
                   )}
                   {isOn("tier-b.knowledgeLibrary") && (
-                    <a href={`/a/${token}/features/knowledge`} className="card p-4 hover:shadow-md transition-shadow">
+                    <Link href={`/a/${token}/features/knowledge`} className="card p-4 hover:shadow-md transition-shadow">
                       <div className="text-2xl mb-2">📚</div>
                       <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">ナレッジ</h3>
                       <p className="text-xs text-[#8B8489]">組織学習</p>
-                    </a>
+                    </Link>
                   )}
                 </div>
               </div>
@@ -1078,10 +1079,10 @@ export default function AdminDashboard() {
                 <div className="text-[10px] font-semibold text-[#8B8489] uppercase tracking-wider mb-2">マネージャー画面</div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {data.managers.map((m: ManagerData) => (
-                    <a key={m.id} href={`/m/${m.token}`} className="block p-3 bg-amber-50/50 rounded-xl border border-amber-100 hover:bg-amber-50 transition-colors">
+                    <Link key={m.id} href={`/m/${m.token}`} className="block p-3 bg-amber-50/50 rounded-xl border border-amber-100 hover:bg-amber-50 transition-colors">
                       <div className="font-medium text-amber-600 text-xs mb-0.5">{m.name}</div>
                       <div className="text-[10px] text-[#8B8489]">{m.department || ""}{m.role === "admin" ? " · 管理者" : m.role === "observer" ? " · 閲覧者" : ""}</div>
-                    </a>
+                    </Link>
                   ))}
                 </div>
               </div>
@@ -1092,10 +1093,10 @@ export default function AdminDashboard() {
                 <div className="text-[10px] font-semibold text-[#8B8489] uppercase tracking-wider mb-2">参加者画面</div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {data.participants.map((p: ParticipantData) => (
-                    <a key={p.id} href={`/p/${p.token}`} className="block p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 hover:bg-indigo-50 transition-colors">
+                    <Link key={p.id} href={`/p/${p.token}`} className="block p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 hover:bg-indigo-50 transition-colors">
                       <div className="font-medium text-[#1A1A2E] text-xs mb-0.5">{p.name}</div>
                       <div className="text-[10px] text-[#8B8489]">{p.managerId && data?.managers ? `上司: ${data.managers.find((m: ManagerData) => m.id === p.managerId)?.name || ""}` : ""}</div>
-                    </a>
+                    </Link>
                   ))}
                 </div>
               </div>
