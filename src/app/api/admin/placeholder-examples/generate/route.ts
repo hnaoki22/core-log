@@ -17,10 +17,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import {
-  DEFAULT_TENANT_ID,
   getManagerByTokenFromSupabase as getManagerByToken,
-  getTenantBySlug,
 } from "@/lib/supabase";
+import { resolveAdminTenantContext } from "@/lib/tenant-context";
 import { generatePlaceholderExamples } from "@/lib/llm";
 import { saveDraftExamples, type StoredExampleSet } from "@/lib/placeholder-store";
 import type { PhaseKey } from "@/lib/placeholder-examples";
@@ -55,13 +54,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Resolve tenant
-    const slug = request.nextUrl.searchParams.get("tenant");
-    let tenantId = manager.tenantId || DEFAULT_TENANT_ID;
-    if (manager.isAdmin && slug) {
-      const t = await getTenantBySlug(slug);
-      if (t) tenantId = t.id;
+    // Resolve tenant via standard admin context
+    const ctx = await resolveAdminTenantContext(request, manager);
+    if (!ctx.tenantId) {
+      return NextResponse.json(
+        { error: "テナントを指定してください（全テナントモードでは例示を生成できません）" },
+        { status: 400 }
+      );
     }
+    const tenantId = ctx.tenantId;
 
     // --- Generate via LLM ---
     const result = await generatePlaceholderExamples({

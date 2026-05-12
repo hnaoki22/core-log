@@ -43,18 +43,19 @@ export async function llmAnalyze(
 export async function llmJson<T>(
   systemPrompt: string,
   userContent: string,
-  fallback: T
+  fallback: T,
+  options?: { maxTokens?: number }
 ): Promise<T> {
   const raw = await llmAnalyze(
-    systemPrompt + "\n\nå¿ãJSONå½¢å¼ã®ã¿ã§åç­ãã¦ãã ããããã¼ã¯ãã¦ã³ã®ã³ã¼ããã­ãã¯ã¯ä½¿ããªãã§ãã ããã",
+    systemPrompt + "\n\n必ずJSON形式のみで回答してください。マークダウンのコードブロックは使わないでください。",
     userContent,
-    { temperature: 0.3 }
+    { temperature: 0.3, maxTokens: options?.maxTokens ?? 1024 }
   );
   try {
     const cleaned = raw.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
     return JSON.parse(cleaned) as T;
   } catch {
-    console.error("LLM JSON parse error. Raw:", raw);
+    console.error("LLM JSON parse error. Raw:", raw.slice(0, 500));
     return fallback;
   }
 }
@@ -543,6 +544,7 @@ ${input.courseBooks}${existingRef}
     {
       sets: [],
       summary: "生成に失敗しました。入力内容を確認してください。",
-    }
+    },
+    { maxTokens: 4096 }
   );
 }

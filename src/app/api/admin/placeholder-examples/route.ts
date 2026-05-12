@@ -9,9 +9,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import {
-  DEFAULT_TENANT_ID,
   getManagerByTokenFromSupabase as getManagerByToken,
 } from "@/lib/supabase";
+import { resolveAdminTenantContext } from "@/lib/tenant-context";
 import {
   getPlaceholderStoreData,
   savePlaceholderStoreData,
@@ -22,22 +22,6 @@ import {
 } from "@/lib/placeholder-store";
 
 export const dynamic = "force-dynamic";
-
-// Resolve tenant for this endpoint (admin-only, uses ?tenant= or fallback)
-async function resolveTenantId(
-  request: NextRequest,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  manager: any
-): Promise<string> {
-  const slug = request.nextUrl.searchParams.get("tenant");
-  if (manager.isAdmin && slug) {
-    // Dynamic import to avoid circular dep
-    const { getTenantBySlug } = await import("@/lib/supabase");
-    const t = await getTenantBySlug(slug);
-    if (t) return t.id;
-  }
-  return manager.tenantId || DEFAULT_TENANT_ID;
-}
 
 // ---------- GET ----------
 export async function GET(request: NextRequest) {
@@ -52,13 +36,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    const tenantId = await resolveTenantId(request, manager);
-    const store = await getPlaceholderStoreData(tenantId);
+    const ctx = await resolveAdminTenantContext(request, manager);
+    if (!ctx.tenantId) {
+      return NextResponse.json(
+        { error: "テナントを指定してください" },
+        { status: 400 }
+      );
+    }
+    const store = await getPlaceholderStoreData(ctx.tenantId);
 
     return NextResponse.json({
       success: true,
       data: store ?? { approved: [], draft: [], updatedAt: null },
-      tenantId,
+      tenantId: ctx.tenantId,
     });
   } catch (err) {
     console.error("GET /api/admin/placeholder-examples error:", err);
@@ -84,7 +74,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    const tenantId = await resolveTenantId(request, manager);
+    const ctx = await resolveAdminTenantContext(request, manager);
+    if (!ctx.tenantId) {
+      return NextResponse.json(
+        { error: "テナントを指定してください" },
+        { status: 400 }
+      );
+    }
+    const tenantId = ctx.tenantId;
 
     switch (action) {
       case "approve": {
