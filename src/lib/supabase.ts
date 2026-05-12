@@ -640,6 +640,49 @@ export async function getParticipantByTokenFromSupabase(
   return { ...rowToParticipant(data), tenantId: data.tenant_id };
 }
 
+/**
+ * Combined query: fetch participant + their logs in a SINGLE Supabase
+ * round trip via PostgREST nested select. Used by Server Components on
+ * the participant routes to eliminate one sequential round-trip latency.
+ *
+ * Falls back to two-call path if the nested select shape isn't usable
+ * (e.g., FK relationship not exposed) so we never break callers.
+ *
+ * Returns logs in the same shape as `getLogsByParticipant` would, ordered
+ * by date descending.
+ */
+export async function getParticipantWithLogsByToken(
+  token: string
+): Promise<{
+  participant: (NotionParticipant & { tenantId: string }) | null;
+  logs: NotionLogEntry[];
+} | null> {
+  const t0 = Date.now();
+  // PostgREST embed: `logs(*)` joins via the FK on logs.participant_id.
+  // If the FK is named differently, use `logs!fk_name(*)` syntax.
+  const { data, error } = await getClient()
+    .from("participants")
+    .select("*, logs(*)")
+    .eq("token", token)
+    .order("date", { foreignTable: "logs", ascending: false })
+    .maybeSingle();
+  const elapsed = Date.now() - t0;
+  if (error) {
+    logger.warn("Nested participant+logs query failed; falling back", { error: error.message, ms: elapsed });
+    // Fall back to two sequential calls. Same observable behavior, slower.
+    const p = await getParticipantByTokenFromSupabase(token);
+    if (!p) return { participant: null, logs: [] };
+    const logs = await getLogsByParticipant(p.name, p.tenantId);
+    return { participant: p, logs };
+  }
+  if (!data) return { participant: null, logs: [] };
+  const participant = { ...rowToParticipant(data), tenantId: data.tenant_id };
+  const logs = ((data as { logs?: unknown[] }).logs || []).map((l) => rowToLog(l as Parameters<typeof rowToLog>[0]));
+  // Useful for production diagnostics — visible in Vercel function logs.
+  console.log(`[perf] getParticipantWithLogsByToken token=${token.slice(0, 6)} logs=${logs.length} ms=${elapsed}`);
+  return { participant, logs };
+}
+
 export async function getParticipantByNameFromSupabase(
   name: string,
   tenantId?: string

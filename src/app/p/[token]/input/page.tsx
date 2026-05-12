@@ -1,17 +1,12 @@
 // Server Component for /p/[token]/input.
 //
-// User flow (before): browser navigates → empty HTML shell → JS DL →
-// hydration → useEffect fetches /api/logs → 500-1000ms "接続中です..."
-// spinner → page renders. Total perceived 1-2 seconds.
-//
-// After: Vercel function fetches today's status directly via Supabase
-// (region-local, no HTTP middleware hop), ships HTML with form already
-// in the correct mode (morning vs evening vs completed). User sees the
-// real form on first paint.
+// Combines participant + logs into ONE Supabase nested-select to avoid the
+// "ParticipantByToken → wait → LogsByParticipant" sequential round trip.
+// Logs timing to the Vercel function log (visible in Vercel dashboard) so
+// we can SEE where the time goes per request.
 
 import { notFound } from "next/navigation";
-import { getParticipantByToken } from "@/lib/participant-db";
-import { getLogsByParticipant } from "@/lib/supabase";
+import { getParticipantWithLogsByToken } from "@/lib/supabase";
 import { getTodayJST, getCurrentHourJST, isGracePeriod, calculateWeekNum } from "@/lib/date-utils";
 import InputClient, { type InputPageInitialData } from "./InputClient";
 
@@ -23,17 +18,21 @@ export default async function InputPageServer({
 }: {
   params: { token: string };
 }) {
+  const t0 = Date.now();
   const token = params.token;
-  const participant = await getParticipantByToken(token);
-  if (!participant || !participant.tenantId) {
+
+  const result = await getParticipantWithLogsByToken(token);
+  const tFetched = Date.now();
+
+  if (!result?.participant || !result.participant.tenantId) {
     notFound();
   }
+  const participant = result.participant;
+  const logs = result.logs;
 
-  const logs = await getLogsByParticipant(participant.name, participant.tenantId);
   const today = getTodayJST();
   const todayEntry = logs.find((l) => l.date === today);
 
-  // Mirror the original client-side logic (lines 124-140 of old page.tsx):
   const hour = getCurrentHourJST();
   const inGracePeriod = isGracePeriod();
 
@@ -69,6 +68,9 @@ export default async function InputPageServer({
     initialMorningClosed,
     initialAlreadyCompleted,
   };
+
+  const tDone = Date.now();
+  console.log(`[perf] /p/[token]/input total=${tDone - t0}ms (fetch=${tFetched - t0}ms, build=${tDone - tFetched}ms)`);
 
   return <InputClient token={token} initialData={initialData} />;
 }
