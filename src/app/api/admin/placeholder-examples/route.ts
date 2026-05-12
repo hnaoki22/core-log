@@ -22,6 +22,7 @@ import {
   type PlaceholderStoreData,
   type StoredExampleSet,
 } from "@/lib/placeholder-store";
+import { getDefaultExamples } from "@/lib/placeholder-examples";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: store ?? { approved: [], draft: [], updatedAt: null },
+      defaults: getDefaultExamples(),
       tenantId,
       tenantSlug: currentTenant?.slug ?? null,
       tenantName: currentTenant?.name ?? null,

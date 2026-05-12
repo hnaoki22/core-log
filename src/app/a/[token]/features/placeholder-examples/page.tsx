@@ -48,6 +48,10 @@ export default function PlaceholderExamplesAdminPage() {
   const [dojoPhase, setDojoPhase] = useState<string>("1");
   const [count, setCount] = useState(7);
 
+  // Default examples (hardcoded)
+  const [defaults, setDefaults] = useState<ExampleSet[]>([]);
+  const [showDefaults, setShowDefaults] = useState(false);
+
   // Tenant state
   const [tenantSlug, setTenantSlug] = useState<string | null>(null);
   const [tenantName, setTenantName] = useState<string | null>(null);
@@ -86,6 +90,7 @@ export default function PlaceholderExamplesAdminPage() {
       if (res.ok) {
         const json = await res.json();
         setStoreData(json.data);
+        setDefaults(json.defaults ?? []);
         setTenantSlug(json.tenantSlug ?? null);
         setTenantName(json.tenantName ?? null);
         setIsSuperAdmin(!!json.isSuperAdmin);
@@ -659,6 +664,74 @@ export default function PlaceholderExamplesAdminPage() {
               </p>
             </div>
           )}
+
+        {/* Default examples reference */}
+        {defaults.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-300 p-6 mb-6">
+            <button
+              onClick={() => setShowDefaults(!showDefaults)}
+              className="flex items-center justify-between w-full text-left"
+            >
+              <div>
+                <h2 className="text-lg font-bold text-[#1A1A2E]">
+                  デフォルト例示（ハードコード）
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  カスタム例示が未設定のテナントに表示される例示です。
+                  {storeData?.approved && storeData.approved.length > 0 && (
+                    <span className="text-emerald-600 ml-1">
+                      このテナントはカスタム例示で上書き済みです。
+                    </span>
+                  )}
+                </p>
+              </div>
+              <span className="text-gray-400 text-xl shrink-0 ml-4">
+                {showDefaults ? "▲" : "▼"}
+              </span>
+            </button>
+
+            {showDefaults && (
+              <div className="mt-4 space-y-4">
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-sm text-amber-800 font-medium">
+                    注意: 道場1・道場2の例示は大幸薬品の課題図書（7つの習慣、イシューからはじめよ等）に基づいています。
+                    他テナントでカスタム例示を設定していない場合、これらがそのまま表示されます。
+                  </p>
+                </div>
+                {defaults.map((set, setIdx) => (
+                  <div key={`default-${setIdx}`}>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded bg-gray-200 text-gray-700 text-xs">
+                        {phaseLabel(set.phase)}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-xs">
+                        {typeLabel(set.type)}
+                      </span>
+                      <span className="text-gray-400 text-xs">
+                        {set.examples.length}件
+                      </span>
+                    </h3>
+                    <div className="space-y-1">
+                      {set.examples.map((ex, exIdx) => (
+                        <div
+                          key={exIdx}
+                          className="p-2 bg-gray-50 rounded border border-gray-100 flex items-start gap-2"
+                        >
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-700">{ex.text}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {ex.source}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -326,6 +326,14 @@ export function getPlaceholderExample(params: {
   return candidates[idx].text;
 }
 
+/**
+ * ハードコードされたデフォルト例示を返す。
+ * admin UI でのプレビュー表示に使用。
+ */
+export function getDefaultExamples(): ExampleSet[] {
+  return EXAMPLES;
+}
+
 // テスト容易化のためエクスポート（UIからは使用しない）
 export const __internals = {
   EXAMPLES,
