@@ -302,10 +302,17 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchAdminData(selectedTenantSlug || undefined);
-    // Fetch phase labels for this tenant
-    fetch(`/api/admin/phase-labels?token=${token}`)
+    // Fetch phase labels for the currently-selected tenant. The query string
+    // must include `tenant=slug` for super-admins viewing a non-home tenant,
+    // otherwise the GET returns the wrong tenant's labels and a subsequent
+    // save silently writes to DEFAULT_TENANT_ID.
+    const tenantParam = selectedTenantSlug ? `&tenant=${selectedTenantSlug}` : "";
+    fetch(`/api/admin/phase-labels?token=${token}${tenantParam}`)
       .then((r) => r.json())
-      .then((d) => { if (d.labels && d.labels.length > 0) setPhaseLabels(d.labels); })
+      .then((d) => {
+        if (d.labels && d.labels.length > 0) setPhaseLabels(d.labels);
+        else setPhaseLabels([]);
+      })
       .catch(() => {/* keep empty */});
   }, [token, selectedTenantSlug]);
 
@@ -510,7 +517,10 @@ export default function AdminDashboard() {
   const handleSavePhaseLabels = async () => {
     setPhaseSaving(true);
     try {
-      const res = await fetch("/api/admin/phase-labels", {
+      // Include the selected tenant slug in the URL so super-admin writes
+      // go to the visible tenant, not their home/DEFAULT tenant.
+      const tenantParam = selectedTenantSlug ? `?tenant=${selectedTenantSlug}` : "";
+      const res = await fetch(`/api/admin/phase-labels${tenantParam}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, labels: phaseEditLabels }),
