@@ -1101,6 +1101,12 @@ export default function AdminDashboard() {
                       <p className="text-xs text-[#8B8489]">組織学習</p>
                     </a>
                   )}
+
+                  <a href={`/a/${token}/features/placeholder-examples`} className="card p-4 hover:shadow-md transition-shadow">
+                    <div className="text-2xl mb-2">💡</div>
+                    <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">例示管理</h3>
+                    <p className="text-xs text-[#8B8489]">AI例示生成・管理</p>
+                  </a>
                 </div>
               </div>
             )}

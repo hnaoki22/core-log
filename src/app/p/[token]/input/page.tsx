@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { getTodayJST, getCurrentHourJST, isGracePeriod } from "@/lib/date-utils";
-import { getPlaceholderExample } from "@/lib/placeholder-examples";
+import { getPlaceholderExample, type CustomExampleSet } from "@/lib/placeholder-examples";
 import { useState, useEffect, useRef } from "react";
 import { useFeatures } from "@/lib/use-features";
 import { StructuredInput } from "@/components/features/StructuredInput";
@@ -54,6 +54,7 @@ export default function InputPage() {
   const [isMorning, setIsMorning] = useState(true);
   const [morningClosed, setMorningClosed] = useState(false); // 12:00過ぎで朝未記入
   const [loadingStatus, setLoadingStatus] = useState(true);
+  const [customExamples, setCustomExamples] = useState<CustomExampleSet[] | null>(null);
   const [alreadyCompleted, setAlreadyCompleted] = useState(false);
   const [showDoubleLoop, setShowDoubleLoop] = useState(true);
   const [structuredInput, setStructuredInput] = useState<StructuredInputState>({
@@ -116,8 +117,6 @@ export default function InputPage() {
               setIsMorning(false);
             }
           } else if (hour >= 12 || inGracePeriod) {
-            // 12:00以降、または深夜0:00〜3:59（グレースピリオド＝前日扱い）
-            // → 朝はクローズ、本日の振り返りを表示
             setIsMorning(false);
             setMorningClosed(true);
           } else {
@@ -130,7 +129,22 @@ export default function InputPage() {
         setLoadingStatus(false);
       }
     }
+    // テナント別カスタム例示を取得（失敗してもハードコードにフォールバック）
+    async function fetchCustomExamples() {
+      try {
+        const res = await fetch(`/api/placeholder-examples?token=${token}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.examples && Array.isArray(data.examples) && data.examples.length > 0) {
+            setCustomExamples(data.examples);
+          }
+        }
+      } catch {
+        // Silent fail — hardcoded examples will be used
+      }
+    }
     checkTodayStatus();
+    fetchCustomExamples();
   }, [token, today]);
 
   const displayDate = now.toLocaleDateString("ja-JP", {
@@ -408,6 +422,7 @@ export default function InputPage() {
                       dojoPhase: participant.dojoPhase,
                       date: today,
                       type: isMorning ? "morning" : "evening",
+                      customExamples,
                     })}
                     className="input-field min-h-[200px] resize-none leading-relaxed pr-12"
                   />

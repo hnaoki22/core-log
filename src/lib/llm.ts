@@ -439,3 +439,110 @@ JSON形式で回答：
     }
   );
 }
+
+// ---------------------------------------------------------------------------
+// Placeholder Example Generation (AI-powered)
+// ---------------------------------------------------------------------------
+
+export type GeneratedExampleSet = {
+  phase: number | "universal";
+  type: "morning" | "evening";
+  examples: { text: string; source: string }[];
+};
+
+export type PlaceholderGenerationResult = {
+  sets: GeneratedExampleSet[];
+  summary: string;
+};
+
+/**
+ * クライアントのMVV（ミッション・ビジョン・バリュー）、課題図書、
+ * 道場ステージ情報からプレースホルダー例示を自動生成する。
+ *
+ * @param input.mvv - クライアントのミッション・ビジョン・バリュー（テキスト）
+ * @param input.courseBooks - 課題図書の概要（書名とキーコンセプトのリスト）
+ * @param input.dojoPhase - 対象の道場ステージ番号（1-7）、またはnullでユニバーサル生成
+ * @param input.groundRules - グラウンドルール（CORE: Compress/Open up/Reframe/Execute first）
+ * @param input.existingExamples - 参考用の既存例示（オプション）
+ * @param input.count - 各セット（朝/夕）あたりの生成数（デフォルト7）
+ */
+export async function generatePlaceholderExamples(input: {
+  mvv: string;
+  courseBooks: string;
+  dojoPhase: number | null;
+  groundRules?: string;
+  existingExamples?: string;
+  count?: number;
+}): Promise<PlaceholderGenerationResult> {
+  const count = input.count ?? 7;
+  const phaseLabel = input.dojoPhase ? `道場${input.dojoPhase}` : "全道場共通（ユニバーサル）";
+  const groundRules = input.groundRules || `CORE グラウンドルール:
+- Compress: 無駄を圧縮する。「忙しい」を疑い、本当に必要なことに集中する
+- Open up: 空気を読んで飲み込まず、自分の考えを場に出す
+- Reframe: 「なぜこれをやっているのか」を問い直す。当たり前を疑う
+- Execute first: 完璧を待たず、60点で先に動く。行動から学ぶ`;
+
+  const existingRef = input.existingExamples
+    ? `\n\n## 参考：既存の例示（品質・トーンの基準として使ってください）\n${input.existingExamples}`
+    : "";
+
+  const systemPrompt = `あなたは組織開発プログラム「CORE」の設計者です。
+参加者が毎朝・毎夕の内省ログを記入する際に、入力欄にプレースホルダーとして表示する「問いの構え」を生成してください。
+
+## 設計原則
+1. 書き方の「処方箋」ではなく、参加者が1日を設計するための「問いの構え」を提示する
+2. グラウンドルール CORE（Compress / Open up / Reframe / Execute first）を軸に構成する
+3. クライアント企業のMVVと課題図書のエッセンスを自然に織り込む
+4. 具体的な行動レベルに落とし込む（抽象的な精神論ではなく、「今日○○してみる」レベル）
+5. 朝の意図：今日の1日をどう設計するか（前向き・行動志向）
+6. 夕の振り返り：今日の経験から何を学べるか（内省・気づき志向）
+7. 各例示は「例：」で始まる自然な日本語の1文（40-80文字程度）
+8. 同じフレーズの繰り返しを避け、多様な切り口を提供する
+
+## CORE グラウンドルール
+${groundRules}
+
+## 出力形式
+JSON形式で、朝と夕のセットを出力してください：
+{
+  "sets": [
+    {
+      "phase": ${input.dojoPhase ?? '"universal"'},
+      "type": "morning",
+      "examples": [
+        { "text": "例：...", "source": "出典メモ（課題図書名 × CORE軸）" }
+      ]
+    },
+    {
+      "phase": ${input.dojoPhase ?? '"universal"'},
+      "type": "evening",
+      "examples": [
+        { "text": "例：...", "source": "出典メモ" }
+      ]
+    }
+  ],
+  "summary": "生成した例示セットの概要説明（1-2文）"
+}
+
+朝・夕それぞれ${count}個ずつ生成してください。`;
+
+  const userContent = `## 対象ステージ
+${phaseLabel}
+
+## クライアント企業のMVV（ミッション・ビジョン・バリュー）
+${input.mvv}
+
+## 課題図書・教材情報
+${input.courseBooks}${existingRef}
+
+上記を踏まえて、朝の意図${count}個、夕の振り返り${count}個を生成してください。`;
+
+  return llmJson<PlaceholderGenerationResult>(
+    systemPrompt,
+    userContent,
+    {
+      sets: [],
+      summary: "生成に失敗しました。入力内容を確認してください。",
+    }
+  );
+}

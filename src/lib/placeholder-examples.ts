@@ -260,6 +260,16 @@ function seededIndex(seed: string, length: number): number {
 }
 
 /**
+ * テナント別カスタム例示セット。
+ * API から取得した例示データをこの型で渡すと、ハードコード例示より優先される。
+ */
+export type CustomExampleSet = {
+  phase: PhaseKey;
+  type: PlaceholderType;
+  examples: PlaceholderExample[];
+};
+
+/**
  * 道場ステージ・朝夕・参加者トークン・日付から、
  * 本日表示するプレースホルダーを1つ決定論的に選んで返す。
  *
@@ -267,19 +277,27 @@ function seededIndex(seed: string, length: number): number {
  *  - 同じ（token, date, type）なら常に同じ例を返す
  *  - 日付が変わると自然に別の例に切り替わる
  *  - 道場ステージ別の例が未整備（現状: 道場3〜7）の場合は CORE ユニバーサルにフォールバック
+ *  - customExamples が渡された場合、ハードコード例示より優先して使用する
  */
 export function getPlaceholderExample(params: {
   token: string;
   dojoPhase: string | undefined | null;
   date: string; // YYYY-MM-DD 形式（JST業務日）
   type: PlaceholderType;
+  /** テナント別カスタム例示（API経由で取得）。存在すればハードコードより優先 */
+  customExamples?: CustomExampleSet[] | null;
 }): string {
   const phaseNum = extractPhaseNumber(params.dojoPhase);
 
-  const phaseSet = EXAMPLES.find(
+  // カスタム例示が存在する場合、そちらを優先
+  const source = params.customExamples && params.customExamples.length > 0
+    ? params.customExamples
+    : EXAMPLES;
+
+  const phaseSet = source.find(
     (set) => set.phase === phaseNum && set.type === params.type
   );
-  const universalSet = EXAMPLES.find(
+  const universalSet = source.find(
     (set) => set.phase === "universal" && set.type === params.type
   );
 
@@ -288,9 +306,16 @@ export function getPlaceholderExample(params: {
       ? phaseSet.examples
       : universalSet?.examples ?? [];
 
+  // カスタム例示から候補が見つからない場合、ハードコードにフォールバック
+  if (candidates.length === 0 && params.customExamples && params.customExamples.length > 0) {
+    // カスタムにもユニバーサルにも該当なし → ハードコードで再試行
+    return getPlaceholderExample({
+      ...params,
+      customExamples: null,
+    });
+  }
+
   if (candidates.length === 0) {
-    // ここに到達するのは EXAMPLES から universal が失われた場合のみ。
-    // 通常は発生しないが、フォームが空プレースホルダーで出荷されるよりは明示的なメッセージを返す。
     return params.type === "morning"
       ? "今日ひとつだけ意識することを書いてみる"
       : "今日やってみてどうだったかを書いてみる";
