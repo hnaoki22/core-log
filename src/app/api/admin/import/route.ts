@@ -2,7 +2,7 @@
 // CSV一括インポート: 参加者・マネージャーを一括登録
 // CSV形式: name,email,department,role,dojoPhase,managerName
 //   role: "参加者" | "マネージャー" | "管理者" | "閲覧者"
-//   dojoPhase: 参加者のみ（省略時は "道場1 覚醒"）
+//   dojoPhase: 参加者のみ（省略時はテナント設定の最初のフェーズ、未設定なら空）
 //   managerName: 参加者のみ。上司の名前（先にマネージャー行を書くこと）
 
 import { NextRequest, NextResponse } from "next/server";
@@ -14,18 +14,9 @@ import {
   getAllManagersFromSupabase as getAllManagers,
   getAllParticipantsFromSupabase as getAllParticipants,
 } from "@/lib/supabase";
+import { getPhaseLabels } from "@/lib/phase-labels";
 
 export const dynamic = "force-dynamic";
-
-const VALID_DOJO_PHASES = [
-  "道場1 覚醒",
-  "道場2 探究",
-  "道場3 挑戦",
-  "道場4 変容",
-  "道場5 統合",
-  "道場6 共創",
-  "道場7 卒業",
-];
 
 type ImportRow = {
   line: number;
@@ -203,10 +194,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 既存データ取得（重複チェック用）
-    const [existingParticipants, existingManagers] = await Promise.all([
+    // 既存データ取得（重複チェック用）+ テナント別フェーズラベル
+    const [existingParticipants, existingManagers, validPhaseLabels] = await Promise.all([
       getAllParticipants(tenantId),
       getAllManagers(tenantId),
+      getPhaseLabels(tenantId),
     ]);
 
     const existingEmails = new Set([
@@ -249,12 +241,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // dojoPhaseバリデーション
-    for (const row of participantRows) {
-      if (row.dojoPhase && !VALID_DOJO_PHASES.includes(row.dojoPhase)) {
-        errors.push(
-          `行${row.line}: 道場フェーズ「${row.dojoPhase}」は無効です。選択肢: ${VALID_DOJO_PHASES.join(", ")}`
-        );
+    // dojoPhaseバリデーション（テナント設定のフェーズラベルと照合）
+    if (validPhaseLabels.length > 0) {
+      for (const row of participantRows) {
+        if (row.dojoPhase && !validPhaseLabels.includes(row.dojoPhase)) {
+          errors.push(
+            `行${row.line}: フェーズ「${row.dojoPhase}」は無効です。選択肢: ${validPhaseLabels.join(", ")}`
+          );
+        }
       }
     }
 
@@ -316,7 +310,7 @@ export async function POST(request: NextRequest) {
           email: r.email,
           role: r.role,
           department: r.department,
-          dojoPhase: r.dojoPhase || "道場1 覚醒",
+          dojoPhase: r.dojoPhase || validPhaseLabels[0] || "",
           managerName: r.managerName,
           isDuplicate: existingEmails.has(r.email.toLowerCase()),
         })),
@@ -400,7 +394,7 @@ export async function POST(request: NextRequest) {
           name: row.name,
           email: row.email,
           department: row.department,
-          dojoPhase: row.dojoPhase || "道場1 覚醒",
+          dojoPhase: row.dojoPhase || validPhaseLabels[0] || "",
           managerId,
           fbPolicy: "",
         },
@@ -462,10 +456,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
+  // テナントのフェーズラベルを取得してテンプレートに反映
+  const manager = await getManagerByToken(token);
+  const tenantId = manager?.tenantId || "";
+  const labels = await getPhaseLabels(tenantId);
+  const examplePhase = labels[0] || "フェーズ1";
+
   const template = `name,email,department,role,dojoPhase,managerName
 田中太郎,tanaka@example.com,営業部,マネージャー,,
-佐藤花子,sato@example.com,営業部,参加者,道場1 覚醒,田中太郎
-鈴木一郎,suzuki@example.com,人事部,参加者,道場1 覚醒,田中太郎`;
+佐藤花子,sato@example.com,営業部,参加者,${examplePhase},田中太郎
+鈴木一郎,suzuki@example.com,人事部,参加者,${examplePhase},田中太郎`;
 
   return new NextResponse(template, {
     headers: {

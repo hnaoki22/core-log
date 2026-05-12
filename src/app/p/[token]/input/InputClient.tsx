@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { getTodayJST, getCurrentHourJST, isGracePeriod } from "@/lib/date-utils";
-import { getPlaceholderExample } from "@/lib/placeholder-examples";
+import { getPlaceholderExample, type CustomExampleSet } from "@/lib/placeholder-examples";
 import { useState, useEffect, useRef } from "react";
 import { useFeatures } from "@/lib/use-features";
 import { StructuredInput } from "@/components/features/StructuredInput";
@@ -71,6 +71,9 @@ export default function InputPage({ token, initialData }: Props) {
   // loadingStatus retained only to keep the diff readable; first paint is
   // already populated by the Server Component parent.
   const [alreadyCompleted, setAlreadyCompleted] = useState(initialData.initialAlreadyCompleted);
+  // テナント別カスタム例示 (main 由来) — fetch しないと null。Server Component 親は
+  // 例示を server 取得していないので、background fetch する。
+  const [customExamples, setCustomExamples] = useState<CustomExampleSet[] | null>(null);
   const [showDoubleLoop, setShowDoubleLoop] = useState(true);
   const [structuredInput, setStructuredInput] = useState<StructuredInputState>({
     fact: "",
@@ -142,6 +145,19 @@ export default function InputPage({ token, initialData }: Props) {
         }
       } catch {
         // ignore — keep server-rendered initial state
+      }
+    })();
+    // テナント別カスタム例示は server 取得していないので background で fetch
+    (async () => {
+      try {
+        const res = await fetch(`/api/placeholder-examples?token=${token}`);
+        if (cancelled || !res.ok) return;
+        const data = await res.json();
+        if (data.examples && Array.isArray(data.examples) && data.examples.length > 0) {
+          setCustomExamples(data.examples);
+        }
+      } catch {
+        // Silent — hardcoded examples will be used as fallback
       }
     })();
     return () => { cancelled = true; };
@@ -414,6 +430,7 @@ export default function InputPage({ token, initialData }: Props) {
                       dojoPhase: participant.dojoPhase,
                       date: today,
                       type: isMorning ? "morning" : "evening",
+                      customExamples,
                     })}
                     className="input-field min-h-[200px] resize-none leading-relaxed pr-12"
                   />

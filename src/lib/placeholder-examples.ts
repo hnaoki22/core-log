@@ -3,13 +3,13 @@
  *
  * 設計思想：
  *  - 書き方の「処方箋」ではなく、参加者が1日を設計するための「問いの構え」を提示する
- *  - グラウンドルール CORE（Compress / Open up / Reframe / Execute first）を軸に、
- *    各道場ステージの課題図書のエッセンスを織り込む
- *  - 道場ステージ別に候補を持ち、対応が未整備のステージは CORE ユニバーサル例示にフォールバック
+ *  - グラウンドルール CORE（Compress / Open up / Reframe / Execute first）を軸にした汎用例示
+ *  - テナント固有の例示（課題図書に紐づくもの等）は ai_settings テーブルにカスタム例示として保存
  *  - 参加者トークン × 日付から決定論的に1つを選択（同じ日は一貫して同じ例、日替わりで変化）
+ *  - カスタム例示が存在すればそちらを優先、なければこのハードコードにフォールバック
  *
- * 道場1 課題図書：7つの習慣 / コンサル1年目が学ぶこと / リーダーシップの旅
- * 道場2・道場3 以降：未定のため CORE ユニバーサルを利用
+ * 注意: 2026-05-12 にテナント固有の道場1・道場2例示（大幸薬品の課題図書に基づくもの）を
+ *        DBに移行し、ハードコードは CORE ユニバーサル（全テナント共通）のみに縮小した。
  */
 
 export type PlaceholderType = "morning" | "evening";
@@ -30,85 +30,15 @@ type ExampleSet = {
 };
 
 /**
- * 例示データ本体。
- * 追加・編集時は設計思想（抽象度・CORE軸・課題図書との紐付け）を守ること。
+ * デフォルト例示データ本体（CORE ユニバーサルのみ）。
+ *
+ * テナント固有の道場別例示（課題図書に紐づくもの）は DB の ai_settings に保存する。
+ * ここにはどのテナントでも使える汎用的な CORE グラウンドルール例示のみを置く。
+ * 全道場で共通のフォールバック先として機能する。
  */
 const EXAMPLES: ExampleSet[] = [
   // ─────────────────────────────────────────
-  // 道場1 覚醒
-  // 課題図書：7つの習慣 / コンサル1年目が学ぶこと / リーダーシップの旅
-  // ─────────────────────────────────────────
-  {
-    phase: 1,
-    type: "morning",
-    examples: [
-      {
-        text: "例：今日の会議で、自分の意見を返す前にまず相手の主張を完全に理解することを試してみる",
-        source: "7つの習慣 第5 × O",
-      },
-      {
-        text: "例：着手する前に「このタスク、本当に自分がやる必要があるか」と3秒立ち止まってみる",
-        source: "7つの習慣 第3 × C",
-      },
-      {
-        text: "例：今日の打ち合わせで、結論を最初に一文で言い切ってから説明に入る練習をする",
-        source: "コンサル1年目 結論から話す × O",
-      },
-      {
-        text: "例：「いつもこうだから」と感じた瞬間に、その理由を自分に問い直してみる",
-        source: "リーダーシップの旅 見えないものを見る × R",
-      },
-      {
-        text: "例：今日自分が本当に影響できることと、できないことを書き出してから仕事を始める",
-        source: "7つの習慣 第1 影響の輪 × R",
-      },
-      {
-        text: "例：迷っている資料は完成度60%のまま、今日中に上司か同僚の目に通す",
-        source: "コンサル1年目 QND × E",
-      },
-      {
-        text: "例：今日の仕事の「終わり」——何が達成できていれば成功か——を先に描いてから動く",
-        source: "7つの習慣 第2 × R",
-      },
-    ],
-  },
-  {
-    phase: 1,
-    type: "evening",
-    examples: [
-      {
-        text: "例：今日、「引っかかった」のに空気を読んで飲み込んだ瞬間はなかっただろうか",
-        source: "グラウンドルール O",
-      },
-      {
-        text: "例：今日自分が話した内容のうち、どこまでが「事実」でどこからが「自分の解釈」だっただろうか",
-        source: "コンサル1年目 事実と意見を分ける × O",
-      },
-      {
-        text: "例：「忙しい」と言いそうになった場面を思い出して、その忙しさは本当に必要だったか振り返る",
-        source: "グラウンドルール C",
-      },
-      {
-        text: "例：今日やった業務のうち、「なぜやっているか3秒で説明できるもの」はいくつあっただろうか",
-        source: "グラウンドルール R",
-      },
-      {
-        text: "例：60点で出したこと、100点を目指して手元で止めたことを数えてみる",
-        source: "コンサル1年目 QND × E",
-      },
-      {
-        text: "例：相手の話を聞く前に、自分の答えを準備していた瞬間はなかっただろうか",
-        source: "7つの習慣 第5 × O",
-      },
-      {
-        text: "例：今日起きた想定外の出来事を、「人のせい」ではなく「自分の選択」として説明できるだろうか",
-        source: "7つの習慣 第1 主体性 × R",
-      },
-    ],
-  },
-
-  // ─────────────────────────────────────────
-  // CORE ユニバーサル（全道場共通・フォールバック先）
+  // CORE ユニバーサル（全道場共通・全テナント共通のフォールバック）
   // グラウンドルール CORE の4文字をそのまま行動指針に落とした最小セット
   // ─────────────────────────────────────────
   {
@@ -185,26 +115,44 @@ function seededIndex(seed: string, length: number): number {
 }
 
 /**
+ * テナント別カスタム例示セット。
+ * API から取得した例示データをこの型で渡すと、ハードコード例示より優先される。
+ */
+export type CustomExampleSet = {
+  phase: PhaseKey;
+  type: PlaceholderType;
+  examples: PlaceholderExample[];
+};
+
+/**
  * 道場ステージ・朝夕・参加者トークン・日付から、
  * 本日表示するプレースホルダーを1つ決定論的に選んで返す。
  *
  * 特徴：
  *  - 同じ（token, date, type）なら常に同じ例を返す
  *  - 日付が変わると自然に別の例に切り替わる
- *  - 道場ステージ別の例が未整備（現状: 道場2〜7）の場合は CORE ユニバーサルにフォールバック
+ *  - 道場ステージ別の例が未整備（現状: 道場3〜7）の場合は CORE ユニバーサルにフォールバック
+ *  - customExamples が渡された場合、ハードコード例示より優先して使用する
  */
 export function getPlaceholderExample(params: {
   token: string;
   dojoPhase: string | undefined | null;
   date: string; // YYYY-MM-DD 形式（JST業務日）
   type: PlaceholderType;
+  /** テナント別カスタム例示（API経由で取得）。存在すればハードコードより優先 */
+  customExamples?: CustomExampleSet[] | null;
 }): string {
   const phaseNum = extractPhaseNumber(params.dojoPhase);
 
-  const phaseSet = EXAMPLES.find(
+  // カスタム例示が存在する場合、そちらを優先
+  const source = params.customExamples && params.customExamples.length > 0
+    ? params.customExamples
+    : EXAMPLES;
+
+  const phaseSet = source.find(
     (set) => set.phase === phaseNum && set.type === params.type
   );
-  const universalSet = EXAMPLES.find(
+  const universalSet = source.find(
     (set) => set.phase === "universal" && set.type === params.type
   );
 
@@ -213,9 +161,16 @@ export function getPlaceholderExample(params: {
       ? phaseSet.examples
       : universalSet?.examples ?? [];
 
+  // カスタム例示から候補が見つからない場合、ハードコードにフォールバック
+  if (candidates.length === 0 && params.customExamples && params.customExamples.length > 0) {
+    // カスタムにもユニバーサルにも該当なし → ハードコードで再試行
+    return getPlaceholderExample({
+      ...params,
+      customExamples: null,
+    });
+  }
+
   if (candidates.length === 0) {
-    // ここに到達するのは EXAMPLES から universal が失われた場合のみ。
-    // 通常は発生しないが、フォームが空プレースホルダーで出荷されるよりは明示的なメッセージを返す。
     return params.type === "morning"
       ? "今日ひとつだけ意識することを書いてみる"
       : "今日やってみてどうだったかを書いてみる";
@@ -224,6 +179,14 @@ export function getPlaceholderExample(params: {
   const seed = `${params.token}-${params.date}-${params.type}`;
   const idx = seededIndex(seed, candidates.length);
   return candidates[idx].text;
+}
+
+/**
+ * ハードコードされたデフォルト例示を返す。
+ * admin UI でのプレビュー表示に使用。
+ */
+export function getDefaultExamples(): ExampleSet[] {
+  return EXAMPLES;
 }
 
 // テスト容易化のためエクスポート（UIからは使用しない）
