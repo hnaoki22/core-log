@@ -438,7 +438,7 @@ export async function GET(request: NextRequest) {
 
   // テナントのフェーズラベルを取得してテンプレートに反映
   const manager = await getManagerByToken(token);
-  const tenantId = manager?.tenantId || DEFAULT_TENANT_ID;
+  const tenantId = manager?.tenantId || "";
   const labels = await getPhaseLabels(tenantId);
   const examplePhase = labels[0] || "フェーズ1";
 
