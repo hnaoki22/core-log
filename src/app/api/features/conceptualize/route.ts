@@ -93,13 +93,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Fetch last 5 days of logs
+    // Fetch last 7 calendar days' worth of logs (NOT last 5 entries — a
+    // sporadic user's most recent 5 entries can span a month, which made
+    // the "weekly concepts" misleading and the week_start/end_date columns
+    // lie about coverage).
     const allLogs = await getLogsByParticipant(participant.name, participant.tenantId);
-    const recentLogs = allLogs.slice(0, 5).reverse(); // Last 5 days, chronological order
+    const sevenDaysAgoStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    const recentLogs = allLogs
+      .filter((log) => log.date && log.date >= sevenDaysAgoStr)
+      .sort((a, b) => a.date.localeCompare(b.date));
 
     if (recentLogs.length === 0) {
       return NextResponse.json(
-        { error: "Not enough logs to generate concepts. Need at least 1 log." },
+        { error: "Not enough logs to generate concepts. Need at least 1 log in the past 7 days." },
         { status: 400 }
       );
     }

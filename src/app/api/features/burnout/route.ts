@@ -102,12 +102,16 @@ export async function GET(req: NextRequest) {
           ? energyScores.reduce((a, b) => a + b, 0) / energyScores.length
           : 2;
 
-      // Calculate entry rate (completion rate)
-      const totalDays = Math.min(logs?.length || 0, 14);
+      // Calculate entry rate (completion rate) against the 14-day window.
+      // Previously this used Math.min(logs.length, 14) as the denominator,
+      // which made the rate always 100% for sparse users (1 log = 1/1).
+      // That inverted the signal — burnout detection cares most about
+      // disengaged users, who should score WORSE on entry rate, not better.
+      const ENTRY_RATE_WINDOW_DAYS = 14;
       const completedDays = (logs || []).filter(
         (log: LogEntry) => log.status === "complete"
       ).length;
-      const entryRate = totalDays > 0 ? completedDays / totalDays : 0;
+      const entryRate = Math.min(completedDays / ENTRY_RATE_WINDOW_DAYS, 1);
 
       // Fetch rumination scores
       const { data: ruminationData } = await client

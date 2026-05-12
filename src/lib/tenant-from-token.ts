@@ -7,14 +7,30 @@
 
 import { getParticipantByToken, getManagerByToken } from "./participant-db";
 
-const cache = new Map<string, { tenantId: string | null; at: number }>();
-const CACHE_TTL_MS = 30 * 1000; // 30s — feature checks are read-heavy
+// Bounded positive-result cache. We only cache successful resolutions because
+// caching null lookups can lock a freshly-created participant out of feature
+// access until the cache entry expires (e.g., right after CSV import). LRU
+// bound protects against memory growth from random-token probing.
+const CACHE_TTL_MS = 30 * 1000;
+const CACHE_MAX_ENTRIES = 5000;
+const cache = new Map<string, { tenantId: string; at: number }>();
+
+function setCached(token: string, tenantId: string): void {
+  if (cache.size >= CACHE_MAX_ENTRIES) {
+    // Map preserves insertion order — drop the oldest entry. Cheap enough at
+    // this scale that we don't need a real LRU.
+    const oldestKey = cache.keys().next().value;
+    if (oldestKey !== undefined) cache.delete(oldestKey);
+  }
+  cache.set(token, { tenantId, at: Date.now() });
+}
 
 export async function resolveTenantFromToken(
   token: string
 ): Promise<string | null> {
   const cached = cache.get(token);
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.tenantId;
+  if (cached) cache.delete(token); // expired
 
   // Admin tokens are prefixed mgr_; participant tokens are not. Try manager
   // first when the prefix matches, otherwise participant first. Fall back to
@@ -37,6 +53,6 @@ export async function resolveTenantFromToken(
     }
   }
 
-  cache.set(token, { tenantId, at: Date.now() });
+  if (tenantId) setCached(token, tenantId);
   return tenantId;
 }

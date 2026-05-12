@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 // Extend Window for SpeechRecognition (vendor-prefixed in some browsers)
 interface SpeechRecognitionEvent extends Event {
@@ -41,6 +41,13 @@ export function VoiceInputButton({ onTextReceived }: VoiceInputProps) {
   const handleStartRecording = useCallback(() => {
     setError("");
 
+    // If a session is already in flight, ignore. Previously a double-tap
+    // could create two recognition instances; the first one's onend would
+    // then flip isRecording off and orphan the second.
+    if (recognitionRef.current) {
+      return;
+    }
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setError("このブラウザは音声入力に対応していません");
@@ -70,10 +77,12 @@ export function VoiceInputButton({ onTextReceived }: VoiceInputProps) {
       } else {
         setError("音声認識エラーが発生しました");
       }
+      recognitionRef.current = null;
       setIsRecording(false);
     };
 
     recognition.onend = () => {
+      recognitionRef.current = null;
       setIsRecording(false);
     };
 
@@ -85,8 +94,20 @@ export function VoiceInputButton({ onTextReceived }: VoiceInputProps) {
   const handleStopRecording = useCallback(() => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
+      // recognitionRef nulled in onend
       setIsRecording(false);
     }
+  }, []);
+
+  // Stop any in-flight recognition when the component unmounts so the mic
+  // indicator and ongoing session don't leak across route changes.
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch { /* ignore */ }
+        recognitionRef.current = null;
+      }
+    };
   }, []);
 
   if (!isSupported) {
@@ -104,7 +125,9 @@ export function VoiceInputButton({ onTextReceived }: VoiceInputProps) {
       {error && <span className="text-xs text-red-600">{error}</span>}
 
       <button
+        type="button"
         onClick={isRecording ? handleStopRecording : handleStartRecording}
+        aria-label={isRecording ? "録音を停止" : "音声入力を開始"}
         className={`p-2 rounded-lg transition-colors ${
           isRecording
             ? "bg-red-100 text-red-600 hover:bg-red-200"

@@ -2,7 +2,7 @@
 // Returns all CORE Log entries for a participant
 
 import { NextRequest, NextResponse } from "next/server";
-import { getLogsByParticipant, getMissionsByParticipant, getMissionComments, getFeedbackByParticipant } from "@/lib/supabase";
+import { getLogsByParticipant, getMissionsByParticipant, getMissionCommentsBatch, getFeedbackByParticipant } from "@/lib/supabase";
 import { getParticipantByToken } from "@/lib/participant-db";
 import { computeParticipantStats } from "@/lib/stats";
 import { getTodayJST } from "@/lib/date-utils";
@@ -38,22 +38,19 @@ export async function GET(request: NextRequest) {
       log.hasFeedback && (log.hmFeedback || log.managerComment)
   );
 
-  // Count missions with manager comments in the last 7 days
-  let missionBadgeCount = 0;
+  // Count missions with manager comments in the last 7 days.
+  // Single batched query instead of N getMissionComments calls — was O(N) DB
+  // roundtrips for a participant with many missions.
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
+  const commentsByMission = await getMissionCommentsBatch(
+    missions.map((m) => m.id),
+    { sinceIso: sevenDaysAgo.toISOString() }
+  );
+  let missionBadgeCount = 0;
   for (const mission of missions) {
-    const comments = await getMissionComments(mission.id);
-    const hasManagerComment = comments.some(
-      (comment: { authorRole?: string; createdAt?: string }) => {
-        if (comment.authorRole !== "manager") return false;
-        if (!comment.createdAt) return false;
-        const commentDate = new Date(comment.createdAt);
-        return commentDate >= sevenDaysAgo;
-      }
-    );
-    if (hasManagerComment) {
+    const comments = commentsByMission.get(mission.id) || [];
+    if (comments.some((c) => c.authorRole === "manager")) {
       missionBadgeCount++;
     }
   }

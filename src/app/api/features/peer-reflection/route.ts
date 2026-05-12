@@ -38,15 +38,21 @@ export async function POST(req: NextRequest) {
     if (!participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const tenantId = participant.tenantId || "default";
+    if (!participant.tenantId) {
+      return NextResponse.json({ error: "Tenant unresolved" }, { status: 500 });
+    }
+    const tenantId = participant.tenantId;
 
-    // Look up the target participant's name
+    // Look up the target participant — REQUIRE the same tenant so a sender
+    // in tenant A cannot create a peer_reflections row pointing at a
+    // recipient in tenant B by guessing the recipient's id.
     const client = getClient();
     const { data: targetParticipant } = await client
       .from("participants")
       .select("id, name")
       .eq("id", toParticipantId)
-      .single();
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
 
     if (!targetParticipant) {
       return NextResponse.json(

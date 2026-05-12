@@ -582,7 +582,12 @@ type FlagMap = Record<string, boolean>;
 
 // Per-tenant cache so multiple tenants don't invalidate each other.
 const cacheByTenant = new Map<string, { data: FlagMap; at: number }>();
-const CACHE_TTL_MS = 5 * 1000;
+// 60s TTL — flags rarely change, and middleware runs on every request so a
+// short TTL was creating an effective ~50-150ms Supabase round-trip on the
+// hot path for every cache miss. Admin edits still flush the cache directly
+// via invalidateFlagCache() on write, so users see updates within milliseconds
+// of an admin toggle.
+const CACHE_TTL_MS = 60 * 1000;
 
 function defaultFlagsFor(): FlagMap {
   const flags: FlagMap = {};

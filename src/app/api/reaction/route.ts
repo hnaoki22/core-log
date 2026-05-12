@@ -24,13 +24,19 @@ export async function POST(request: NextRequest) {
     if (!manager) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
+    if (!manager.tenantId) {
+      return NextResponse.json({ error: "Tenant unresolved" }, { status: 500 });
+    }
 
     // Validate reaction
     if (!ALLOWED_REACTIONS.includes(reaction)) {
       return NextResponse.json({ error: "Invalid reaction" }, { status: 400 });
     }
 
-    const result = await toggleManagerReaction(logEntryId, reaction);
+    // Scope the toggle to the manager's tenant so reactions on logs from
+    // other tenants are rejected (manager.tenantId comes from the verified
+    // token lookup above).
+    const result = await toggleManagerReaction(logEntryId, reaction, manager.tenantId);
     if (!result.success) {
       return NextResponse.json({ error: "Failed to update reaction" }, { status: 500 });
     }

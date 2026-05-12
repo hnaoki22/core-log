@@ -8,12 +8,31 @@ import { sendNotificationEmail } from "@/lib/email";
 
 export async function GET(request: NextRequest) {
   const missionId = request.nextUrl.searchParams.get("missionId");
+  const token = request.nextUrl.searchParams.get("token");
 
   if (!missionId) {
     return NextResponse.json({ error: "missionId required" }, { status: 400 });
   }
+  if (!token) {
+    return NextResponse.json({ error: "token required" }, { status: 401 });
+  }
 
   try {
+    const manager = await getManagerByToken(token);
+    const participant = !manager ? await getParticipantByToken(token) : null;
+    const tenantId = manager?.tenantId || participant?.tenantId;
+    if (!tenantId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    // Verify mission belongs to caller's tenant (and to the participant if
+    // the caller is one) before exposing its comments.
+    const mission = await getMissionById(missionId);
+    if (!mission || mission.tenantId !== tenantId) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    if (participant && mission.participantName !== participant.name) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const comments = await getMissionComments(missionId);
     return NextResponse.json({ comments });
   } catch (error) {
@@ -41,11 +60,25 @@ export async function POST(request: NextRequest) {
     if (!manager && !participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
+    const tenantId = manager?.tenantId || participant?.tenantId;
+    if (!tenantId) {
+      return NextResponse.json({ error: "Tenant unresolved" }, { status: 500 });
+    }
+
+    // Verify the mission belongs to caller's tenant; for participant authors
+    // also enforce that they own the mission they are commenting on.
+    const targetMission = await getMissionById(missionId);
+    if (!targetMission || targetMission.tenantId !== tenantId) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    if (participant && targetMission.participantName !== participant.name) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const authorName = manager?.name || participant?.name || "";
     const authorRole: "manager" | "participant" = manager ? "manager" : "participant";
 
-    const success = await addMissionComment(missionId, authorName, authorRole, comment);
+    const success = await addMissionComment(missionId, authorName, authorRole, comment, tenantId);
 
     if (!success) {
       return NextResponse.json({ error: "Failed to add comment" }, { status: 500 });
@@ -54,10 +87,9 @@ export async function POST(request: NextRequest) {
     // Send notification email to the other party (non-blocking)
     try {
       if (manager) {
-        // Manager commented â notify participant
-        const mission = await getMissionById(missionId);
-        if (mission) {
-          const targetParticipant = await getParticipantByName(mission.participantName);
+        // Manager commented — notify participant
+        if (targetMission) {
+          const targetParticipant = await getParticipantByName(targetMission.participantName, tenantId);
           if (targetParticipant?.email && !targetParticipant.email.includes("example.com")) {
             await sendNotificationEmail({
               to: targetParticipant.email,
@@ -112,10 +144,17 @@ export async function PATCH(request: NextRequest) {
     if (!manager && !participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
+    const tenantId = manager?.tenantId || participant?.tenantId;
+    const authorName = manager?.name || participant?.name;
+    if (!tenantId || !authorName) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    const success = await updateMissionComment(commentId, newBody.trim());
+    // updateMissionComment enforces tenant scope and that the caller is the
+    // original author. Returns false on any mismatch (treated as 403).
+    const success = await updateMissionComment(commentId, newBody.trim(), tenantId, authorName);
     if (!success) {
-      return NextResponse.json({ error: "Failed to update comment" }, { status: 500 });
+      return NextResponse.json({ error: "Forbidden or not found" }, { status: 403 });
     }
 
     return NextResponse.json({ success: true });
@@ -143,10 +182,15 @@ export async function DELETE(request: NextRequest) {
     if (!manager && !participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
+    const tenantId = manager?.tenantId || participant?.tenantId;
+    const authorName = manager?.name || participant?.name;
+    if (!tenantId || !authorName) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    const success = await deleteMissionComment(commentId);
+    const success = await deleteMissionComment(commentId, tenantId, authorName);
     if (!success) {
-      return NextResponse.json({ error: "Failed to delete comment" }, { status: 500 });
+      return NextResponse.json({ error: "Forbidden or not found" }, { status: 403 });
     }
 
     return NextResponse.json({ success: true });

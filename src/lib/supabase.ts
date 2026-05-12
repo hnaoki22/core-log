@@ -1,7 +1,12 @@
 /**
  * Supabase backend for CORE Log multi-tenant system.
  * Provides the same interface as notion.ts so the frontend can switch backends per tenant.
+ *
+ * IMPORTANT: this module uses SUPABASE_SERVICE_ROLE_KEY which MUST NOT ship
+ * to the browser. The `server-only` import causes the build to fail loudly
+ * if any client component ever imports this file (directly or transitively).
  */
+import "server-only";
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "./logger";
@@ -24,8 +29,18 @@ let _client: SupabaseClient | null = null;
 export function getClient(): SupabaseClient {
   if (_client) return _client;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) throw new Error("Supabase credentials not configured");
+  // Require service role explicitly. The previous code silently fell back to
+  // NEXT_PUBLIC_SUPABASE_ANON_KEY, which (a) is exposed to the browser bundle,
+  // and (b) hits RLS — the RLS migration enables deny-all policies on every
+  // tenant table, so anon-keyed queries would return empty arrays without an
+  // error. Failing loudly here surfaces the misconfiguration immediately.
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error(
+      "Supabase server credentials not configured. " +
+      "Set NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL) AND SUPABASE_SERVICE_ROLE_KEY.",
+    );
+  }
   _client = createClient(url, key, {
     global: {
       fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }),
@@ -88,6 +103,7 @@ export type NotionManager = {
 
 export type MissionEntry = {
   id: string;
+  tenantId: string;
   title: string;
   participantName: string;
   setDate: string;
@@ -198,6 +214,7 @@ function rowToManager(r: any): NotionManager & { role?: string } {
 function rowToMission(r: any): MissionEntry {
   return {
     id: r.id,
+    tenantId: r.tenant_id,
     title: r.title,
     participantName: r.participant_name,
     setDate: r.set_date || "",
@@ -238,12 +255,38 @@ function rowToFeedback(r: any): NotionFeedback {
 // ---------------------------------------------------------------------------
 // Tenant resolution helper — every query is scoped by tenant_id
 // ---------------------------------------------------------------------------
+//
+// Tenant rows almost never change — slug ↔ id mapping is essentially static
+// for the lifetime of a deploy. The hot path (every protected request runs
+// through tenant resolution) used to issue one Supabase round trip per call.
+// A small in-process cache cuts that to ~one per cold start per tenant.
+//
+// `getClient()` enforces `cache: "no-store"` so we can't lean on Next.js'
+// fetch cache. The TTL here is short enough that admin-side rename ops
+// surface within a minute on a serverless instance.
+const TENANT_CACHE_TTL_MS = 60 * 1000;
+const tenantIdBySlugCache = new Map<string, { id: string | null; at: number }>();
+const tenantBySlugCache = new Map<
+  string,
+  { value: { id: string; name: string; slug: string; companyName: string; featureFlags: Record<string, boolean> } | null; at: number }
+>();
+const tenantByIdCache = new Map<
+  string,
+  { value: { id: string; name: string; slug: string; companyName: string } | null; at: number }
+>();
+let allTenantsCache: { value: { id: string; name: string; slug: string; companyName: string; plan: string }[]; at: number } | null = null;
+
 async function getTenantIdBySlug(slug: string): Promise<string | null> {
+  const hit = tenantIdBySlugCache.get(slug);
+  if (hit && Date.now() - hit.at < TENANT_CACHE_TTL_MS) return hit.id;
+
   const { data, error } = await getClient().from("tenants").select("id").eq("slug", slug).single();
   if (error) {
     logger.error("Query failed", { error: error.message, slug });
   }
-  return data?.id ?? null;
+  const id = data?.id ?? null;
+  tenantIdBySlugCache.set(slug, { id, at: Date.now() });
+  return id;
 }
 
 // ---------------------------------------------------------------------------
@@ -266,14 +309,30 @@ export async function getLogsByParticipant(
   return data.map(rowToLog);
 }
 
-// Batch: fetch ALL logs for a tenant (or all tenants) in one query (for admin dashboard)
+// Batch: fetch logs for a tenant (or all tenants) in one query — used by the
+// admin dashboard. Defaults to a 90-day window so a long-running tenant
+// doesn't pull months of historical rows on every page render, and caps the
+// result at MAX_LOGS to bound the response size if a tenant ever lands above
+// that volume.
+const ADMIN_LOGS_DEFAULT_WINDOW_DAYS = 90;
+const ADMIN_LOGS_MAX_ROWS = 5000;
+
 export async function getAllLogsForTenant(
-  tenantId?: string
+  tenantId?: string,
+  options?: { sinceDate?: string; limit?: number },
 ): Promise<Map<string, NotionLogEntry[]>> {
+  const since = options?.sinceDate
+    ?? new Date(Date.now() - ADMIN_LOGS_DEFAULT_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+  const limit = Math.min(options?.limit ?? ADMIN_LOGS_MAX_ROWS, ADMIN_LOGS_MAX_ROWS);
+
   let query = getClient()
     .from("logs")
     .select("*")
-    .order("date", { ascending: false });
+    .gte("date", since)
+    .order("date", { ascending: false })
+    .limit(limit);
   if (tenantId) {
     query = query.eq("tenant_id", tenantId);
   }
@@ -317,15 +376,17 @@ export async function hasLoggedToday(
 }
 
 export async function getLogEntryOwner(
-  pageId: string
+  pageId: string,
+  tenantId: string
 ): Promise<string | null> {
   const { data, error } = await getClient()
     .from("logs")
     .select("participant_name")
     .eq("id", pageId)
-    .single();
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
   if (error) {
-    logger.error("Query failed", { error: error.message, pageId });
+    logger.error("Query failed", { error: error.message, pageId, tenantId });
   }
   return data?.participant_name ?? null;
 }
@@ -470,7 +531,8 @@ export async function createEveningOnlyEntry(
 
 export async function addManagerComment(
   pageId: string,
-  comment: string
+  comment: string,
+  tenantId: string
 ): Promise<boolean> {
   const now = new Date();
   const updateData = {
@@ -481,13 +543,14 @@ export async function addManagerComment(
     .from("logs")
     .update(updateData)
     .eq("id", pageId)
+    .eq("tenant_id", tenantId)
     .select("id");
   if (error) {
     logger.error("Update failed", { error: error.message, pageId });
     return false;
   }
   if (!updated || updated.length === 0) {
-    logger.warn("Update matched 0 rows", { pageId });
+    logger.warn("Update matched 0 rows", { pageId, tenantId });
     return false;
   }
   return true;
@@ -495,16 +558,18 @@ export async function addManagerComment(
 
 export async function toggleManagerReaction(
   logId: string,
-  emoji: string
+  emoji: string,
+  tenantId: string
 ): Promise<{ success: boolean; reactions: string | null }> {
-  // 1. Read current reactions
+  // 1. Read current reactions (scoped to tenant)
   const { data: row, error: readErr } = await getClient()
     .from("logs")
     .select("manager_reaction")
     .eq("id", logId)
-    .single();
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
   if (readErr || !row) {
-    logger.error("Read failed for reaction toggle", { error: readErr?.message, logId });
+    logger.error("Read failed for reaction toggle", { error: readErr?.message, logId, tenantId });
     return { success: false, reactions: null };
   }
 
@@ -520,18 +585,22 @@ export async function toggleManagerReaction(
   }
   const newValue = current.length > 0 ? current.join(",") : null;
 
-  // 3. Write back
+  // 3. CAS write back — only update if reactions are still what we read, to
+  // avoid lost updates under concurrent toggles. Defends in depth alongside
+  // tenant filter.
   const { error: writeErr, data: updated } = await getClient()
     .from("logs")
     .update({ manager_reaction: newValue })
     .eq("id", logId)
+    .eq("tenant_id", tenantId)
+    .eq("manager_reaction", row.manager_reaction ?? null)
     .select("id");
   if (writeErr) {
     logger.error("Update failed for reaction", { error: writeErr.message, logId });
     return { success: false, reactions: null };
   }
   if (!updated || updated.length === 0) {
-    logger.warn("Reaction update matched 0 rows", { logId });
+    logger.warn("Reaction update matched 0 rows (raced or cross-tenant)", { logId, tenantId });
     return { success: false, reactions: null };
   }
   return { success: true, reactions: newValue };
@@ -952,6 +1021,40 @@ export async function getMissionComments(
   return (data || []).map(rowToComment);
 }
 
+/**
+ * Batch-fetch comments for many missions in one round trip.
+ * Returns Map(missionId -> comments[]). Used by /api/logs which previously
+ * issued N queries (one per mission) inside a loop.
+ */
+export async function getMissionCommentsBatch(
+  missionIds: string[],
+  options?: { sinceIso?: string }
+): Promise<Map<string, MissionComment[]>> {
+  const result = new Map<string, MissionComment[]>();
+  if (missionIds.length === 0) return result;
+  let query = getClient()
+    .from("mission_comments")
+    .select("*")
+    .in("mission_id", missionIds)
+    .order("created_at", { ascending: true });
+  if (options?.sinceIso) {
+    query = query.gte("created_at", options.sinceIso);
+  }
+  const { data, error } = await query;
+  if (error) {
+    logger.error("Batch mission_comments query failed", { error: error.message });
+    return result;
+  }
+  for (const row of data || []) {
+    const comment = rowToComment(row);
+    const missionId = (row as { mission_id: string }).mission_id;
+    const list = result.get(missionId) || [];
+    list.push(comment);
+    result.set(missionId, list);
+  }
+  return result;
+}
+
 export async function createMission(
   participantName: string,
   title: string,
@@ -990,7 +1093,8 @@ export async function createMission(
 export async function updateMissionStatus(
   missionId: string,
   status: string,
-  finalReview: string | null
+  finalReview: string | null,
+  tenantId: string
 ): Promise<boolean> {
   const update: Record<string, unknown> = { status };
   if (finalReview !== null) update.final_review = finalReview;
@@ -998,13 +1102,14 @@ export async function updateMissionStatus(
     .from("missions")
     .update(update)
     .eq("id", missionId)
+    .eq("tenant_id", tenantId)
     .select("id");
   if (error) {
     logger.error("Update failed", { error: error.message, missionId });
     return false;
   }
   if (!updated || updated.length === 0) {
-    logger.warn("Update matched 0 rows", { missionId });
+    logger.warn("Update matched 0 rows", { missionId, tenantId });
     return false;
   }
   return true;
@@ -1012,7 +1117,8 @@ export async function updateMissionStatus(
 
 export async function updateMissionFields(
   missionId: string,
-  fields: { title?: string; purpose?: string; deadline?: string }
+  fields: { title?: string; purpose?: string; deadline?: string },
+  tenantId: string
 ): Promise<boolean> {
   const update: Record<string, unknown> = {};
   if (fields.title !== undefined) update.title = fields.title;
@@ -1023,22 +1129,61 @@ export async function updateMissionFields(
     .from("missions")
     .update(update)
     .eq("id", missionId)
+    .eq("tenant_id", tenantId)
     .select("id");
   if (error) {
     logger.error("Mission field update failed", { error: error.message, missionId });
     return false;
   }
   if (!updated || updated.length === 0) {
-    logger.warn("Mission field update matched 0 rows", { missionId });
+    logger.warn("Mission field update matched 0 rows", { missionId, tenantId });
     return false;
   }
   return true;
 }
 
+/**
+ * Find the comment's parent mission tenant + author. Used by routes that
+ * mutate a comment to verify the caller's tenant matches and that the caller
+ * is the original author (only authors can edit/delete their own comments).
+ */
+export async function getMissionCommentMeta(
+  commentId: string
+): Promise<{ missionId: string; tenantId: string; authorName: string; authorRole: string } | null> {
+  const { data, error } = await getClient()
+    .from("mission_comments")
+    .select("mission_id, author_name, author_role, missions!inner(tenant_id)")
+    .eq("id", commentId)
+    .maybeSingle();
+  if (error) {
+    logger.error("Mission comment meta lookup failed", { error: error.message, commentId });
+    return null;
+  }
+  if (!data) return null;
+  // Supabase returns the joined `missions` as either an object or array depending on relation shape.
+  const missions = (data as { missions?: { tenant_id?: string } | { tenant_id?: string }[] }).missions;
+  const tenantId = Array.isArray(missions) ? missions[0]?.tenant_id : missions?.tenant_id;
+  if (!tenantId) return null;
+  return {
+    missionId: (data as { mission_id: string }).mission_id,
+    tenantId,
+    authorName: (data as { author_name: string }).author_name,
+    authorRole: (data as { author_role: string }).author_role,
+  };
+}
+
 export async function updateMissionComment(
   commentId: string,
-  newBody: string
+  newBody: string,
+  tenantId: string,
+  authorName: string
 ): Promise<boolean> {
+  // Look up the comment's mission to enforce tenant scoping, then update only
+  // when the caller is the original author and the tenant matches.
+  const meta = await getMissionCommentMeta(commentId);
+  if (!meta) return false;
+  if (meta.tenantId !== tenantId) return false;
+  if (meta.authorName !== authorName) return false;
   const { error, data: updated } = await getClient()
     .from("mission_comments")
     .update({ body: newBody })
@@ -1052,8 +1197,14 @@ export async function updateMissionComment(
 }
 
 export async function deleteMissionComment(
-  commentId: string
+  commentId: string,
+  tenantId: string,
+  authorName: string
 ): Promise<boolean> {
+  const meta = await getMissionCommentMeta(commentId);
+  if (!meta) return false;
+  if (meta.tenantId !== tenantId) return false;
+  if (meta.authorName !== authorName) return false;
   const { error } = await getClient()
     .from("mission_comments")
     .delete()
@@ -1069,8 +1220,18 @@ export async function addMissionComment(
   missionId: string,
   authorName: string,
   authorRole: "manager" | "participant",
-  commentText: string
+  commentText: string,
+  tenantId: string
 ): Promise<boolean> {
+  // Verify the mission belongs to the caller's tenant before inserting,
+  // otherwise an attacker could comment cross-tenant by guessing missionId.
+  const { data: missionRow, error: missionErr } = await getClient()
+    .from("missions")
+    .select("id")
+    .eq("id", missionId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  if (missionErr || !missionRow) return false;
   const { error } = await getClient()
     .from("mission_comments")
     .insert({
@@ -1193,19 +1354,26 @@ export async function createFeedback(
 }
 
 export async function markFeedbackAsRead(
-  feedbackId: string
+  feedbackId: string,
+  tenantId: string,
+  participantName: string
 ): Promise<boolean> {
+  // Restrict to the caller's own tenant AND own participant_name so a
+  // participant cannot mark another tenant's (or another peer's) feedback as
+  // read by guessing the feedback row id.
   const { error, data: updated } = await getClient()
     .from("feedback")
     .update({ is_read: true })
     .eq("id", feedbackId)
+    .eq("tenant_id", tenantId)
+    .eq("participant_name", participantName)
     .select("id");
   if (error) {
     logger.error("Update failed", { error: error.message, feedbackId });
     return false;
   }
   if (!updated || updated.length === 0) {
-    logger.warn("Update matched 0 rows", { feedbackId });
+    logger.warn("Update matched 0 rows", { feedbackId, tenantId });
     return false;
   }
   return true;
@@ -1284,6 +1452,8 @@ export async function createTenant(
 export async function getTenantBySlug(
   slug: string
 ): Promise<{ id: string; name: string; slug: string; companyName: string; featureFlags: Record<string, boolean> } | null> {
+  const hit = tenantBySlugCache.get(slug);
+  if (hit && Date.now() - hit.at < TENANT_CACHE_TTL_MS) return hit.value;
   const { data, error } = await getClient()
     .from("tenants")
     .select("*")
@@ -1292,19 +1462,24 @@ export async function getTenantBySlug(
   if (error) {
     logger.error("Query failed", { error: error.message, slug });
   }
-  if (!data) return null;
-  return {
-    id: data.id,
-    name: data.name,
-    slug: data.slug,
-    companyName: data.company_name,
-    featureFlags: data.feature_flags || {},
-  };
+  const value = data
+    ? {
+        id: data.id,
+        name: data.name,
+        slug: data.slug,
+        companyName: data.company_name,
+        featureFlags: data.feature_flags || {},
+      }
+    : null;
+  tenantBySlugCache.set(slug, { value, at: Date.now() });
+  return value;
 }
 
 export async function getTenantById(
   id: string
 ): Promise<{ id: string; name: string; slug: string; companyName: string } | null> {
+  const hit = tenantByIdCache.get(id);
+  if (hit && Date.now() - hit.at < TENANT_CACHE_TTL_MS) return hit.value;
   const { data, error } = await getClient()
     .from("tenants")
     .select("id, name, slug, company_name")
@@ -1314,18 +1489,24 @@ export async function getTenantById(
     logger.error("Query failed", { error: error.message, id });
     return null;
   }
-  if (!data) return null;
-  return {
-    id: data.id as string,
-    name: data.name as string,
-    slug: data.slug as string,
-    companyName: (data.company_name as string) || "",
-  };
+  const value = data
+    ? {
+        id: data.id as string,
+        name: data.name as string,
+        slug: data.slug as string,
+        companyName: (data.company_name as string) || "",
+      }
+    : null;
+  tenantByIdCache.set(id, { value, at: Date.now() });
+  return value;
 }
 
 export async function getAllTenants(): Promise<
   { id: string; name: string; slug: string; companyName: string; plan: string }[]
 > {
+  if (allTenantsCache && Date.now() - allTenantsCache.at < TENANT_CACHE_TTL_MS) {
+    return allTenantsCache.value;
+  }
   const { data, error } = await getClient()
     .from("tenants")
     .select("id, name, slug, company_name, plan")
@@ -1333,13 +1514,15 @@ export async function getAllTenants(): Promise<
   if (error) {
     logger.error("Query failed", { error: error.message });
   }
-  return (data || []).map((t) => ({
+  const value = (data || []).map((t) => ({
     id: t.id,
     name: t.name,
     slug: t.slug,
     companyName: t.company_name,
     plan: t.plan,
   }));
+  allTenantsCache = { value, at: Date.now() };
+  return value;
 }
 
 // Re-export for convenience

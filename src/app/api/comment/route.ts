@@ -19,20 +19,33 @@ export async function POST(request: NextRequest) {
     // Sanitize user input
     const sanitizedComment = sanitizeInput(comment);
 
-    // Add comment to the specific log entry
-    if (participantId) {
-      const success = await addManagerComment(participantId, sanitizedComment);
-      if (!success) {
-        return NextResponse.json({ error: "Failed to save comment" }, { status: 500 });
-      }
+    // Authenticate manager up-front (was previously deferred to the
+    // notification block, leaving the addManagerComment write effectively
+    // unauthenticated for tenant scope).
+    const manager = await getManagerByToken(token);
+    if (!manager) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!manager.tenantId) {
+      return NextResponse.json({ error: "Tenant unresolved" }, { status: 500 });
+    }
+    const managerTenantId = manager.tenantId;
+    if (!participantId) {
+      return NextResponse.json({ error: "participantId (log id) required" }, { status: 400 });
+    }
+
+    // Add comment to the specific log entry. addManagerComment enforces
+    // tenant scope, so a comment on a log row from another tenant fails.
+    const success = await addManagerComment(participantId, sanitizedComment, managerTenantId);
+    if (!success) {
+      return NextResponse.json({ error: "Failed to save comment" }, { status: 500 });
     }
 
     // Notify the specific participant whose log was commented on (non-blocking)
     try {
-      const manager = await getManagerByToken(token);
       if (manager && participantId) {
-        // Look up which participant owns this log entry
-        const ownerName = await getLogEntryOwner(participantId);
+        // Look up which participant owns this log entry (tenant-scoped)
+        const ownerName = await getLogEntryOwner(participantId, managerTenantId);
         if (ownerName) {
           const targetParticipant = await getParticipantByName(ownerName, manager.tenantId);
           if (targetParticipant?.email && !targetParticipant.email.includes("example.com")) {

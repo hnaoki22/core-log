@@ -40,6 +40,10 @@ interface OTPEntry {
 }
 interface OTPStore { [tokenKey: string]: OTPEntry; }
 const memoryStore: OTPStore = {};
+// Track recent OTP generation timestamps per token (for rate limiting),
+// independent of the currently-valid OTP entry. Older than 1 hour entries
+// are filtered out at read time.
+const memoryGenerateHistory: Map<string, number[]> = new Map();
 
 const OTP_TTL = 10 * 60 * 1000; // 10 minutes
 const MAX_ATTEMPTS = 5;
@@ -157,57 +161,94 @@ async function supabaseGenerateOTP(token: string, email: string): Promise<string
 
 interface OTPRecord {
   id: string;
+  code: string;
   attempts: number;
   email: string;
+}
+
+/**
+ * Constant-time string compare. Returns false for unequal-length inputs but
+ * still loops over the longer string to avoid leaking length information.
+ */
+function timingSafeEqual(a: string, b: string): boolean {
+  const len = Math.max(a.length, b.length);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < len; i++) {
+    const ca = i < a.length ? a.charCodeAt(i) : 0;
+    const cb = i < b.length ? b.charCodeAt(i) : 0;
+    diff |= ca ^ cb;
+  }
+  return diff === 0;
 }
 
 async function supabaseVerifyOTP(token: string, code: string): Promise<{ valid: boolean; email?: string }> {
   const client = await getSupabaseClient();
   if (!client) return { valid: false };
 
+  // Look up by TOKEN ONLY. The previous code also filtered by `code`, which
+  // meant wrong guesses never matched the row and the attempts counter never
+  // incremented — making MAX_ATTEMPTS unenforceable and the entire OTP code
+  // space brute-forceable. Fetch by token, then count attempts and compare
+  // in constant time.
   const { data, error } = await client
     .from("otp_codes")
-    .select("*")
+    .select("id, code, attempts, email")
     .eq("token", token)
-    .eq("code", code)
     .gte("expires_at", new Date().toISOString())
-    .single() as unknown as { data: OTPRecord | null; error: { message: string } | null };
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle() as unknown as { data: OTPRecord | null; error: { message: string } | null };
 
   if (error || !data) return { valid: false };
 
-  // Check attempts
+  // Exceeded attempts → invalidate and deny regardless of whether this guess matches
   if (data.attempts >= MAX_ATTEMPTS) {
     await client.from("otp_codes").delete().eq("id", data.id);
     return { valid: false };
   }
 
-  // Increment attempts atomically
-  const updatePayload: Record<string, number> = { attempts: data.attempts + 1 };
-  const { error: updateError } = await client
+  // Always increment the attempts counter BEFORE checking equality, so every
+  // wrong guess counts toward the cap. Use the optimistic CAS pattern to make
+  // increments race-safe under concurrent requests.
+  const { data: updatedRows, error: updateError } = await client
     .from("otp_codes")
-    .update(updatePayload as never)
-    .eq("id", data.id);
+    .update({ attempts: data.attempts + 1 } as never)
+    .eq("id", data.id)
+    .eq("attempts", data.attempts)
+    .select("id");
 
   if (updateError) {
     logger.error("OTP attempt update failed", { error: updateError.message });
+    return { valid: false };
+  }
+  if (!updatedRows || updatedRows.length === 0) {
+    // Lost the race against another verify request. Treat as invalid; the
+    // other request bears responsibility for outcome.
+    return { valid: false };
   }
 
-  // Valid — delete the OTP
+  const isMatch = timingSafeEqual(code, data.code);
+  if (!isMatch) {
+    // Wrong code: leave the row in place (with incremented attempts) so the
+    // user can retry up to MAX_ATTEMPTS total.
+    return { valid: false };
+  }
+
+  // Correct code: consume the OTP so it cannot be replayed.
   await client.from("otp_codes").delete().eq("id", data.id);
   return { valid: true, email: data.email };
 }
 
 // === In-memory fallback operations ===
 
+// Memory store keys are now the bare `token` (not `${token}:${code}`) so a
+// wrong guess looks up the same entry as a correct one and increments its
+// attempts counter — without this, MAX_ATTEMPTS was unenforceable.
+
 function memoryCountOTPsInLastHour(token: string): number {
   const oneHourAgo = Date.now() - 60 * 60 * 1000;
-  return Object.entries(memoryStore)
-    .filter(([key]) => {
-      const parts = key.split(":");
-      return parts.length === 2 && parts[0] === token;
-    })
-    .filter(([, entry]) => entry.createdAt > oneHourAgo)
-    .length;
+  const history = memoryGenerateHistory.get(token) || [];
+  return history.filter((ts) => ts > oneHourAgo).length;
 }
 
 function memoryGenerateOTP(token: string, email: string): string {
@@ -216,14 +257,17 @@ function memoryGenerateOTP(token: string, email: string): string {
       tokenPrefix: token.slice(0, 8),
     });
   }
-  const count = memoryCountOTPsInLastHour(token);
-  if (count >= MAX_OTPS_PER_HOUR) {
+  if (memoryCountOTPsInLastHour(token) >= MAX_OTPS_PER_HOUR) {
     throw new Error("OTP request rate limit exceeded. Please try again in 1 hour.");
   }
   const code = generateCode();
-  const key = `${token}:${code}`;
   const now = Date.now();
-  memoryStore[key] = { code, email, expiresAt: now + OTP_TTL, attempts: 0, createdAt: now };
+  memoryStore[token] = { code, email, expiresAt: now + OTP_TTL, attempts: 0, createdAt: now };
+  // Append to history and prune to the last hour to bound memory growth.
+  const oneHourAgo = now - 60 * 60 * 1000;
+  const history = (memoryGenerateHistory.get(token) || []).filter((ts) => ts > oneHourAgo);
+  history.push(now);
+  memoryGenerateHistory.set(token, history);
   return code;
 }
 
@@ -233,14 +277,19 @@ function memoryVerifyOTP(token: string, code: string): { valid: boolean; email?:
       tokenPrefix: token.slice(0, 8),
     });
   }
-  const key = `${token}:${code}`;
-  const entry = memoryStore[key];
+  const entry = memoryStore[token];
   if (!entry) return { valid: false };
-  if (Date.now() > entry.expiresAt) { delete memoryStore[key]; return { valid: false }; }
+  if (Date.now() > entry.expiresAt) { delete memoryStore[token]; return { valid: false }; }
+
+  // Always count the attempt, even when the code is wrong, so MAX_ATTEMPTS
+  // bounds the brute-force search space.
   entry.attempts++;
-  if (entry.attempts > MAX_ATTEMPTS) { delete memoryStore[key]; return { valid: false }; }
+  if (entry.attempts > MAX_ATTEMPTS) { delete memoryStore[token]; return { valid: false }; }
+
+  const isMatch = timingSafeEqual(code, entry.code);
+  if (!isMatch) return { valid: false };
   const email = entry.email;
-  delete memoryStore[key];
+  delete memoryStore[token];
   return { valid: true, email };
 }
 
@@ -271,11 +320,13 @@ export async function verifyOTP(token: string, code: string): Promise<{ valid: b
   return memoryVerifyOTP(token, code);
 }
 
-export function getRemainingAttempts(token: string, code: string): number | null {
-  const key = `${token}:${code}`;
-  const entry = memoryStore[key];
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function getRemainingAttempts(token: string, _code?: string): number | null {
+  // Memory-store only: Supabase path doesn't expose remaining attempts to
+  // avoid an extra round-trip. Callers should treat null as "unknown".
+  const entry = memoryStore[token];
   if (!entry) return null;
-  if (Date.now() > entry.expiresAt) { delete memoryStore[key]; return null; }
+  if (Date.now() > entry.expiresAt) { delete memoryStore[token]; return null; }
   return Math.max(0, MAX_ATTEMPTS - entry.attempts);
 }
 
@@ -288,4 +339,5 @@ export function cleanupExpiredOTPs(): void {
 
 export function clearAllOTPs(): void {
   Object.keys(memoryStore).forEach((key) => delete memoryStore[key]);
+  memoryGenerateHistory.clear();
 }

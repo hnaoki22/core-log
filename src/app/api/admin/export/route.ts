@@ -10,6 +10,22 @@ import { getAllLogsForTenant } from "@/lib/supabase";
 import { getDayOfWeekJPShort } from "@/lib/date-utils";
 import { resolveAdminTenantContext } from "@/lib/tenant-context";
 
+/**
+ * Make a single CSV cell safe for Excel/Sheets/Numbers.
+ *  - Defends against formula injection (CWE-1236): any cell starting with
+ *    `=`, `+`, `-`, `@`, `\t`, or `\r` is treated as a formula by Excel and
+ *    can fire HYPERLINK/cmd|/etc. We prefix with `'` to neutralize.
+ *  - Doubles embedded quotes per RFC 4180.
+ *  - Wraps in quotes so commas/newlines are tolerated.
+ */
+function csvCell(value: unknown): string {
+  let s = value == null ? "" : String(value);
+  if (s.length > 0 && /^[=+\-@\t\r]/.test(s)) {
+    s = "'" + s;
+  }
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
 
@@ -48,7 +64,7 @@ export async function GET(request: NextRequest) {
       "HMフィードバック",
       "上司コメント",
     ];
-    csvRows.push(headers.join(","));
+    csvRows.push(headers.map(csvCell).join(","));
 
     for (const participant of participants) {
       const logs = logsByName.get(participant.name) || [];
@@ -60,26 +76,21 @@ export async function GET(request: NextRequest) {
           dayOfWeek = getDayOfWeekJPShort(d);
         }
 
-        const energy = log.energy || "";
-        const status = log.status || "";
-        const hmFeedback = ((log as Record<string, unknown>).hmFeedback as string || "").replace(/"/g, '""');
-        const managerComment = ((log as Record<string, unknown>).managerComment as string || "").replace(/"/g, '""');
-        const morningIntent = (log.morningIntent || "").replace(/"/g, '""');
-        const eveningInsight = (log.eveningInsight || "").replace(/"/g, '""');
-        const tenantLabel = (participant.tenantId || "").replace(/"/g, '""');
+        const hmFeedback = (log as Record<string, unknown>).hmFeedback as string | undefined;
+        const managerComment = (log as Record<string, unknown>).managerComment as string | undefined;
 
         const row = [
-          log.date,
-          dayOfWeek,
-          ...(ctx.isAllTenants ? [`"${tenantLabel}"`] : []),
-          participant.name,
-          participant.department,
-          `"${morningIntent}"`,
-          `"${eveningInsight}"`,
-          energy,
-          status,
-          `"${hmFeedback}"`,
-          `"${managerComment}"`,
+          csvCell(log.date),
+          csvCell(dayOfWeek),
+          ...(ctx.isAllTenants ? [csvCell(participant.tenantId || "")] : []),
+          csvCell(participant.name),
+          csvCell(participant.department),
+          csvCell(log.morningIntent),
+          csvCell(log.eveningInsight),
+          csvCell(log.energy),
+          csvCell(log.status),
+          csvCell(hmFeedback),
+          csvCell(managerComment),
         ];
         csvRows.push(row.join(","));
       }

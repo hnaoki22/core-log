@@ -8,12 +8,25 @@ import { getClient } from "@/lib/supabase";
 import { getParticipantByTokenFromSupabase, getManagerByTokenFromSupabase } from "@/lib/supabase";
 import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 
+/**
+ * Compute the JST ISO-week string for the given instant.
+ *
+ * Previously this called `date.getFullYear()`/`getDay()` directly, which use
+ * the server's timezone (UTC on Vercel). Around UTC midnight, two callers in
+ * Japan could fall into different weeks. Anchor everything to JST.
+ */
 function getWeekString(date: Date): string {
-  const jan4 = new Date(date.getFullYear(), 0, 4);
-  const weekStart = new Date(jan4);
-  weekStart.setDate(jan4.getDate() - jan4.getDay());
-  const weekNum = Math.floor((date.getTime() - weekStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
-  return `${date.getFullYear()}-W${String(weekNum).padStart(2, "0")}`;
+  const jstISO = new Date(date.getTime() + 9 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10); // YYYY-MM-DD in JST
+  const [y, m, d] = jstISO.split("-").map((n) => parseInt(n, 10));
+  // Compute ISO-week via the "Thursday" rule.
+  const target = new Date(Date.UTC(y, m - 1, d));
+  const dayNum = target.getUTCDay() || 7; // Sun=0 -> 7
+  target.setUTCDate(target.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
+  const weekNum = Math.ceil(((target.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${target.getUTCFullYear()}-W${String(weekNum).padStart(2, "0")}`;
 }
 
 export async function GET(req: NextRequest) {
@@ -105,12 +118,28 @@ export async function POST(req: NextRequest) {
     if (!participantId) {
       return NextResponse.json({ error: "participantId is required" }, { status: 400 });
     }
+    if (!manager.tenantId) {
+      return NextResponse.json({ error: "Tenant unresolved" }, { status: 500 });
+    }
+
+    // Confirm the target participant belongs to the manager's tenant so an
+    // admin in tenant A cannot assign a task to a participant in tenant B
+    // by guessing the participant id.
+    const client = getClient();
+    const { data: targetOk } = await client
+      .from("participants")
+      .select("id")
+      .eq("id", participantId)
+      .eq("tenant_id", manager.tenantId)
+      .maybeSingle();
+    if (!targetOk) {
+      return NextResponse.json({ error: "Target participant not found" }, { status: 404 });
+    }
 
     // Get current week string
     const weekString = getWeekString(new Date());
 
     // Store in outsight_tasks table
-    const client = getClient();
     const { data, error } = await client
       .from("outsight_tasks")
       .insert({

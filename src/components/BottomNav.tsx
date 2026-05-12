@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useFeatures } from "@/lib/use-features";
 
 interface BadgeCounts {
@@ -77,9 +78,10 @@ export function BottomNav({ active, baseUrl, badges }: BottomNavProps) {
           const badge = getBadge(tab.id);
           const isActive = active === tab.id;
           return (
-            <a
+            <Link
               key={tab.id}
               href={tab.path ? `${baseUrl}/${tab.path}` : baseUrl}
+              aria-current={isActive ? "page" : undefined}
               className={`flex-1 flex flex-col items-center justify-center py-2.5 px-2 transition-colors relative ${
                 isActive ? "text-[#1A1A2E]" : "text-[#8B8489]"
               }`}
@@ -98,7 +100,7 @@ export function BottomNav({ active, baseUrl, badges }: BottomNavProps) {
               <div className={`text-[10px] font-medium ${isActive ? "text-[#1A1A2E]" : "text-[#8B8489]"}`}>
                 {tab.label}
               </div>
-            </a>
+            </Link>
           );
         })}
       </div>

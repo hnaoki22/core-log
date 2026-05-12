@@ -150,31 +150,35 @@ export function buildRateLimitKey(request: { url: string }, ip: string): string 
 }
 
 /**
- * Get client IP from request headers
- * On Vercel: x-forwarded-for is set by the platform (trustworthy for last entry)
- * Falls back through headers in order of trust
+ * Get client IP from request headers.
+ *
+ * On Vercel (this app's deployment target):
+ *   - `x-forwarded-for` is rewritten by the edge so the LEFTMOST entry is the
+ *     real client IP. Attacker-controlled values cannot survive the rewrite.
+ *   - `x-real-ip` is also set by Vercel and overwrites client input, so it's
+ *     safe to use as a fallback when xff is absent.
+ *
+ * Previously this function read the LAST entry of `x-forwarded-for`, which
+ * was incorrect on Vercel and allowed an attacker to rotate IPs per request
+ * by setting their own `x-forwarded-for` (e.g., a fixed prefix Vercel
+ * appends to). Use the leftmost entry instead.
+ *
+ * `cf-connecting-ip` is kept only as a last-resort fallback for Cloudflare
+ * fronting; it's stripped by Vercel so harmless there.
  */
 export function getClientIp(request: Request): string {
-  // Vercel sets x-real-ip to the actual client IP
-  const realIp = request.headers.get("x-real-ip");
-  if (realIp) {
-    return realIp.trim();
-  }
-
-  // Cloudflare sets cf-connecting-ip
-  const cloudflareIp = request.headers.get("cf-connecting-ip");
-  if (cloudflareIp) {
-    return cloudflareIp.trim();
-  }
-
-  // X-Forwarded-For: use the LAST entry (added by the closest trusted proxy)
-  // Attackers can prepend fake IPs, but can't control what the proxy appends
+  // Leftmost xff entry (true client IP on Vercel edge)
   const forwardedFor = request.headers.get("x-forwarded-for");
   if (forwardedFor) {
-    const ips = forwardedFor.split(",").map(ip => ip.trim());
-    // Last IP is the one added by the edge proxy (most trustworthy)
-    return ips[ips.length - 1];
+    const first = forwardedFor.split(",")[0]?.trim();
+    if (first) return first;
   }
+
+  const realIp = request.headers.get("x-real-ip");
+  if (realIp) return realIp.trim();
+
+  const cloudflareIp = request.headers.get("cf-connecting-ip");
+  if (cloudflareIp) return cloudflareIp.trim();
 
   return "unknown";
 }

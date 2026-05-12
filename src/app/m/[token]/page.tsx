@@ -100,7 +100,7 @@ export default function ManagerHome() {
       <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
         <div className="text-center">
           <p className="text-[#5B5560] mb-4">{error || "上司が見つかりません"}</p>
-          <a href="/" className="text-[#1A1A2E] font-medium hover:underline">ホームに戻る</a>
+          <Link href="/" className="text-[#1A1A2E] font-medium hover:underline">ホームに戻る</Link>
         </div>
       </div>
     );

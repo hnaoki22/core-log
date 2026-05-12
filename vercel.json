@@ -1,4 +1,25 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "src/app/api/cron/**/*.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/admin/export/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/admin/import/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/features/consultant-spotlight/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/features/burnout/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/features/psych-safety/route.ts": {
+      "maxDuration": 60
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/remind",

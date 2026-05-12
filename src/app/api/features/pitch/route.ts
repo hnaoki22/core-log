@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getManagerByTokenFromSupabase } from "@/lib/supabase";
 import { isFeatureEnabledForToken } from "@/lib/feature-flags";
-import { generatePitchContent } from "@/lib/llm";
+import { generatePitchContent, truncateForLLM } from "@/lib/llm";
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,15 +36,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 });
     }
 
-    // Generate pitch content using LLM
-    const pitchContent = await generatePitchContent(companyName, industry, challenges);
+    // Generate pitch content using LLM. Cap user input lengths so a runaway
+    // paste cannot inflate token cost or smuggle pseudo-role markers.
+    const safeCompany = truncateForLLM(companyName, 200);
+    const safeIndustry = truncateForLLM(industry, 200);
+    const safeChallenges = truncateForLLM(challenges, 4000);
+    const pitchContent = await generatePitchContent(safeCompany, safeIndustry, safeChallenges);
 
     return NextResponse.json({
       success: true,
       pitch: {
-        companyName,
-        industry,
-        challenges,
+        companyName: safeCompany,
+        industry: safeIndustry,
+        challenges: safeChallenges,
         content: pitchContent,
         generatedAt: new Date().toISOString(),
       },

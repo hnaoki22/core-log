@@ -58,23 +58,33 @@ function getJapaneseHolidays(year: number): Set<string> {
   // 敬老の日: 9月第3月曜
   add(9, getNthMonday(year, 9, 3));
 
-  // 春分の日（概算）: 3月20日 or 21日
-  const shunbun = year % 4 === 0 ? 20 : 20; // 2026は3/20
+  // 春分の日・秋分の日 — National Astronomical Observatory of Japan formula.
+  // Previously hardcoded both branches of the year%4 ternary to the same
+  // value, so the date never moved. The formula below is accurate for
+  // 1980-2099 per the NAO's reference table.
+  // Reference: https://www.nao.ac.jp/en/news/yearly-events.html
+  const shunbun = Math.floor(20.8431 + 0.242194 * (year - 1980)) - Math.floor((year - 1980) / 4);
   add(3, shunbun);
-
-  // 秋分の日（概算）: 9月22日 or 23日
-  // For leap years: September 22, for non-leap years: September 23
-  const shubun = year % 4 === 0 ? 22 : 23;
+  const shubun = Math.floor(23.2488 + 0.242194 * (year - 1980)) - Math.floor((year - 1980) / 4);
   add(9, shubun);
 
-  // 振替休日: 祝日が日曜の場合、翌月曜が休日
+  // 振替休日: 祝日が日曜の場合、次の非祝日（平日）が休日になる。
+  // Loop forward until we hit a day that is neither a holiday nor a weekend.
+  // Previously the code only advanced one day, which fails when the next
+  // day is itself a holiday (e.g., 5/3 日曜の年 → 5/4 みどりの日 もすでに祝日 → 5/5 →
+  // 5/6 平日に振替)。
   const allHolidays = Array.from(holidays);
   for (const h of allHolidays) {
     const d = new Date(h + "T00:00:00Z");
-    if (d.getUTCDay() === 0) { // Sunday
-      const next = new Date(d);
-      next.setUTCDate(next.getUTCDate() + 1);
-      holidays.add(next.toISOString().split("T")[0]);
+    if (d.getUTCDay() !== 0) continue;
+    const candidate = new Date(d);
+    for (let attempts = 0; attempts < 7; attempts++) {
+      candidate.setUTCDate(candidate.getUTCDate() + 1);
+      const key = candidate.toISOString().split("T")[0];
+      if (!holidays.has(key) && candidate.getUTCDay() !== 0 && candidate.getUTCDay() !== 6) {
+        holidays.add(key);
+        break;
+      }
     }
   }
 
@@ -90,15 +100,25 @@ function getNthMonday(year: number, month: number, n: number): number {
   return firstMonday + (n - 1) * 7;
 }
 
-// Cache for holidays
-const holidayCache: Record<number, Set<string>> = {};
+// Cache for holidays — keyed by year. Capped because long-lived dev servers
+// would otherwise accumulate entries when callers pass synthetic future years.
+// 200 entries is well over what any deployment would ever touch (one entry per
+// year, and we only ever care about ~3 years of data) but cheap insurance.
+const HOLIDAY_CACHE_MAX = 200;
+const holidayCache: Map<number, Set<string>> = new Map();
 
 export function isJapaneseHoliday(dateStr: string): boolean {
   const year = parseInt(dateStr.substring(0, 4));
-  if (!holidayCache[year]) {
-    holidayCache[year] = getJapaneseHolidays(year);
+  let set = holidayCache.get(year);
+  if (!set) {
+    set = getJapaneseHolidays(year);
+    if (holidayCache.size >= HOLIDAY_CACHE_MAX) {
+      const oldest = holidayCache.keys().next().value;
+      if (oldest !== undefined) holidayCache.delete(oldest);
+    }
+    holidayCache.set(year, set);
   }
-  return holidayCache[year].has(dateStr);
+  return set.has(dateStr);
 }
 
 // Check if a date is a business day (not weekend, not holiday)

@@ -10,6 +10,15 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const FROM_EMAIL = process.env.REMIND_FROM_EMAIL || "CORE Log <noreply@resend.dev>";
 const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://core-log-lilac.vercel.app";
 
+/**
+ * Sanitize a string for inclusion in an email Subject header.
+ * Strips CR/LF/TAB (to defeat header injection), trims, and bounds length.
+ * Subject header values are not HTML and don't need entity escaping.
+ */
+function sanitizeSubject(s: string, max = 80): string {
+  return s.replace(/[\r\n\t]+/g, " ").trim().slice(0, max);
+}
+
 // Daily email quota tracking
 const DAILY_QUOTA = 100;
 let emailsSentToday = 0;
@@ -104,6 +113,7 @@ interface SendEmailOptions {
 
 function buildMorningEmail(name: string, token: string) {
   const url = `${APP_BASE_URL}/p/${token}/input`;
+  const safeName = escapeHtml(name);
   return {
     subject: "【CORE Log】おはようございます！今日の意図を記入しましょう",
     html: `
@@ -112,7 +122,7 @@ function buildMorningEmail(name: string, token: string) {
           <h1 style="margin: 0; font-size: 24px;">📝 CORE Log</h1>
           <p style="margin: 8px 0 0; opacity: 0.8;">Morning Check-in</p>
         </div>
-        <p>${name}さん、おはようございます。</p>
+        <p>${safeName}さん、おはようございます。</p>
         <p>今日も1日が始まります。<br>
         <strong>今日意識すること</strong>を3分で記入しましょう。</p>
         <div style="text-align: center; margin: 24px 0;">
@@ -130,6 +140,7 @@ function buildMorningEmail(name: string, token: string) {
 
 function buildEveningEmail(name: string, token: string) {
   const url = `${APP_BASE_URL}/p/${token}/input`;
+  const safeName = escapeHtml(name);
   return {
     subject: "【CORE Log】お疲れさまでした！今日の気づきを振り返りましょう",
     html: `
@@ -138,7 +149,7 @@ function buildEveningEmail(name: string, token: string) {
           <h1 style="margin: 0; font-size: 24px;">📝 CORE Log</h1>
           <p style="margin: 8px 0 0; opacity: 0.8;">Evening Reflection</p>
         </div>
-        <p>${name}さん、お疲れさまでした。</p>
+        <p>${safeName}さん、お疲れさまでした。</p>
         <p>今日1日を振り返って、<br>
         <strong>気づいたこと・学んだこと</strong>を3分で記録しましょう。</p>
         <div style="text-align: center; margin: 24px 0;">
@@ -156,6 +167,7 @@ function buildEveningEmail(name: string, token: string) {
 
 function buildEveningNoMorningEmail(name: string, token: string) {
   const url = `${APP_BASE_URL}/p/${token}/input`;
+  const safeName = escapeHtml(name);
   return {
     subject: "【CORE Log】今日の振り返りを記録しましょう",
     html: `
@@ -164,7 +176,7 @@ function buildEveningNoMorningEmail(name: string, token: string) {
           <h1 style="margin: 0; font-size: 24px;">📝 CORE Log</h1>
           <p style="margin: 8px 0 0; opacity: 0.8;">Evening Reflection</p>
         </div>
-        <p>${name}さん、お疲れさまでした。</p>
+        <p>${safeName}さん、お疲れさまでした。</p>
         <p>今日1日を振り返って、<br>
         <strong>気づいたこと・学んだこと</strong>を3分で記録しましょう。</p>
         <p style="color: #888; font-size: 12px;">※ 朝の意図設定は12:00で締め切られました。<br>本日の振り返りだけでも記録を残しましょう。</p>
@@ -202,19 +214,25 @@ interface NotificationOptions {
 function buildNotificationEmail(options: NotificationOptions) {
   const { recipientName, senderName, token, type, detail } = options;
   const baseUrl = APP_BASE_URL;
+  // Names come from DB rows that admins/tenant staff can edit, so they may
+  // contain HTML control characters or header-injection payloads. Escape for
+  // HTML bodies and sanitize for the Subject header.
+  const safeRecipient = escapeHtml(recipientName);
+  const safeSender = escapeHtml(senderName);
+  const subjectSender = sanitizeSubject(senderName, 40);
 
   switch (type) {
     case "mission_comment": {
       const url = `${baseUrl}/p/${token}/mission`;
       return {
-        subject: `【CORE Log】${senderName}さんからミッションにコメントがありました`,
+        subject: sanitizeSubject(`【CORE Log】${subjectSender}さんからミッションにコメントがありました`),
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
             <div style="background: linear-gradient(135deg, #C17817, #C17817); border-radius: 12px; padding: 20px; color: white; text-align: center; margin-bottom: 24px;">
               <h1 style="margin: 0; font-size: 20px;">💬 ミッションに新しいコメント</h1>
             </div>
-            <p>${recipientName}さん</p>
-            <p><strong>${senderName}</strong>さんがミッションにコメントしました。</p>
+            <p>${safeRecipient}さん</p>
+            <p><strong>${safeSender}</strong>さんがミッションにコメントしました。</p>
             ${detail ? `<div style="background: #F5E5BF; border-left: 4px solid #C17817; padding: 12px 16px; margin: 16px 0; border-radius: 4px;"><p style="margin: 0; color: #9A3412; font-size: 14px;">${escapeHtml(detail)}</p></div>` : ""}
             <div style="text-align: center; margin: 24px 0;">
               <a href="${url}" style="display: inline-block; background: #C17817; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
@@ -230,14 +248,14 @@ function buildNotificationEmail(options: NotificationOptions) {
     case "mission_created": {
       const url = `${baseUrl}/p/${token}/mission`;
       return {
-        subject: `【CORE Log】${senderName}さんから新しいミッションが設定されました`,
+        subject: sanitizeSubject(`【CORE Log】${subjectSender}さんから新しいミッションが設定されました`),
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
             <div style="background: linear-gradient(135deg, #1A1A2E, #2C2C4A); border-radius: 12px; padding: 20px; color: white; text-align: center; margin-bottom: 24px;">
               <h1 style="margin: 0; font-size: 20px;">🎯 新しいミッション</h1>
             </div>
-            <p>${recipientName}さん</p>
-            <p><strong>${senderName}</strong>さんが新しいミッションを設定しました。</p>
+            <p>${safeRecipient}さん</p>
+            <p><strong>${safeSender}</strong>さんが新しいミッションを設定しました。</p>
             ${detail ? `<div style="background: #F2F2F7; border-left: 4px solid #1A1A2E; padding: 12px 16px; margin: 16px 0; border-radius: 4px;"><p style="margin: 0; color: #141423; font-size: 14px; font-weight: bold;">${escapeHtml(detail)}</p></div>` : ""}
             <div style="text-align: center; margin: 24px 0;">
               <a href="${url}" style="display: inline-block; background: #1A1A2E; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
@@ -253,14 +271,14 @@ function buildNotificationEmail(options: NotificationOptions) {
     case "manager_comment": {
       const url = `${baseUrl}/p/${token}/logs`;
       return {
-        subject: `【CORE Log】${senderName}さんから日報にコメントがありました`,
+        subject: sanitizeSubject(`【CORE Log】${subjectSender}さんから日報にコメントがありました`),
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
             <div style="background: linear-gradient(135deg, #1A1A2E, #3B82F6); border-radius: 12px; padding: 20px; color: white; text-align: center; margin-bottom: 24px;">
               <h1 style="margin: 0; font-size: 20px;">💬 日報にコメント</h1>
             </div>
-            <p>${recipientName}さん</p>
-            <p><strong>${senderName}</strong>さんがあなたの日報にコメントしました。</p>
+            <p>${safeRecipient}さん</p>
+            <p><strong>${safeSender}</strong>さんがあなたの日報にコメントしました。</p>
             ${detail ? `<div style="background: #EFF6FF; border-left: 4px solid #1A1A2E; padding: 12px 16px; margin: 16px 0; border-radius: 4px;"><p style="margin: 0; color: #1E40AF; font-size: 14px;">${escapeHtml(detail)}</p></div>` : ""}
             <div style="text-align: center; margin: 24px 0;">
               <a href="${url}" style="display: inline-block; background: #1A1A2E; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
@@ -282,7 +300,7 @@ function buildNotificationEmail(options: NotificationOptions) {
             <div style="background: linear-gradient(135deg, #1A1A2E, #2C2C4A); border-radius: 12px; padding: 20px; color: white; text-align: center; margin-bottom: 24px;">
               <h1 style="margin: 0; font-size: 20px;">📋 週次フィードバック</h1>
             </div>
-            <p>${recipientName}さん</p>
+            <p>${safeRecipient}さん</p>
             <p>Human Matureから今週のフィードバックが届いています。<br>振り返りを確認し、来週に活かしましょう。</p>
             <div style="text-align: center; margin: 24px 0;">
               <a href="${url}" style="display: inline-block; background: #1A1A2E; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
@@ -298,18 +316,21 @@ function buildNotificationEmail(options: NotificationOptions) {
     }
     case "daily_log_submitted": {
       const url = `${baseUrl}/m/${token}`;
-      const nowJST = new Date(Date.now() + 9 * 60 * 60 * 1000);
-      const timeStr = `${nowJST.getUTCHours().toString().padStart(2, "0")}:${nowJST.getUTCMinutes().toString().padStart(2, "0")}`;
+      const timeStr = new Date().toLocaleTimeString("ja-JP", {
+        timeZone: "Asia/Tokyo",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
       return {
-        subject: `【CORE Log】${senderName}さんが日報を投稿しました`,
+        subject: sanitizeSubject(`【CORE Log】${subjectSender}さんが日報を投稿しました`),
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
             <div style="background: linear-gradient(135deg, #22C55E, #16A34A); border-radius: 12px; padding: 20px; color: white; text-align: center; margin-bottom: 24px;">
               <h1 style="margin: 0; font-size: 20px;">📝 日報投稿通知</h1>
               <p style="margin: 8px 0 0; opacity: 0.9; font-size: 14px;">${timeStr} 投稿</p>
             </div>
-            <p>${recipientName}さん</p>
-            <p><strong>${senderName}</strong>さんが日報を投稿しました。</p>
+            <p>${safeRecipient}さん</p>
+            <p><strong>${safeSender}</strong>さんが日報を投稿しました。</p>
             ${detail ? `<div style="background: #F0FDF4; border-left: 4px solid #22C55E; padding: 12px 16px; margin: 16px 0; border-radius: 4px;"><p style="margin: 0; color: #166534; font-size: 14px;">${escapeHtml(detail)}</p></div>` : ""}
             <div style="text-align: center; margin: 24px 0;">
               <a href="${url}" style="display: inline-block; background: #22C55E; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px;">
