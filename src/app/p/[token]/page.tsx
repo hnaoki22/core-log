@@ -17,9 +17,8 @@
 //   collapse into one render.
 
 import { notFound } from "next/navigation";
-import { getParticipantByToken } from "@/lib/participant-db";
 import {
-  getLogsByParticipant,
+  getParticipantWithLogsByToken,
   getFeedbackByParticipant,
   getUnreadFeedbackCount,
 } from "@/lib/supabase";
@@ -37,23 +36,28 @@ export default async function ParticipantHome({
 }: {
   params: { token: string };
 }) {
+  const t0 = Date.now();
   const token = params.token;
-  const participant = await getParticipantByToken(token);
-  if (!participant || !participant.tenantId) {
+
+  // Phase 1: nested-select for participant + logs in 1 round trip
+  const result = await getParticipantWithLogsByToken(token);
+  const tFetch1 = Date.now();
+  if (!result?.participant || !result.participant.tenantId) {
     notFound();
   }
+  const participant = result.participant;
+  const logs = result.logs;
   const tenantId = participant.tenantId;
 
-  // 3 parallel Supabase queries — same as /api/logs but skipping the HTTP
-  // hop and the middleware feature-flag round trip. Mission data is loaded
-  // by the client-side background refresh because the badge depends on
-  // mission_comments which is a 4th query; keeping it client-side keeps
-  // the server fetch small and the first paint fast.
-  const [logs, feedbacks, unreadCount] = await Promise.all([
-    getLogsByParticipant(participant.name, tenantId),
+  // Phase 2: feedback list + unread count in parallel.
+  // Mission data is left to the client-side background refresh because the
+  // mission badge needs a join into mission_comments (a 4th query); keeping
+  // it client-side keeps the server fetch small and the first paint fast.
+  const [feedbacks, unreadCount] = await Promise.all([
     getFeedbackByParticipant(participant.name, tenantId),
     getUnreadFeedbackCount(participant.name, tenantId),
   ]);
+  const tFetch2 = Date.now();
 
   const todayJST = getTodayJST();
   const stats = computeParticipantStats(logs, todayJST);
@@ -96,6 +100,12 @@ export default async function ParticipantHome({
       businessDaysElapsed: stats.businessDaysElapsed,
     },
   };
+
+  const tDone = Date.now();
+  console.log(
+    `[perf] /p/[token] total=${tDone - t0}ms ` +
+      `(participant+logs=${tFetch1 - t0}ms, feedback=${tFetch2 - tFetch1}ms, build=${tDone - tFetch2}ms)`,
+  );
 
   return <ParticipantHomeClient token={token} initialData={initialData} />;
 }
