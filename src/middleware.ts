@@ -77,9 +77,12 @@ export async function middleware(request: NextRequest) {
       ? new URL(process.env.NEXT_PUBLIC_APP_URL).host
           : null;
 
+    // Use endsWith — `includes` matched user-controllable hosts like
+    // "attacker-vercel.app.com" too. Vercel preview hosts always end in
+    // ".vercel.app" so a suffix check is both accurate and tight.
     if (
           customDomain &&
-          host.includes("vercel.app") &&
+          host.endsWith(".vercel.app") &&
           !pathname.startsWith("/api/cron/")
         ) {
           const redirectUrl = new URL(request.url);

@@ -125,6 +125,15 @@ export default function AdminDashboard() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
 
+  // Read window.location.origin once on mount to avoid a hydration mismatch.
+  // Inlining `typeof window !== "undefined" ? window.location.origin : ""`
+  // emits "" on the server and the real origin on the client, which React
+  // flags. We render an empty string until the effect runs.
+  const [appOrigin, setAppOrigin] = useState("");
+  useEffect(() => {
+    setAppOrigin(window.location.origin);
+  }, []);
+
   // Participant edit state
   const [editingParticipant, setEditingParticipant] = useState<ParticipantData | null>(null);
   const [editForm, setEditForm] = useState<{
@@ -651,7 +660,7 @@ export default function AdminDashboard() {
               <div className="flex items-center gap-2">
                 <span className="text-[#8B8489] w-16 text-xs">URL</span>
                 <a href={addResult.url} className="text-[#1A1A2E] underline break-all text-xs" target="_blank">
-                  {typeof window !== "undefined" ? window.location.origin : ""}{addResult.url}
+                  {appOrigin}{addResult.url}
                 </a>
               </div>
               <p className="text-[11px] text-amber-600 mt-1">このURLを本人にお伝えください</p>

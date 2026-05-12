@@ -100,15 +100,25 @@ function getNthMonday(year: number, month: number, n: number): number {
   return firstMonday + (n - 1) * 7;
 }
 
-// Cache for holidays
-const holidayCache: Record<number, Set<string>> = {};
+// Cache for holidays — keyed by year. Capped because long-lived dev servers
+// would otherwise accumulate entries when callers pass synthetic future years.
+// 200 entries is well over what any deployment would ever touch (one entry per
+// year, and we only ever care about ~3 years of data) but cheap insurance.
+const HOLIDAY_CACHE_MAX = 200;
+const holidayCache: Map<number, Set<string>> = new Map();
 
 export function isJapaneseHoliday(dateStr: string): boolean {
   const year = parseInt(dateStr.substring(0, 4));
-  if (!holidayCache[year]) {
-    holidayCache[year] = getJapaneseHolidays(year);
+  let set = holidayCache.get(year);
+  if (!set) {
+    set = getJapaneseHolidays(year);
+    if (holidayCache.size >= HOLIDAY_CACHE_MAX) {
+      const oldest = holidayCache.keys().next().value;
+      if (oldest !== undefined) holidayCache.delete(oldest);
+    }
+    holidayCache.set(year, set);
   }
-  return holidayCache[year].has(dateStr);
+  return set.has(dateStr);
 }
 
 // Check if a date is a business day (not weekend, not holiday)
