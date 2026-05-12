@@ -354,8 +354,8 @@ export default function PlaceholderExamplesAdminPage() {
             AI例示生成
           </h2>
           <p className="text-sm text-gray-600 mb-4">
-            クライアントのMVVと課題図書情報をAIに読み込ませ、
-            COREグラウンドルールに基づいた例示を自動生成します。
+            クライアントのMVVと課題図書のタイトル・キーワードを入力すると、
+            COREグラウンドルールに基づいた例示をAIが生成します。
           </p>
 
           <div className="space-y-4">
