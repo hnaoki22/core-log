@@ -1,10 +1,16 @@
 // PUT /api/admin/participants/[id]
 // Update participant fields (name, email, department, dojoPhase, managerId, fbPolicy, emailEnabled, startDate, endDate)
+//
+// Tenant resolution: looks up the participant's ACTUAL tenant via a SELECT
+// before updating, then validates that the caller has access to that tenant.
+// Previously the code forced the WHERE clause to `tenant_id = admin.homeTenant`,
+// which silently 0-row updated when a super-admin (or admin with ?tenant=slug
+// selected) edited a participant outside their home tenant. The dropdown
+// change appeared to fail because the WHERE filter excluded the target row.
 
 import { NextRequest, NextResponse } from "next/server";
 import { getManagerByToken } from "@/lib/participant-db";
-import { updateParticipantInSupabase } from "@/lib/supabase";
-import { resolveManagerTenantStrict } from "@/lib/tenant-context";
+import { getClient, updateParticipantInSupabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -24,17 +30,40 @@ export async function PUT(
     if (!manager || !manager.isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
-    const tenantResult = resolveManagerTenantStrict(manager);
-    if (!tenantResult.ok) {
-      return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
-    }
-    const tenantId = tenantResult.tenantId;
 
     const participantId = params.id;
     if (!participantId) {
       return NextResponse.json(
         { error: "参加者IDが必要です" },
         { status: 400 }
+      );
+    }
+
+    // Discover the participant's actual tenant. We update via this tenant so
+    // super-admins (and admins working across tenants via the dropdown) can
+    // legitimately edit anyone they are authorized for.
+    const { data: existing, error: lookupErr } = await getClient()
+      .from("participants")
+      .select("tenant_id")
+      .eq("id", participantId)
+      .maybeSingle();
+    if (lookupErr) {
+      console.error("Participant lookup failed:", lookupErr.message);
+      return NextResponse.json({ error: "Lookup failed" }, { status: 500 });
+    }
+    if (!existing) {
+      return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+    }
+    const targetTenantId = existing.tenant_id as string;
+
+    // Access check: super-admin (no tenantId) can edit anyone; tenant-admin
+    // can only edit participants within their own tenant.
+    const isSuperAdmin = !manager.tenantId;
+    const allowed = isSuperAdmin || manager.tenantId === targetTenantId;
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Forbidden: cross-tenant edit not allowed" },
+        { status: 403 }
       );
     }
 
@@ -67,7 +96,7 @@ export async function PUT(
     const success = await updateParticipantInSupabase(
       participantId,
       updateData as Parameters<typeof updateParticipantInSupabase>[1],
-      tenantId
+      targetTenantId,
     );
 
     if (!success) {

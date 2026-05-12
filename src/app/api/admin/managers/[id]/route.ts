@@ -1,10 +1,15 @@
 // PUT /api/admin/managers/[id]
 // Update manager fields (name, email, department, isAdmin)
+//
+// Tenant resolution: looks up the manager's ACTUAL tenant first, then
+// validates the caller's access. Previously this forced the WHERE clause to
+// `tenant_id = admin.homeTenant`, which 0-row updated when super-admins (or
+// admins on a non-home tenant via ?tenant=slug) edited a manager outside
+// their home tenant.
 
 import { NextRequest, NextResponse } from "next/server";
 import { getManagerByToken } from "@/lib/participant-db";
-import { updateManagerInSupabase } from "@/lib/supabase";
-import { resolveManagerTenantStrict } from "@/lib/tenant-context";
+import { getClient, updateManagerInSupabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -24,17 +29,38 @@ export async function PUT(
     if (!manager || !manager.isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
-    const tenantResult = resolveManagerTenantStrict(manager);
-    if (!tenantResult.ok) {
-      return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
-    }
-    const tenantId = tenantResult.tenantId;
 
     const managerId = params.id;
     if (!managerId) {
       return NextResponse.json(
         { error: "マネージャーIDが必要です" },
         { status: 400 }
+      );
+    }
+
+    // Discover the target manager's actual tenant.
+    const { data: existing, error: lookupErr } = await getClient()
+      .from("managers")
+      .select("tenant_id")
+      .eq("id", managerId)
+      .maybeSingle();
+    if (lookupErr) {
+      console.error("Manager lookup failed:", lookupErr.message);
+      return NextResponse.json({ error: "Lookup failed" }, { status: 500 });
+    }
+    if (!existing) {
+      return NextResponse.json({ error: "Manager not found" }, { status: 404 });
+    }
+    const targetTenantId = existing.tenant_id as string;
+
+    // Access check: super-admin can edit any manager; tenant-admin can only
+    // edit managers within their own tenant.
+    const isSuperAdmin = !manager.tenantId;
+    const allowed = isSuperAdmin || manager.tenantId === targetTenantId;
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Forbidden: cross-tenant edit not allowed" },
+        { status: 403 }
       );
     }
 
@@ -47,11 +73,12 @@ export async function PUT(
       }
     }
 
-    // Admin-only: allow tenant transfer
+    // Admin-only: allow tenant transfer (super-admin only since tenant-admin
+    // is bounded to their own tenant by the access check above).
     const newTenantId = updates.tenantId as string | undefined;
-    if (newTenantId && !manager.isAdmin) {
+    if (newTenantId && !isSuperAdmin) {
       return NextResponse.json(
-        { error: "テナント変更にはadmin権限が必要です" },
+        { error: "テナント変更にはsuper-admin権限が必要です" },
         { status: 403 }
       );
     }
@@ -66,8 +93,8 @@ export async function PUT(
     const success = await updateManagerInSupabase(
       managerId,
       updateData as Parameters<typeof updateManagerInSupabase>[1],
-      tenantId,
-      newTenantId
+      targetTenantId,
+      newTenantId,
     );
 
     if (!success) {
