@@ -215,7 +215,13 @@ export async function isSessionValid(token: string, cookieHeader: string | null)
 }
 
 /**
- * Parse cookie header string into an object
+ * Parse cookie header string into an object.
+ *
+ * If the same cookie name appears twice (e.g., an attacker on a sibling
+ * subdomain set a wider-Path duplicate), the FIRST occurrence wins — that's
+ * the one the user's browser stored first, and the duplicate is unsafe to
+ * trust. Browsers typically send the more specific Path first, so this
+ * preserves the most-scoped cookie. Defence-in-depth alongside SameSite=Lax.
  */
 function parseCookies(cookieHeader: string): Record<string, string> {
   const cookies: Record<string, string> = {};
@@ -224,7 +230,7 @@ function parseCookies(cookieHeader: string): Record<string, string> {
   for (const part of parts) {
     const [name, ...rest] = part.trim().split("=");
     const value = rest.join("="); // Handle values containing "="
-    if (name && value) {
+    if (name && value && !(name in cookies)) {
       try {
         cookies[name] = decodeURIComponent(value);
       } catch {

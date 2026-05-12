@@ -28,6 +28,10 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // The `server-only` package throws when loaded outside a server build.
+      // Tests import server modules (lib/supabase.ts, etc.) directly, so we
+      // stub it to a no-op for the test environment.
+      "server-only": path.resolve(__dirname, "./test-utils/server-only-stub.ts"),
     },
   },
 });

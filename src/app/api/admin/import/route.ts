@@ -48,13 +48,67 @@ type ImportResult = {
   message: string;
 };
 
+/**
+ * RFC 4180-style CSV tokenizer.
+ *
+ * Returns rows as arrays of fields. Embedded newlines inside quoted fields
+ * are preserved (Excel produces these all the time for multi-line cells),
+ * unlike the previous naive `split(/\r?\n/)`-then-parse approach which
+ * silently truncated the row at the first inner newline.
+ */
+function parseCSVDocument(text: string): string[][] {
+  const rows: string[][] = [];
+  let cur = "";
+  let row: string[] = [];
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        cur += ch;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ",") {
+      row.push(cur);
+      cur = "";
+    } else if (ch === "\n" || ch === "\r") {
+      // End row, skip a paired \r\n.
+      row.push(cur);
+      cur = "";
+      rows.push(row);
+      row = [];
+      if (ch === "\r" && text[i + 1] === "\n") i++;
+    } else {
+      cur += ch;
+    }
+  }
+  // Flush final field/row if present.
+  if (cur !== "" || row.length > 0) {
+    row.push(cur);
+    rows.push(row);
+  }
+  return rows;
+}
+
 function parseCSV(csvText: string): ImportRow[] {
-  const lines = csvText.trim().split(/\r?\n/);
-  if (lines.length < 2) return [];
+  const allRows = parseCSVDocument(csvText.replace(/^﻿/, ""));
+  if (allRows.length < 2) return [];
 
   // ヘッダー行を解析
-  const headerLine = lines[0].toLowerCase().replace(/\s/g, "");
-  const headers = headerLine.split(",").map((h) => h.trim());
+  const headers = (allRows[0] || []).map((h) =>
+    h.toLowerCase().replace(/\s/g, "").trim()
+  );
 
   // ヘッダーマッピング（日本語・英語対応）
   const nameIdx = headers.findIndex((h) =>
@@ -83,15 +137,13 @@ function parseCSV(csvText: string): ImportRow[] {
   }
 
   const rows: ImportRow[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
+  for (let i = 1; i < allRows.length; i++) {
+    const cols = allRows[i];
+    if (!cols || cols.every((c) => !c || !c.trim())) continue; // 空行スキップ
 
-    const cols = parseCSVLine(line);
     const name = cols[nameIdx]?.trim() || "";
     const email = cols[emailIdx]?.trim() || "";
-
-    if (!name || !email) continue; // 空行スキップ
+    if (!name || !email) continue;
 
     rows.push({
       line: i + 1,
@@ -105,38 +157,6 @@ function parseCSV(csvText: string): ImportRow[] {
   }
 
   return rows;
-}
-
-// CSV行をパース（引用符対応）
-function parseCSVLine(line: string): string[] {
-  const result: string[] = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (inQuotes) {
-      if (ch === '"' && line[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else if (ch === '"') {
-        inQuotes = false;
-      } else {
-        current += ch;
-      }
-    } else {
-      if (ch === '"') {
-        inQuotes = true;
-      } else if (ch === ",") {
-        result.push(current);
-        current = "";
-      } else {
-        current += ch;
-      }
-    }
-  }
-  result.push(current);
-  return result;
 }
 
 export async function POST(request: NextRequest) {

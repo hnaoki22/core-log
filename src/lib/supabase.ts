@@ -1,7 +1,12 @@
 /**
  * Supabase backend for CORE Log multi-tenant system.
  * Provides the same interface as notion.ts so the frontend can switch backends per tenant.
+ *
+ * IMPORTANT: this module uses SUPABASE_SERVICE_ROLE_KEY which MUST NOT ship
+ * to the browser. The `server-only` import causes the build to fail loudly
+ * if any client component ever imports this file (directly or transitively).
  */
+import "server-only";
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "./logger";
@@ -24,8 +29,18 @@ let _client: SupabaseClient | null = null;
 export function getClient(): SupabaseClient {
   if (_client) return _client;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) throw new Error("Supabase credentials not configured");
+  // Require service role explicitly. The previous code silently fell back to
+  // NEXT_PUBLIC_SUPABASE_ANON_KEY, which (a) is exposed to the browser bundle,
+  // and (b) hits RLS — the RLS migration enables deny-all policies on every
+  // tenant table, so anon-keyed queries would return empty arrays without an
+  // error. Failing loudly here surfaces the misconfiguration immediately.
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error(
+      "Supabase server credentials not configured. " +
+      "Set NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL) AND SUPABASE_SERVICE_ROLE_KEY.",
+    );
+  }
   _client = createClient(url, key, {
     global: {
       fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }),
@@ -268,14 +283,30 @@ export async function getLogsByParticipant(
   return data.map(rowToLog);
 }
 
-// Batch: fetch ALL logs for a tenant (or all tenants) in one query (for admin dashboard)
+// Batch: fetch logs for a tenant (or all tenants) in one query — used by the
+// admin dashboard. Defaults to a 90-day window so a long-running tenant
+// doesn't pull months of historical rows on every page render, and caps the
+// result at MAX_LOGS to bound the response size if a tenant ever lands above
+// that volume.
+const ADMIN_LOGS_DEFAULT_WINDOW_DAYS = 90;
+const ADMIN_LOGS_MAX_ROWS = 5000;
+
 export async function getAllLogsForTenant(
-  tenantId?: string
+  tenantId?: string,
+  options?: { sinceDate?: string; limit?: number },
 ): Promise<Map<string, NotionLogEntry[]>> {
+  const since = options?.sinceDate
+    ?? new Date(Date.now() - ADMIN_LOGS_DEFAULT_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+  const limit = Math.min(options?.limit ?? ADMIN_LOGS_MAX_ROWS, ADMIN_LOGS_MAX_ROWS);
+
   let query = getClient()
     .from("logs")
     .select("*")
-    .order("date", { ascending: false });
+    .gte("date", since)
+    .order("date", { ascending: false })
+    .limit(limit);
   if (tenantId) {
     query = query.eq("tenant_id", tenantId);
   }
@@ -962,6 +993,40 @@ export async function getMissionComments(
     logger.error("Query failed", { error: error.message, missionId });
   }
   return (data || []).map(rowToComment);
+}
+
+/**
+ * Batch-fetch comments for many missions in one round trip.
+ * Returns Map(missionId -> comments[]). Used by /api/logs which previously
+ * issued N queries (one per mission) inside a loop.
+ */
+export async function getMissionCommentsBatch(
+  missionIds: string[],
+  options?: { sinceIso?: string }
+): Promise<Map<string, MissionComment[]>> {
+  const result = new Map<string, MissionComment[]>();
+  if (missionIds.length === 0) return result;
+  let query = getClient()
+    .from("mission_comments")
+    .select("*")
+    .in("mission_id", missionIds)
+    .order("created_at", { ascending: true });
+  if (options?.sinceIso) {
+    query = query.gte("created_at", options.sinceIso);
+  }
+  const { data, error } = await query;
+  if (error) {
+    logger.error("Batch mission_comments query failed", { error: error.message });
+    return result;
+  }
+  for (const row of data || []) {
+    const comment = rowToComment(row);
+    const missionId = (row as { mission_id: string }).mission_id;
+    const list = result.get(missionId) || [];
+    list.push(comment);
+    result.set(missionId, list);
+  }
+  return result;
 }
 
 export async function createMission(
