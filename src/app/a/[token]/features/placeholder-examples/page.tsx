@@ -304,7 +304,7 @@ export default function PlaceholderExamplesAdminPage() {
               プレースホルダー例示管理
             </h1>
             <p className="text-sm text-gray-500 mt-1">
-              AI生成でテナント別の朝の意図・振り返り例示をカスタマイズ
+              テナント別に朝の意図・振り返りのプレースホルダー例示を管理
             </p>
           </div>
           {/* Tenant switcher */}
@@ -355,7 +355,7 @@ export default function PlaceholderExamplesAdminPage() {
           </h2>
           <p className="text-sm text-gray-600 mb-4">
             クライアントのMVVと課題図書のタイトル・キーワードを入力すると、
-            COREグラウンドルールに基づいた例示をAIが生成します。
+            それらを反映した朝の意図・振り返りの例示をAIが生成します。
           </p>
 
           <div className="space-y-4">
