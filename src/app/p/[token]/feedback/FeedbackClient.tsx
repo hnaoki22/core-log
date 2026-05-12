@@ -1,0 +1,173 @@
+"use client";
+
+import { BottomNav } from "@/components/BottomNav";
+import { useState, useEffect } from "react";
+import { useFeatures } from "@/lib/use-features";
+
+type FeedbackEntry = {
+  id: string;
+  participantName: string;
+  authorName: string;
+  type: "HMフィードバック" | "上司コメント";
+  content: string;
+  period: string;
+  weekNum: number;
+  date: string;
+  isRead: boolean;
+};
+
+export type FeedbackInitialData = {
+  feedbacks: FeedbackEntry[];
+  unreadCount: number;
+  totalCount: number;
+};
+
+interface Props {
+  token: string;
+  initialData: FeedbackInitialData;
+}
+
+export default function FeedbackClient({ token, initialData }: Props) {
+  // Hydrate with server-fetched data — no client fetch waterfall.
+  const [feedbacks, setFeedbacks] = useState<FeedbackEntry[]>(initialData.feedbacks);
+  const [unreadCount, setUnreadCount] = useState(initialData.unreadCount);
+  const [badges, setBadges] = useState<{ feedback: number; feedbackTotal: number; mission: number }>({
+    feedback: initialData.unreadCount,
+    feedbackTotal: initialData.totalCount,
+    mission: 0,
+  });
+  const { isOn, loaded: featuresLoaded } = useFeatures();
+  // フィードバック機能フラグがOFFでも、既にフィードバックが存在する場合は表示する
+  const fbOn = !featuresLoaded || isOn("feature.managerFeedback");
+  const hasFeedbacks = feedbacks.length > 0;
+
+  // Background revalidate: pick up mission badge count (which needs an extra
+  // query into mission_comments) and refresh feedback list if anything
+  // changed since the server fetched it.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const logsRes = await fetch(`/api/logs?token=${token}`);
+        if (cancelled || !logsRes.ok) return;
+        const logsData = await logsRes.json();
+        if (logsData.badges) {
+          setBadges((prev) => ({ ...prev, mission: logsData.badges.mission || 0 }));
+        }
+      } catch {
+        // ignore — keep server-rendered initial state
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [token]);
+
+  const markAsRead = async (feedbackId: string) => {
+    try {
+      await fetch("/api/feedback", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, feedbackId }),
+      });
+      setFeedbacks((prev) => prev.map((f) => (f.id === feedbackId ? { ...f, isRead: true } : f)));
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+      setBadges((prev) => ({ ...prev, feedback: Math.max(0, prev.feedback - 1) }));
+    } catch {
+      // silently fail
+    }
+  };
+
+  // フィードバック機能がOFFでも、既にフィードバックが届いている場合は表示する
+  if (featuresLoaded && !fbOn && !hasFeedbacks) {
+    return (
+      <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6 pb-24">
+        <div className="text-center max-w-sm">
+          <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8B8489" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
+          <h2 className="text-base font-semibold text-[#1A1A2E] mb-2">フィードバック機能は現在オフです</h2>
+          <p className="text-sm text-[#5B5560] leading-relaxed">
+            まずは自由に記入を続けることで、自分なりの気づきや学びを得る期間です。<br />
+            しばらく継続したあとで、この機能が有効化されます。
+          </p>
+        </div>
+        <BottomNav active="feedback" baseUrl={`/p/${token}`} badges={badges} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F5F0EB] pb-24">
+      {/* Header */}
+      <div className="gradient-header text-white px-6 pt-12 pb-6">
+        <div className="max-w-md mx-auto relative z-10">
+          <h1 className="text-xl font-semibold tracking-tight">フィードバック</h1>
+          {unreadCount > 0 && (
+            <p className="text-indigo-200 text-sm mt-1 font-light">未読 {unreadCount}件</p>
+          )}
+        </div>
+      </div>
+
+      <div className="max-w-md mx-auto px-5 pt-5 space-y-3 animate-fade-up relative z-10">
+        {feedbacks.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="w-12 h-12 bg-[#EFE8DD] rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8B8489" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
+            <p className="text-[#5B5560] text-sm">フィードバックはまだありません</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {feedbacks.map((fb) => {
+              const isHM = fb.type === "HMフィードバック";
+              return (
+                <div
+                  key={fb.id}
+                  className={`card p-4 space-y-3 transition-all ${
+                    !fb.isRead ? "border-l-[3px] border-l-[#1A1A2E] bg-white" : "bg-white"
+                  }`}
+                  onClick={() => {
+                    if (!fb.isRead) markAsRead(fb.id);
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
+                        isHM ? "bg-amber-50 text-amber-600" : "bg-indigo-50 text-[#1A1A2E]"
+                      }`}>
+                        {fb.type}
+                      </span>
+                      {!fb.isRead && (
+                        <span className="bg-[#8B1A2B] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">
+                          NEW
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-[#8B8489]">{fb.date}</p>
+                  </div>
+
+                  {fb.period && (
+                    <p className="text-[11px] text-[#8B8489]">
+                      対象: {fb.period}
+                      {fb.weekNum > 0 && ` (第${fb.weekNum}週)`}
+                    </p>
+                  )}
+
+                  <div className={`p-3 rounded-xl ${isHM ? "bg-amber-50/50" : "bg-indigo-50/50"}`}>
+                    <p className="text-[11px] text-[#8B8489] mb-1.5">from: {fb.authorName}</p>
+                    <p className="text-sm text-[#2C2C4A] leading-relaxed whitespace-pre-wrap">{fb.content}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <BottomNav active="feedback" baseUrl={`/p/${token}`} badges={badges} />
+    </div>
+  );
+}

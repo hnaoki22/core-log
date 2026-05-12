@@ -1,0 +1,225 @@
+"use client";
+
+import { BottomNav } from "@/components/BottomNav";
+import { formatDateTimeJST, formatTimeJST } from "@/lib/date-utils";
+import { useState, useEffect } from "react";
+
+/** Format datetime string to "2026/6/10 08:30" in JST */
+const formatDateTime = formatDateTimeJST;
+
+type LogEntry = {
+  id: string;
+  date: string;
+  datetime?: string;
+  dayOfWeek: string;
+  dayNum: number;
+  morningIntent: string;
+  eveningInsight: string | null;
+  energy: "excellent" | "good" | "okay" | "low" | null;
+  status: "complete" | "morning_only" | "empty" | "fb_done";
+  hasFeedback: boolean;
+  hmFeedback?: string | null;
+  managerComment?: string | null;
+  managerCommentTime?: string | null;
+  managerReaction?: string | null;
+  morningTime?: string | null;
+  eveningTime?: string | null;
+};
+
+const energyEmoji: Record<string, string> = {
+  excellent: "🔥",
+  good: "😊",
+  okay: "😐",
+  low: "😞",
+};
+
+const energyLabel: Record<string, string> = {
+  excellent: "絶好調",
+  good: "良い",
+  okay: "まあまあ",
+  low: "低調",
+};
+
+/** Format time in JST */
+const formatTime = formatTimeJST;
+
+export type LogsInitialData = {
+  logs: LogEntry[];
+  badges: { feedback: number; feedbackTotal: number; mission: number };
+};
+
+interface Props {
+  token: string;
+  initialData: LogsInitialData;
+}
+
+export default function LogsClient({ token, initialData }: Props) {
+  // Hydrate from server-fetched data — no client fetch waterfall on first paint.
+  const [logs, setLogs] = useState<LogEntry[]>(initialData.logs);
+  const [badges, setBadges] = useState<{ feedback: number; feedbackTotal: number; mission: number }>(initialData.badges);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Background revalidate so logs stay fresh in long-running tabs and the
+  // mission badge (which needs a join into mission_comments) populates.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/logs?token=${token}`);
+        if (cancelled || !res.ok) return;
+        const data = await res.json();
+        setLogs(data.logs || []);
+        if (data.badges) setBadges(data.badges);
+      } catch {
+        // ignore — keep server-rendered initial state
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [token]);
+
+  const statusConfig = {
+    morning_only: { label: "朝のみ", bg: "bg-indigo-50", text: "text-[#1A1A2E]" },
+    complete: { label: "完了", bg: "bg-emerald-50", text: "text-emerald-600" },
+    fb_done: { label: "FB済", bg: "bg-amber-50", text: "text-amber-600" },
+    empty: { label: "未記入", bg: "bg-gray-50", text: "text-gray-400" },
+  };
+
+  return (
+    <div className="min-h-screen bg-[#F5F0EB] pb-24">
+      {/* Header */}
+      <div className="gradient-header text-white px-6 pt-12 pb-6">
+        <div className="max-w-md mx-auto relative z-10">
+          <h1 className="text-xl font-semibold tracking-tight">ログ一覧</h1>
+          <p className="text-indigo-200 text-sm mt-1 font-light">{logs.length}件の記録</p>
+        </div>
+      </div>
+
+      <div className="max-w-md mx-auto px-5 pt-5 animate-fade-up relative z-10">
+        {logs.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="w-12 h-12 bg-[#EFE8DD] rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8B8489" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+            </div>
+            <p className="text-[#5B5560] text-sm">まだログがありません</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {logs.map((log) => {
+              const config = statusConfig[log.status] || statusConfig.empty;
+              return (
+                <div key={log.id} className="card overflow-hidden">
+                  <button
+                    onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
+                    className="w-full p-4 flex gap-3 hover:bg-[#FBF8F4] transition-colors text-left"
+                  >
+                    <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-semibold ${
+                      log.hasFeedback ? "bg-amber-500" : "bg-[#1A1A2E]"
+                    }`}>
+                      <div className="text-center leading-tight">
+                        <div className="font-bold text-sm">{log.dayNum}</div>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-[#1A1A2E] font-medium truncate leading-tight">
+                        {log.morningIntent || "(未記入)"}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className="text-[11px] text-[#8B8489]">{formatDateTime(log.datetime, log.date)} ({log.dayOfWeek})</span>
+                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${config.bg} ${config.text}`}>
+                          {config.label}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex-shrink-0 flex items-center gap-2">
+                      {log.energy && (
+                        <span className="text-base leading-none">{energyEmoji[log.energy]}</span>
+                      )}
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9BDAE" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                        className={`transition-transform duration-200 ${expandedId === log.id ? "rotate-90" : ""}`}>
+                        <polyline points="9 18 15 12 9 6"/>
+                      </svg>
+                    </div>
+                  </button>
+
+                  {/* Expanded View */}
+                  {expandedId === log.id && (
+                    <div className="border-t border-[#EFE8DD] p-4 bg-[#FBF8F4] space-y-3">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="text-[10px] font-medium text-[#1A1A2E] tracking-wide uppercase">朝の意図</p>
+                          {log.morningTime && (
+                            <span className="text-[10px] text-[#C9BDAE]">{formatTime(log.morningTime)}</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-[#2C2C4A] leading-relaxed">{log.morningIntent || "(未記入)"}</p>
+                      </div>
+
+                      {log.eveningInsight && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-[10px] font-medium text-amber-600 tracking-wide uppercase">本日の振り返り</p>
+                            {log.eveningTime && (
+                              <span className="text-[10px] text-[#C9BDAE]">{formatTime(log.eveningTime)}</span>
+                            )}
+                          </div>
+                          <p className="text-sm text-[#2C2C4A] leading-relaxed">{log.eveningInsight}</p>
+                        </div>
+                      )}
+
+                      {log.energy && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-base leading-none">{energyEmoji[log.energy]}</span>
+                          <span className="text-xs text-[#5B5560]">{energyLabel[log.energy]}</span>
+                        </div>
+                      )}
+
+                      {log.managerReaction && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] text-[#8B8489] mr-0.5">上司リアクション</span>
+                          {log.managerReaction.split(",").filter(Boolean).map((emoji, i) => (
+                            <span
+                              key={`${emoji}-${i}`}
+                              className="inline-flex items-center px-1.5 py-0.5 bg-indigo-50 border border-indigo-200 rounded-full text-sm"
+                            >
+                              {emoji}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {log.managerComment && (
+                        <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-xl">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-[10px] font-medium text-[#1A1A2E] tracking-wide">上司コメント</p>
+                            {log.managerCommentTime && (
+                              <span className="text-[10px] text-[#C9BDAE]">{formatTime(log.managerCommentTime)}</span>
+                            )}
+                          </div>
+                          <p className="text-sm text-[#2C2C4A] leading-relaxed">{log.managerComment}</p>
+                        </div>
+                      )}
+
+                      {log.hmFeedback && (
+                        <div className="bg-amber-50 border border-amber-100 p-3 rounded-xl">
+                          <p className="text-[10px] font-medium text-amber-600 tracking-wide mb-1">HMフィードバック</p>
+                          <p className="text-sm text-[#2C2C4A] leading-relaxed">{log.hmFeedback}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <BottomNav active="logs" baseUrl={`/p/${token}`} badges={badges} />
+    </div>
+  );
+}
