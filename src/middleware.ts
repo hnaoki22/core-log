@@ -69,6 +69,23 @@ function logApiRequest(
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
+  // ===== Skip prefetch =====
+  // Next.js fires GET requests with `Next-Router-Prefetch: 1` (or the older
+  // `purpose: prefetch`) when a <Link> enters the viewport. We don't need
+  // to do session validation, redirect logic, or rate-limit accounting for
+  // these — they're speculative loads, not real navigation, and forcing
+  // them through the full auth path causes prefetch failures that defeat
+  // the point of Link prefetching.
+  const isPrefetch =
+    request.headers.get("next-router-prefetch") === "1" ||
+    request.headers.get("purpose") === "prefetch" ||
+    request.headers.get("sec-purpose")?.includes("prefetch");
+  if (isPrefetch) {
+    const res = NextResponse.next();
+    Object.entries(securityHeaders).forEach(([key, value]) => res.headers.set(key, value));
+    return res;
+  }
+
     // ===== Domain Redirect =====
     // vercel.appドメインからカスタムドメインへ308永久リダイレクト
     // ただしVercel Cronからのリクエスト（/api/cron/*）はリダイレクトしない
@@ -92,92 +109,38 @@ export async function middleware(request: NextRequest) {
           return NextResponse.redirect(redirectUrl, 308);
     }
 
-  // OTP session verification for protected routes
-  // Check feature flag from admin dashboard (Supabase ai_settings)
-  // Falls back to OTP_ENABLED env var if feature flag check fails
-  let otpEnabled = false;
-  try {
-    otpEnabled = await isFeatureEnabled("feature.otpAuth", DEFAULT_TENANT_ID); // global toggle
-  } catch {
-    // Fallback to env var if Supabase is unreachable
-    otpEnabled = process.env.OTP_ENABLED === "true";
-  }
+  // ===== Fast path for authenticated requests =====
+  //
+  // For protected routes (/p, /m, /a, /api) check the session cookie FIRST.
+  // If the cookie's HMAC signature validates, the user is authenticated and
+  // we can skip the Supabase round-trip for the OTP feature flag entirely.
+  //
+  // Previously the order was: feature-flag check (Supabase RT) → session
+  // check (HMAC). On the happy path (logged-in user) the flag check was
+  // pure overhead, paid on every page navigation and every fetch from the
+  // page. With the cache miss probability ≈ 1/(uptime_seconds/5), on a
+  // low-traffic deploy almost every request was a cache miss.
+  const tokenMatch = pathname.match(/^\/([pma])\/([a-zA-Z0-9_-]+)(\/.*)?$/);
+  const isProtectedPage = tokenMatch && !pathname.startsWith("/api/") && !pathname.startsWith("/verify/");
 
-  if (otpEnabled) {
-    // Match patterns: /p/[token], /m/[token], /a/[token]
-    const tokenMatch = pathname.match(/^\/([pma])\/([a-zA-Z0-9_-]+)(\/.*)?$/);
-
-    if (tokenMatch && !pathname.startsWith("/api/") && !pathname.startsWith("/verify/")) {
-      const [, , token] = tokenMatch;
-      const cookieHeader = request.headers.get("cookie");
-
-      // Check if session is valid (async — uses Web Crypto API for HMAC, multi-key validation)
-      const sessionValid = await isSessionValid(token, cookieHeader);
-      if (!sessionValid) {
-        // Cookie validation failed — try Supabase-backed session as fallback.
-        // This handles iOS in-app browser cookie isolation, cookie clearing, etc.
-        const supabaseSessionValid = await checkSession(token);
-
-        if (supabaseSessionValid) {
-          // Session exists in Supabase but cookie is missing/invalid.
-          // Re-issue the cookie so future requests don't need Supabase lookup.
-          console.log(
-            `[OTP] Session recovered from Supabase: token=${token.slice(0, 6)}... ` +
-            `Reissuing cookie. path=${pathname}`
-          );
-          const cookieName = getSessionCookieName(token);
-          const signedValue = await createSignedSessionValue(token);
-          const res = NextResponse.next();
-          res.cookies.set({
-            name: cookieName,
-            value: signedValue,
-            httpOnly: true,
-            secure: isSecureRequest(request),
-            sameSite: "lax",
-            maxAge: SESSION_MAX_AGE,
-            path: "/",
-          });
-          Object.entries(securityHeaders).forEach(([key, value]) => {
-            res.headers.set(key, value);
-          });
-          return res;
-        }
-
-        // Both cookie and Supabase validation failed — redirect to OTP verification
-        const cookieName = getSessionCookieName(token);
-        const hasCookie = cookieHeader?.includes(cookieName) ?? false;
-        const userAgent = request.headers.get("user-agent") || "none";
-        const isSafari = userAgent.includes("Safari") && !userAgent.includes("Chrome");
-        console.warn(
-          `[OTP] Session invalid (cookie+supabase): token=${token.slice(0, 6)}... hasCookie=${hasCookie} ` +
-          `safari=${isSafari} path=${pathname} ` +
-          `referer=${request.headers.get("referer") || "none"}`
-        );
-        // Redirect to verification page
-        const verifyUrl = new URL(`/verify/${token}`, request.url);
-        return NextResponse.redirect(verifyUrl);
-      }
-
-      // Sliding session: renew cookie expiry on every valid page visit
-      // This means users who access CORE Log at least once every 30 days
-      // will never be asked to re-authenticate.
+  if (isProtectedPage) {
+    const [, , token] = tokenMatch!;
+    const cookieHeader = request.headers.get("cookie");
+    // HMAC validation is pure Web Crypto, no I/O — fast.
+    const sessionValid = await isSessionValid(token, cookieHeader);
+    if (sessionValid) {
+      // Sliding session: renew cookie expiry on every valid visit.
       const cookieName = getSessionCookieName(token);
       const existingCookie = cookieHeader?.split(";").find((c) => c.trim().startsWith(`${cookieName}=`));
+      const res = NextResponse.next();
       if (existingCookie) {
         const rawCookieValue = existingCookie.split("=").slice(1).join("=").trim();
-        // IMPORTANT: Decode the cookie value before re-setting it.
-        // The browser stores URL-encoded values (e.g., "verified%3A...").
-        // Next.js cookies.set() re-encodes the value, so passing the raw
-        // encoded value would cause double-encoding ("%253A" instead of "%3A"),
-        // corrupting the cookie on subsequent requests.
         let cookieValue: string;
         try {
           cookieValue = decodeURIComponent(rawCookieValue);
         } catch {
           cookieValue = rawCookieValue;
         }
-        const res = NextResponse.next();
-        // Re-set the same cookie with a fresh 30-day expiry
         res.cookies.set({
           name: cookieName,
           value: cookieValue,
@@ -187,13 +150,63 @@ export async function middleware(request: NextRequest) {
           maxAge: SESSION_MAX_AGE,
           path: "/",
         });
-        // Add security headers to this response too
-        Object.entries(securityHeaders).forEach(([key, value]) => {
-          res.headers.set(key, value);
-        });
-        return res;
       }
+      Object.entries(securityHeaders).forEach(([key, value]) => res.headers.set(key, value));
+      return res;
     }
+  }
+
+  // Slow path: no valid session, OR not a protected page. Now check the OTP
+  // feature flag to decide whether to enforce auth or pass through.
+  let otpEnabled = false;
+  try {
+    otpEnabled = await isFeatureEnabled("feature.otpAuth", DEFAULT_TENANT_ID); // global toggle
+  } catch {
+    // Fallback to env var if Supabase is unreachable
+    otpEnabled = process.env.OTP_ENABLED === "true";
+  }
+
+  if (otpEnabled && isProtectedPage) {
+    const [, , token] = tokenMatch!;
+    const cookieHeader = request.headers.get("cookie");
+    // Session HMAC already failed in the fast-path branch (we wouldn't be
+    // here otherwise). Try the Supabase-backed session as fallback —
+    // handles iOS in-app browser cookie isolation, cookie clearing, etc.
+    const supabaseSessionValid = await checkSession(token);
+
+    if (supabaseSessionValid) {
+      console.log(
+        `[OTP] Session recovered from Supabase: token=${token.slice(0, 6)}... ` +
+        `Reissuing cookie. path=${pathname}`
+      );
+      const cookieName = getSessionCookieName(token);
+      const signedValue = await createSignedSessionValue(token);
+      const res = NextResponse.next();
+      res.cookies.set({
+        name: cookieName,
+        value: signedValue,
+        httpOnly: true,
+        secure: isSecureRequest(request),
+        sameSite: "lax",
+        maxAge: SESSION_MAX_AGE,
+        path: "/",
+      });
+      Object.entries(securityHeaders).forEach(([key, value]) => res.headers.set(key, value));
+      return res;
+    }
+
+    // Both cookie and Supabase validation failed — redirect to OTP verification
+    const cookieName = getSessionCookieName(token);
+    const hasCookie = cookieHeader?.includes(cookieName) ?? false;
+    const userAgent = request.headers.get("user-agent") || "none";
+    const isSafari = userAgent.includes("Safari") && !userAgent.includes("Chrome");
+    console.warn(
+      `[OTP] Session invalid (cookie+supabase): token=${token.slice(0, 6)}... hasCookie=${hasCookie} ` +
+      `safari=${isSafari} path=${pathname} ` +
+      `referer=${request.headers.get("referer") || "none"}`
+    );
+    const verifyUrl = new URL(`/verify/${token}`, request.url);
+    return NextResponse.redirect(verifyUrl);
   }
 
   const response = NextResponse.next();
