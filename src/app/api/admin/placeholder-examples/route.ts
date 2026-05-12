@@ -10,6 +10,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   getManagerByTokenFromSupabase as getManagerByToken,
+  getAllTenants,
+  DEFAULT_TENANT_ID,
 } from "@/lib/supabase";
 import { resolveAdminTenantContext } from "@/lib/tenant-context";
 import {
@@ -36,19 +38,30 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
+    // Resolve tenant — for this per-tenant feature, fall back to manager's own
+    // tenant when no ?tenant= slug is provided (全テナント mode is not useful here).
     const ctx = await resolveAdminTenantContext(request, manager);
-    if (!ctx.tenantId) {
-      return NextResponse.json(
-        { error: "テナントを指定してください" },
-        { status: 400 }
-      );
-    }
-    const store = await getPlaceholderStoreData(ctx.tenantId);
+    const tenantId = ctx.tenantId ?? manager.tenantId ?? DEFAULT_TENANT_ID;
+
+    const store = await getPlaceholderStoreData(tenantId);
+
+    // Build tenant metadata for UI (tenant switcher)
+    const allTenants = manager.isAdmin ? await getAllTenants() : [];
+    const currentTenant = allTenants.find((t) => t.id === tenantId);
 
     return NextResponse.json({
       success: true,
       data: store ?? { approved: [], draft: [], updatedAt: null },
-      tenantId: ctx.tenantId,
+      tenantId,
+      tenantSlug: currentTenant?.slug ?? null,
+      tenantName: currentTenant?.name ?? null,
+      isSuperAdmin: !!manager.isAdmin,
+      allTenants: allTenants.map((t) => ({
+        id: t.id,
+        slug: t.slug,
+        name: t.name,
+        companyName: t.companyName,
+      })),
     });
   } catch (err) {
     console.error("GET /api/admin/placeholder-examples error:", err);
@@ -75,13 +88,7 @@ export async function POST(request: NextRequest) {
     }
 
     const ctx = await resolveAdminTenantContext(request, manager);
-    if (!ctx.tenantId) {
-      return NextResponse.json(
-        { error: "テナントを指定してください" },
-        { status: 400 }
-      );
-    }
-    const tenantId = ctx.tenantId;
+    const tenantId = ctx.tenantId ?? manager.tenantId ?? DEFAULT_TENANT_ID;
 
     switch (action) {
       case "approve": {

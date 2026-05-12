@@ -22,6 +22,13 @@ type StoreData = {
   generationContext?: string;
 };
 
+type TenantOption = {
+  id: string;
+  slug: string;
+  name: string;
+  companyName?: string;
+};
+
 export default function PlaceholderExamplesAdminPage() {
   const params = useParams();
   const token = params.token as string;
@@ -41,6 +48,12 @@ export default function PlaceholderExamplesAdminPage() {
   const [dojoPhase, setDojoPhase] = useState<string>("1");
   const [count, setCount] = useState(7);
 
+  // Tenant state
+  const [tenantSlug, setTenantSlug] = useState<string | null>(null);
+  const [tenantName, setTenantName] = useState<string | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [allTenants, setAllTenants] = useState<TenantOption[]>([]);
+
   // Editing state
   const [editingSet, setEditingSet] = useState<{
     source: "draft" | "approved";
@@ -54,15 +67,29 @@ export default function PlaceholderExamplesAdminPage() {
     loadData();
   }, [token]);
 
+  // Build API URL with tenant param
+  function apiUrl(path: string): string {
+    const base = `${path}?token=${token}`;
+    if (tenantSlug) return `${base}&tenant=${tenantSlug}`;
+    // On first load, check URL for tenant param
+    if (typeof window !== "undefined") {
+      const urlTenant = new URL(window.location.href).searchParams.get("tenant");
+      if (urlTenant) return `${base}&tenant=${urlTenant}`;
+    }
+    return base;
+  }
+
   async function loadData() {
     setLoading(true);
     try {
-      const res = await fetch(
-        `/api/admin/placeholder-examples?token=${token}`
-      );
+      const res = await fetch(apiUrl("/api/admin/placeholder-examples"));
       if (res.ok) {
         const json = await res.json();
         setStoreData(json.data);
+        setTenantSlug(json.tenantSlug ?? null);
+        setTenantName(json.tenantName ?? null);
+        setIsSuperAdmin(!!json.isSuperAdmin);
+        setAllTenants(json.allTenants ?? []);
       } else {
         setMessage({ type: "err", text: "データの読み込みに失敗しました" });
       }
@@ -85,7 +112,7 @@ export default function PlaceholderExamplesAdminPage() {
     setMessage(null);
     try {
       const res = await fetch(
-        `/api/admin/placeholder-examples/generate?token=${token}`,
+        apiUrl("/api/admin/placeholder-examples/generate"),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -123,7 +150,7 @@ export default function PlaceholderExamplesAdminPage() {
     setMessage(null);
     try {
       const res = await fetch(
-        `/api/admin/placeholder-examples?token=${token}`,
+        apiUrl("/api/admin/placeholder-examples"),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -149,7 +176,7 @@ export default function PlaceholderExamplesAdminPage() {
     setSaving(true);
     try {
       const res = await fetch(
-        `/api/admin/placeholder-examples?token=${token}`,
+        apiUrl("/api/admin/placeholder-examples"),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -201,7 +228,7 @@ export default function PlaceholderExamplesAdminPage() {
       else body.approved = sets;
 
       const res = await fetch(
-        `/api/admin/placeholder-examples?token=${token}`,
+        apiUrl("/api/admin/placeholder-examples"),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -232,7 +259,7 @@ export default function PlaceholderExamplesAdminPage() {
     if (source === "draft") body.draft = sets;
     else body.approved = sets;
 
-    fetch(`/api/admin/placeholder-examples?token=${token}`, {
+    fetch(apiUrl("/api/admin/placeholder-examples"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -274,6 +301,32 @@ export default function PlaceholderExamplesAdminPage() {
             <p className="text-sm text-gray-500 mt-1">
               AI生成でテナント別の朝の意図・振り返り例示をカスタマイズ
             </p>
+          </div>
+          {/* Tenant switcher */}
+          <div className="text-right">
+            {isSuperAdmin && allTenants.length > 1 ? (
+              <select
+                value={tenantSlug ?? ""}
+                onChange={(e) => {
+                  const slug = e.target.value;
+                  const url = new URL(window.location.href);
+                  if (slug) url.searchParams.set("tenant", slug);
+                  else url.searchParams.delete("tenant");
+                  window.location.href = url.toString();
+                }}
+                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-[#8B1A2B]/20 focus:border-[#8B1A2B]"
+              >
+                {allTenants.map((t) => (
+                  <option key={t.id} value={t.slug}>
+                    {t.name} ({t.slug})
+                  </option>
+                ))}
+              </select>
+            ) : tenantName ? (
+              <span className="text-sm text-gray-600">
+                編集中のテナント: <strong className="text-[#1A1A2E]">{tenantName}</strong>
+              </span>
+            ) : null}
           </div>
         </div>
 

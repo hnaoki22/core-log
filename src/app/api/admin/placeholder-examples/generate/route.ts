@@ -54,15 +54,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Resolve tenant via standard admin context
+    // Resolve tenant via standard admin context — fall back to manager's own tenant
     const ctx = await resolveAdminTenantContext(request, manager);
-    if (!ctx.tenantId) {
+    const tenantId = ctx.tenantId ?? manager.tenantId;
+    if (!tenantId) {
       return NextResponse.json(
-        { error: "テナントを指定してください（全テナントモードでは例示を生成できません）" },
+        { error: "テナントを特定できません" },
         { status: 400 }
       );
     }
-    const tenantId = ctx.tenantId;
 
     // --- Generate via LLM ---
     const result = await generatePlaceholderExamples({
