@@ -692,10 +692,10 @@ export default function PlaceholderExamplesAdminPage() {
 
             {showDefaults && (
               <div className="mt-4 space-y-4">
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-sm text-amber-800 font-medium">
-                    注意: 道場1・道場2の例示は大幸薬品の課題図書（7つの習慣、イシューからはじめよ等）に基づいています。
-                    他テナントでカスタム例示を設定していない場合、これらがそのまま表示されます。
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    デフォルト例示はCOREグラウンドルール（C/O/R/E）に基づく汎用的な内容です。
+                    テナント固有の課題図書に紐づく例示は、上のAI生成機能でカスタム例示として設定してください。
                   </p>
                 </div>
                 {defaults.map((set, setIdx) => (
