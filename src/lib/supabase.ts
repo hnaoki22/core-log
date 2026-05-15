@@ -585,16 +585,27 @@ export async function toggleManagerReaction(
   }
   const newValue = current.length > 0 ? current.join(",") : null;
 
-  // 3. CAS write back — only update if reactions are still what we read, to
-  // avoid lost updates under concurrent toggles. Defends in depth alongside
-  // tenant filter.
-  const { error: writeErr, data: updated } = await getClient()
+  // 3. Write back. Previously this used `.eq("manager_reaction", row.manager_reaction ?? null)`
+  // as a "compare-and-swap" to defend against concurrent toggles. That was wrong:
+  // PostgREST `.eq("col", null)` becomes SQL `col = NULL`, which is always false
+  // (SQL NULL semantics require `IS NULL`). On the very first reaction (and any
+  // time the column was cleared) the CAS matched 0 rows, the API returned
+  // `success: false`, and the client rolled back the optimistic update —
+  // stamps appeared to vanish immediately after being pressed.
+  //
+  // Use PostgREST's `.is()` for the NULL case, `.eq()` for the value case.
+  // This preserves the lost-update protection without breaking first-press.
+  let query = getClient()
     .from("logs")
     .update({ manager_reaction: newValue })
     .eq("id", logId)
-    .eq("tenant_id", tenantId)
-    .eq("manager_reaction", row.manager_reaction ?? null)
-    .select("id");
+    .eq("tenant_id", tenantId);
+  if (row.manager_reaction === null || row.manager_reaction === undefined) {
+    query = query.is("manager_reaction", null);
+  } else {
+    query = query.eq("manager_reaction", row.manager_reaction);
+  }
+  const { error: writeErr, data: updated } = await query.select("id");
   if (writeErr) {
     logger.error("Update failed for reaction", { error: writeErr.message, logId });
     return { success: false, reactions: null };
