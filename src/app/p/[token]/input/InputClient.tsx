@@ -53,10 +53,6 @@ export default function InputPage({ token, initialData }: Props) {
   const router = useRouter();
   const { isOn } = useFeatures();
 
-  // Hydrate from server-fetched data. The previous Client-Component version
-  // showed a "loading..." spinner for ~500-1000ms while it awaited
-  // /api/logs from useEffect; with the Server Component parent the page
-  // already knows whether today's log exists by the time HTML is sent.
   const [participant, setParticipant] = useState<ParticipantBasic>(initialData.participant);
   const [step, setStep] = useState(1);
   const [morning, setMorning] = useState("");
@@ -68,12 +64,8 @@ export default function InputPage({ token, initialData }: Props) {
   const [now, setNow] = useState(new Date());
   const [todayLog, setTodayLog] = useState<TodayLog | null>(initialData.todayLog);
   const [isMorning, setIsMorning] = useState(initialData.initialIsMorning);
-  const [morningClosed, setMorningClosed] = useState(initialData.initialMorningClosed); // 12:00過ぎで朝未記入
-  // loadingStatus retained only to keep the diff readable; first paint is
-  // already populated by the Server Component parent.
+  const [morningClosed, setMorningClosed] = useState(initialData.initialMorningClosed);
   const [alreadyCompleted, setAlreadyCompleted] = useState(initialData.initialAlreadyCompleted);
-  // テナント別カスタム例示 (main 由来) — fetch しないと null。Server Component 親は
-  // 例示を server 取得していないので、background fetch する。
   const [customExamples, setCustomExamples] = useState<CustomExampleSet[] | null>(null);
   const [showDoubleLoop, setShowDoubleLoop] = useState(true);
   const [structuredInput, setStructuredInput] = useState<StructuredInputState>({
@@ -81,21 +73,16 @@ export default function InputPage({ token, initialData }: Props) {
     observation: "",
     lesson: "",
   });
-  // Daily questions (feature.dailyQuestions): per-tenant 3 morning + 3 evening
-  // questions, each rendered with its own textarea + Whisper mic. Loaded once
-  // on mount; empty arrays mean the feature is disabled or unset for this tenant.
-  const [dailyQuestions, setDailyQuestions] = useState<{ morning: string[]; evening: string[] }>({
+  const [dailyQuestions, setDailyQuestions] = useState<{ morning: string[]; evening: string[]; axis: string; day: string }>({
     morning: [],
     evening: [],
+    axis: "",
+    day: "",
   });
   const [dailyQuestionsEnabled, setDailyQuestionsEnabled] = useState(false);
   const eveningTextareaRef = useRef<HTMLTextAreaElement>(null);
   const morningTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // 記入所要時間の計測:
-  //   textarea に最初にフォーカスした時刻を保存し、submit 時に経過秒数を計算する。
-  //   - 最初のフォーカス時刻のみ記録（再フォーカスは無視 → 「考え始めから出すまで」を測る）
-  //   - 提出後の振り返りで「N 分 N 秒で書きました」と表示するために durationSec を保持
   const focusedAtRef = useRef<number | null>(null);
   const [completedDurationSec, setCompletedDurationSec] = useState<number | null>(null);
   const handleFocus = () => {
@@ -109,9 +96,6 @@ export default function InputPage({ token, initialData }: Props) {
   const useRumination = isOn("tier-e.ruminationTimer");
   const useDailyQuestions = isOn("feature.dailyQuestions");
 
-  // Background fetch of per-tenant daily questions when the feature is on.
-  // Sets dailyQuestionsEnabled=true only if at least one question slot is
-  // populated, so an empty tenant config gracefully falls back to legacy UI.
   useEffect(() => {
     if (!useDailyQuestions) return;
     let cancelled = false;
@@ -121,12 +105,14 @@ export default function InputPage({ token, initialData }: Props) {
         if (cancelled || !data?.enabled) return;
         const morning: string[] = Array.isArray(data.morning) ? data.morning.filter((s: unknown) => typeof s === "string") : [];
         const evening: string[] = Array.isArray(data.evening) ? data.evening.filter((s: unknown) => typeof s === "string") : [];
+        const axis: string = typeof data.axis === "string" ? data.axis : "";
+        const day: string = typeof data.day === "string" ? data.day : "";
         if (morning.length > 0 || evening.length > 0) {
-          setDailyQuestions({ morning, evening });
+          setDailyQuestions({ morning, evening, axis, day });
           setDailyQuestionsEnabled(true);
         }
       })
-      .catch(() => {/* silent: fall back to legacy UI */});
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -143,10 +129,6 @@ export default function InputPage({ token, initialData }: Props) {
     return () => clearInterval(timer);
   }, []);
 
-  // Server Component parent already fetched today's status — no client-side
-  // initial fetch needed. Keep the background refresh in case the user
-  // opens the page in one tab and submits from another: re-pull today's
-  // log once on mount so stale "alreadyCompleted" doesn't double-submit.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -176,11 +158,8 @@ export default function InputPage({ token, initialData }: Props) {
           setIsMorning(false);
           setMorningClosed(true);
         }
-      } catch {
-        // ignore — keep server-rendered initial state
-      }
+      } catch {}
     })();
-    // テナント別カスタム例示は server 取得していないので background で fetch
     (async () => {
       try {
         const res = await fetch(`/api/placeholder-examples?token=${token}`);
@@ -189,9 +168,7 @@ export default function InputPage({ token, initialData }: Props) {
         if (data.examples && Array.isArray(data.examples) && data.examples.length > 0) {
           setCustomExamples(data.examples);
         }
-      } catch {
-        // Silent — hardcoded examples will be used as fallback
-      }
+      } catch {}
     })();
     return () => { cancelled = true; };
   }, [token, today]);
@@ -206,10 +183,6 @@ export default function InputPage({ token, initialData }: Props) {
     hour: "2-digit",
     minute: "2-digit",
   });
-
-  // No loading spinner — Server Component parent guarantees `participant`
-  // and `loadingStatus` is permanently false. The previous "接続中です..."
-  // spinner was the dominant visible delay (500-1000ms).
 
   if (alreadyCompleted) {
     return (
@@ -237,8 +210,6 @@ export default function InputPage({ token, initialData }: Props) {
     setIsSubmitting(true);
     setSubmitError("");
 
-    // 記入所要時間を計算（focus → 提出ボタン押下までの経過秒数）
-    // 最大 1800 秒（30 分）でクリップ。focus が取れていない場合は null。
     let durationSec: number | null = null;
     if (focusedAtRef.current !== null) {
       const elapsed = Math.round((Date.now() - focusedAtRef.current) / 1000);
@@ -250,10 +221,8 @@ export default function InputPage({ token, initialData }: Props) {
     }
 
     try {
-      // Prepare evening insight text
       let eveningText = evening;
       if (useStructured && !isMorning) {
-        // Concatenate structured fields
         eveningText = `【事実】\n${structuredInput.fact}\n\n【観察】\n${structuredInput.observation}\n\n【教訓】\n${structuredInput.lesson}`;
       }
 
@@ -271,7 +240,6 @@ export default function InputPage({ token, initialData }: Props) {
           morningDurationSec: durationSec,
         };
       } else if (morningClosed && !todayLog) {
-        // 朝未記入・12:00過ぎ → 夕方のみの新規エントリー
         body = {
           type: "evening_only",
           token,
@@ -301,7 +269,6 @@ export default function InputPage({ token, initialData }: Props) {
       });
 
       if (res.ok) {
-        // 完了画面で「N 分 N 秒で書きました」表示用に保持
         setCompletedDurationSec(durationSec);
         setCompleted(true);
       } else {
@@ -315,10 +282,6 @@ export default function InputPage({ token, initialData }: Props) {
     }
   };
 
-  /**
-   * 経過秒数を「3 分 12 秒」「45 秒」のような日本語表記に変換。
-   * 5 秒未満は表示しない（誤フォーカスの可能性）。
-   */
   const formatDurationJP = (sec: number | null): string | null => {
     if (sec === null || sec < 5) return null;
     const m = Math.floor(sec / 60);
@@ -387,7 +350,6 @@ export default function InputPage({ token, initialData }: Props) {
 
   return (
     <div className="min-h-screen bg-[#F5F0EB] pb-32">
-      {/* Header */}
       <div className="gradient-header text-white px-6 pt-12 pb-6">
         <div className="max-w-md mx-auto relative z-10">
           <button
@@ -414,7 +376,6 @@ export default function InputPage({ token, initialData }: Props) {
       </div>
 
       <div className="max-w-md mx-auto px-5 pt-6 animate-fade-up">
-        {/* Double-Loop Prompt (Monday morning only) */}
         {step === 1 && useDoubleLoop && isMorning && showDoubleLoop && (
           <DoubleLoopPrompt
             token={token}
@@ -423,7 +384,6 @@ export default function InputPage({ token, initialData }: Props) {
           />
         )}
 
-        {/* Progress Bar */}
         <div className="flex gap-2 mb-8">
           <div className={`flex-1 h-1 rounded-full transition-colors duration-300 ${
             step >= 1 ? "bg-[#1A1A2E]" : "bg-[#E5DCD0]"
@@ -433,7 +393,6 @@ export default function InputPage({ token, initialData }: Props) {
           }`}></div>
         </div>
 
-        {/* Step 1: Text Input */}
         {step === 1 && (
           <div className="space-y-4">
             {!isMorning && todayLog && (
@@ -444,14 +403,21 @@ export default function InputPage({ token, initialData }: Props) {
             )}
 
             {dailyQuestionsEnabled && (isMorning ? dailyQuestions.morning.length : dailyQuestions.evening.length) > 0 ? (
-              <DailyQuestionsBlock
-                questions={isMorning ? dailyQuestions.morning : dailyQuestions.evening}
-                onCombinedChange={(combined) => {
-                  if (isMorning) setMorning(combined);
-                  else setEvening(combined);
-                }}
-                onFirstFocus={handleFocus}
-              />
+              <>
+                {dailyQuestions.axis && (
+                  <p className="text-xs text-[#8B8489] mb-3 tracking-wide">
+                    今日の軸 ── <span className="text-[#1A1A2E] font-medium">{dailyQuestions.axis}</span>
+                  </p>
+                )}
+                <DailyQuestionsBlock
+                  questions={isMorning ? dailyQuestions.morning : dailyQuestions.evening}
+                  onCombinedChange={(combined) => {
+                    if (isMorning) setMorning(combined);
+                    else setEvening(combined);
+                  }}
+                  onFirstFocus={handleFocus}
+                />
+              </>
             ) : useStructured ? (
               <StructuredInput
                 value={structuredInput}
@@ -496,7 +462,6 @@ export default function InputPage({ token, initialData }: Props) {
               </div>
             )}
 
-            {/* Rumination breathing prompt */}
             {useRumination && isMorning && ruminationMorningState.showBreathingPrompt && (
               <BreathingPrompt onDismiss={ruminationMorningState.handleDismiss} />
             )}
@@ -506,7 +471,6 @@ export default function InputPage({ token, initialData }: Props) {
           </div>
         )}
 
-        {/* Step 2: Energy Selector */}
         {step === 2 && (
           <div className="space-y-4">
             <p className="text-[#1A1A2E] font-medium text-sm mb-2">今日のエネルギーレベルは？</p>
@@ -529,7 +493,6 @@ export default function InputPage({ token, initialData }: Props) {
           </div>
         )}
 
-        {/* Action Buttons */}
         <div className="mt-8 space-y-3">
           {submitError && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-center">
