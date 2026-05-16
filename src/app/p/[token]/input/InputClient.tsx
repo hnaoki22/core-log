@@ -9,6 +9,7 @@ import { StructuredInput } from "@/components/features/StructuredInput";
 import { DoubleLoopPrompt } from "@/components/features/DoubleLoopPrompt";
 import { useRuminationDetector, BreathingPrompt } from "@/components/features/RuminationTimerIntegration";
 import { VoiceInputButton } from "@/components/features/VoiceInput";
+import { DailyQuestionsBlock } from "@/components/features/DailyQuestionsBlock";
 
 type TodayLog = {
   id: string;
@@ -80,6 +81,14 @@ export default function InputPage({ token, initialData }: Props) {
     observation: "",
     lesson: "",
   });
+  // Daily questions (feature.dailyQuestions): per-tenant 3 morning + 3 evening
+  // questions, each rendered with its own textarea + Whisper mic. Loaded once
+  // on mount; empty arrays mean the feature is disabled or unset for this tenant.
+  const [dailyQuestions, setDailyQuestions] = useState<{ morning: string[]; evening: string[] }>({
+    morning: [],
+    evening: [],
+  });
+  const [dailyQuestionsEnabled, setDailyQuestionsEnabled] = useState(false);
   const eveningTextareaRef = useRef<HTMLTextAreaElement>(null);
   const morningTextareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -98,6 +107,30 @@ export default function InputPage({ token, initialData }: Props) {
   const useStructured = isOn("tier-s.structuredInput");
   const useDoubleLoop = isOn("tier-s.doubleLoopPrompt");
   const useRumination = isOn("tier-e.ruminationTimer");
+  const useDailyQuestions = isOn("feature.dailyQuestions");
+
+  // Background fetch of per-tenant daily questions when the feature is on.
+  // Sets dailyQuestionsEnabled=true only if at least one question slot is
+  // populated, so an empty tenant config gracefully falls back to legacy UI.
+  useEffect(() => {
+    if (!useDailyQuestions) return;
+    let cancelled = false;
+    fetch(`/api/features/daily-questions?token=${encodeURIComponent(token)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.enabled) return;
+        const morning: string[] = Array.isArray(data.morning) ? data.morning.filter((s: unknown) => typeof s === "string") : [];
+        const evening: string[] = Array.isArray(data.evening) ? data.evening.filter((s: unknown) => typeof s === "string") : [];
+        if (morning.length > 0 || evening.length > 0) {
+          setDailyQuestions({ morning, evening });
+          setDailyQuestionsEnabled(true);
+        }
+      })
+      .catch(() => {/* silent: fall back to legacy UI */});
+    return () => {
+      cancelled = true;
+    };
+  }, [useDailyQuestions, token]);
   const useVoice = isOn("tier-e.voiceInput");
 
   const ruminationEveningState = useRuminationDetector(eveningTextareaRef, useRumination && !isMorning);
@@ -410,7 +443,16 @@ export default function InputPage({ token, initialData }: Props) {
               </div>
             )}
 
-            {useStructured ? (
+            {dailyQuestionsEnabled && (isMorning ? dailyQuestions.morning.length : dailyQuestions.evening.length) > 0 ? (
+              <DailyQuestionsBlock
+                questions={isMorning ? dailyQuestions.morning : dailyQuestions.evening}
+                onCombinedChange={(combined) => {
+                  if (isMorning) setMorning(combined);
+                  else setEvening(combined);
+                }}
+                onFirstFocus={handleFocus}
+              />
+            ) : useStructured ? (
               <StructuredInput
                 value={structuredInput}
                 onChange={setStructuredInput}
