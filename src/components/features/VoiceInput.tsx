@@ -1,117 +1,192 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+// VoiceInput — Whisper-based voice transcription (server-side).
+//
+// History:
+//   - v1 (Web Speech API): client-side only, free, low accuracy for 省察/business vocab.
+//   - v2 (2026-05-16, this file): MediaRecorder → /api/features/voice-input (Whisper).
+//
+// Why Whisper:
+//   reflection-lab dogfooding needs accurate Japanese transcription of
+//   strategy/省察 terminology that browser-native APIs handle poorly.
+//
+// Behavior:
+//   - Press to start recording. Press again to stop.
+//   - On stop, the recorded webm/opus blob is POSTed to
+//     /api/features/voice-input with the participant token.
+//   - The returned text is appended to the calling input field.
 
-// Extend Window for SpeechRecognition (vendor-prefixed in some browsers)
-interface SpeechRecognitionEvent extends Event {
-  results: { [index: number]: { [index: number]: { transcript: string } }; length: number };
-  resultIndex: number;
-}
-
-interface SpeechRecognitionInstance extends EventTarget {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  start(): void;
-  stop(): void;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: ((event: Event & { error: string }) => void) | null;
-  onend: (() => void) | null;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition?: new () => SpeechRecognitionInstance;
-    webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
-  }
-}
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useParams } from "next/navigation";
 
 interface VoiceInputProps {
   onTextReceived: (text: string) => void;
 }
 
+// MIME types we try in order of Whisper-friendliness.
+// audio/webm (Opus) — best support across Chrome/Edge.
+// audio/mp4 — Safari iOS fallback.
+const PREFERRED_MIME_TYPES = [
+  "audio/webm;codecs=opus",
+  "audio/webm",
+  "audio/mp4",
+  "audio/ogg;codecs=opus",
+];
+
+function pickSupportedMimeType(): string | null {
+  if (typeof MediaRecorder === "undefined") return null;
+  for (const mime of PREFERRED_MIME_TYPES) {
+    if (MediaRecorder.isTypeSupported(mime)) return mime;
+  }
+  return null;
+}
+
 export function VoiceInputButton({ onTextReceived }: VoiceInputProps) {
-  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const params = useParams<{ token: string }>();
+  const token = params?.token || "";
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
   const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [error, setError] = useState("");
 
-  const isSupported = typeof window !== "undefined" &&
-    (!!window.SpeechRecognition || !!window.webkitSpeechRecognition);
+  // Browser support probe runs on mount to render or hide the button.
+  const [isSupported, setIsSupported] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices) {
+      setIsSupported(false);
+      return;
+    }
+    setIsSupported(typeof MediaRecorder !== "undefined" && !!pickSupportedMimeType());
+  }, []);
 
-  const handleStartRecording = useCallback(() => {
+  const cleanupStream = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    mediaRecorderRef.current = null;
+    chunksRef.current = [];
+  }, []);
+
+  const transcribe = useCallback(
+    async (blob: Blob, mimeType: string) => {
+      setIsTranscribing(true);
+      setError("");
+      try {
+        const ext = mimeType.includes("webm")
+          ? "webm"
+          : mimeType.includes("mp4")
+          ? "mp4"
+          : mimeType.includes("ogg")
+          ? "ogg"
+          : "bin";
+        const file = new File([blob], `voice.${ext}`, { type: mimeType });
+        const form = new FormData();
+        form.append("audio", file);
+        form.append("token", token);
+
+        const res = await fetch("/api/features/voice-input", {
+          method: "POST",
+          body: form,
+        });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(body.error || `HTTP ${res.status}`);
+        }
+        const data = (await res.json()) as { text?: string };
+        const text = (data.text || "").trim();
+        if (text) {
+          onTextReceived(text);
+        } else {
+          setError("音声を認識できませんでした");
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "文字起こしに失敗しました");
+      } finally {
+        setIsTranscribing(false);
+      }
+    },
+    [token, onTextReceived]
+  );
+
+  const handleStartRecording = useCallback(async () => {
     setError("");
+    if (mediaRecorderRef.current) return; // already recording
 
-    // If a session is already in flight, ignore. Previously a double-tap
-    // could create two recognition instances; the first one's onend would
-    // then flip isRecording off and orphan the second.
-    if (recognitionRef.current) {
+    const mimeType = pickSupportedMimeType();
+    if (!mimeType) {
+      setError("このブラウザは音声録音に対応していません");
       return;
     }
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setError("このブラウザは音声入力に対応していません");
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = "ja-JP";
-    recognition.continuous = true;
-    recognition.interimResults = false;
-
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let transcript = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
-      }
-      if (transcript) {
-        onTextReceived(transcript);
-      }
-    };
-
-    recognition.onerror = (event) => {
-      if (event.error === "not-allowed") {
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      const name = (err as { name?: string })?.name || "";
+      if (name === "NotAllowedError" || name === "SecurityError") {
         setError("マイクへのアクセスが許可されていません");
-      } else if (event.error === "no-speech") {
-        setError("音声が検出されませんでした");
+      } else if (name === "NotFoundError") {
+        setError("マイクが見つかりません");
       } else {
-        setError("音声認識エラーが発生しました");
+        setError("マイクの取得に失敗しました");
       }
-      recognitionRef.current = null;
+      return;
+    }
+
+    streamRef.current = stream;
+    const recorder = new MediaRecorder(stream, { mimeType });
+    chunksRef.current = [];
+
+    recorder.ondataavailable = (e: BlobEvent) => {
+      if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+    };
+    recorder.onerror = () => {
+      setError("録音中にエラーが発生しました");
+      cleanupStream();
       setIsRecording(false);
     };
-
-    recognition.onend = () => {
-      recognitionRef.current = null;
+    recorder.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: mimeType });
+      cleanupStream();
       setIsRecording(false);
+      if (blob.size > 0) {
+        void transcribe(blob, mimeType);
+      }
     };
 
-    recognitionRef.current = recognition;
-    recognition.start();
+    mediaRecorderRef.current = recorder;
+    recorder.start();
     setIsRecording(true);
-  }, [onTextReceived]);
+  }, [cleanupStream, transcribe]);
 
   const handleStopRecording = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      // recognitionRef nulled in onend
-      setIsRecording(false);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+      // onstop handler cleans up and triggers transcription
     }
   }, []);
 
-  // Stop any in-flight recognition when the component unmounts so the mic
-  // indicator and ongoing session don't leak across route changes.
+  // Stop and release the mic if the component unmounts mid-recording.
   useEffect(() => {
     return () => {
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch { /* ignore */ }
-        recognitionRef.current = null;
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        try {
+          mediaRecorderRef.current.stop();
+        } catch {
+          /* ignore */
+        }
       }
+      cleanupStream();
     };
-  }, []);
+  }, [cleanupStream]);
 
-  if (!isSupported) {
-    return null; // Don't show button if browser doesn't support it
+  if (isSupported === false) {
+    return null;
   }
 
   return (
@@ -119,7 +194,13 @@ export function VoiceInputButton({ onTextReceived }: VoiceInputProps) {
       {isRecording && (
         <div className="flex items-center gap-2">
           <span className="inline-block w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-          <span className="text-xs text-[#8B8489]">録音中...</span>
+          <span className="text-xs text-[#8B8489]">録音中…</span>
+        </div>
+      )}
+      {isTranscribing && !isRecording && (
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
+          <span className="text-xs text-[#8B8489]">文字起こし中…</span>
         </div>
       )}
       {error && <span className="text-xs text-red-600">{error}</span>}
@@ -127,13 +208,14 @@ export function VoiceInputButton({ onTextReceived }: VoiceInputProps) {
       <button
         type="button"
         onClick={isRecording ? handleStopRecording : handleStartRecording}
+        disabled={isTranscribing}
         aria-label={isRecording ? "録音を停止" : "音声入力を開始"}
-        className={`p-2 rounded-lg transition-colors ${
+        className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${
           isRecording
             ? "bg-red-100 text-red-600 hover:bg-red-200"
             : "bg-[#F2F2F7] text-[#1A1A2E] hover:bg-[#E5DCD0]"
         }`}
-        title={isRecording ? "録音を停止" : "音声入力"}
+        title={isRecording ? "録音を停止" : "音声入力（Whisper）"}
       >
         <svg
           width="20"
