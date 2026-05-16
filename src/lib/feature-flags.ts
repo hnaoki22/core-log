@@ -166,6 +166,15 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     phase1Enabled: true,
     implemented: true,
   },
+  {
+    key: "feature.dailyQuestions",
+    label: "朝・夕の問い 6 問表示",
+    description: "テナント毎にカスタマイズした朝3問・夕3問を入力画面に表示。各問いに音声入力ボタン付き。reflection-lab で先行検証中。",
+    category: "existing",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    implemented: true,
+  },
 
   // ===== Tier S: Differentiators =====
   {

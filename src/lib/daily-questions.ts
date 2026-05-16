@@ -1,0 +1,156 @@
+// Daily questions store — per-tenant questions organized by day-of-week (Meso layer).
+//
+// Schema in ai_settings.value JSON:
+//   {
+//     "monday":    { "axis": "意図", "morning": string[], "evening": string[] },
+//     "tuesday":   { "axis": "対話", "morning": string[], "evening": string[] },
+//     "wednesday": { "axis": "感情", ... },
+//     "thursday":  { "axis": "学び", ... },
+//     "friday":    { "axis": "体",   ... },
+//     "saturday":  { "axis": "関係", ... },
+//     "sunday":    { "axis": "統合", ... }
+//   }
+//
+// This is the Meso layer of the four-tier inquiry algorithm (v0.2):
+//   i.   Macro — dojo theme rotation (monthly/quarterly)         [future]
+//   ii.  Meso  — weekly axis rotation (THIS FILE)                [implemented]
+//   iii. Micro — AI deepens questions from yesterday's log       [future]
+//   iv.  Meta  — monthly self-theorization                       [future]
+//
+// Backwards compatibility: if the legacy flat shape
+//   { morning: string[], evening: string[] }
+// is encountered, it is returned as-is for every day (same questions Mon-Sun).
+// This lets the migration land without breaking any tenant that still has
+// the old shape.
+
+import { getClient } from "./supabase";
+import { logger } from "./logger";
+
+export type DayKey =
+  | "monday" | "tuesday" | "wednesday" | "thursday"
+  | "friday" | "saturday" | "sunday";
+
+export type DailyQuestionsForDay = {
+  axis: string;
+  morning: string[];
+  evening: string[];
+};
+
+export type DailyQuestionsWeekly = Record<DayKey, DailyQuestionsForDay>;
+
+const EMPTY_DAY: DailyQuestionsForDay = { axis: "", morning: [], evening: [] };
+
+const DAY_KEYS: DayKey[] = [
+  "sunday", "monday", "tuesday", "wednesday",
+  "thursday", "friday", "saturday",
+];
+
+const cacheByTenant = new Map<string, { data: DailyQuestionsWeekly | null; at: number }>();
+const CACHE_TTL_MS = 60 * 1000;
+
+function pickStrings(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((s): s is string => typeof s === "string") : [];
+}
+
+function parseWeekly(raw: unknown): DailyQuestionsWeekly | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+
+  // Legacy flat shape: { morning: string[], evening: string[] } → broadcast to all days
+  if (Array.isArray((obj as { morning?: unknown }).morning) ||
+      Array.isArray((obj as { evening?: unknown }).evening)) {
+    const morning = pickStrings(obj.morning);
+    const evening = pickStrings(obj.evening);
+    if (morning.length === 0 && evening.length === 0) return null;
+    const dayBundle: DailyQuestionsForDay = { axis: "", morning, evening };
+    return {
+      sunday: dayBundle, monday: dayBundle, tuesday: dayBundle,
+      wednesday: dayBundle, thursday: dayBundle, friday: dayBundle, saturday: dayBundle,
+    };
+  }
+
+  // New weekly shape
+  const result: Partial<DailyQuestionsWeekly> = {};
+  for (const day of DAY_KEYS) {
+    const d = obj[day];
+    if (d && typeof d === "object") {
+      const dd = d as Record<string, unknown>;
+      result[day] = {
+        axis: typeof dd.axis === "string" ? dd.axis : "",
+        morning: pickStrings(dd.morning),
+        evening: pickStrings(dd.evening),
+      };
+    } else {
+      result[day] = { ...EMPTY_DAY };
+    }
+  }
+  // If every day is empty, treat as unset
+  if (DAY_KEYS.every((d) =>
+    result[d]!.morning.length === 0 && result[d]!.evening.length === 0
+  )) return null;
+  return result as DailyQuestionsWeekly;
+}
+
+async function readFromSupabase(tenantId: string): Promise<DailyQuestionsWeekly | null> {
+  try {
+    const { data, error } = await getClient()
+      .from("ai_settings")
+      .select("value")
+      .eq("tenant_id", tenantId)
+      .eq("key", "daily_questions")
+      .maybeSingle();
+    if (error) {
+      logger.error("daily-questions: read failed", { tenantId, error: error.message });
+      return null;
+    }
+    if (!data?.value) return null;
+    try {
+      return parseWeekly(JSON.parse(data.value));
+    } catch (err) {
+      logger.error("daily-questions: parse failed", {
+        tenantId, error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  } catch (err) {
+    logger.error("daily-questions: query failed", {
+      tenantId, error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
+export async function getWeeklyForTenant(tenantId: string): Promise<DailyQuestionsWeekly | null> {
+  const cached = cacheByTenant.get(tenantId);
+  if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.data;
+  const data = await readFromSupabase(tenantId);
+  cacheByTenant.set(tenantId, { data, at: Date.now() });
+  return data;
+}
+
+// Returns today's day key in JST (Tokyo timezone). The participant's calendar
+// day is the JST one — this matches how the rest of the app keys logs by
+// getTodayJST().
+export function getTodayDayKey(now: Date = new Date()): DayKey {
+  // Get JST weekday by formatting in Asia/Tokyo
+  const jstWeekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Tokyo",
+    weekday: "long",
+  }).format(now).toLowerCase();
+  if ((DAY_KEYS as string[]).includes(jstWeekday)) return jstWeekday as DayKey;
+  return "monday";
+}
+
+export async function getTodayQuestionsForTenant(
+  tenantId: string,
+  now: Date = new Date()
+): Promise<DailyQuestionsForDay | null> {
+  const weekly = await getWeeklyForTenant(tenantId);
+  if (!weekly) return null;
+  return weekly[getTodayDayKey(now)] || null;
+}
+
+export function invalidateDailyQuestionsCache(tenantId?: string) {
+  if (tenantId) cacheByTenant.delete(tenantId);
+  else cacheByTenant.clear();
+}
