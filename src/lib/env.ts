@@ -12,6 +12,7 @@ const REQUIRED_ENV_VARS = [
 const OPTIONAL_ENV_VARS = [
   "ANTHROPIC_API_KEY",
   "ADMIN_TOKENS",
+  "OPENAI_API_KEY",
 ];
 
 /**
