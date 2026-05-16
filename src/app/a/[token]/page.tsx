@@ -1134,15 +1134,26 @@ export default function AdminDashboard() {
                       <p className="text-xs text-[#8B8489]">組織学習</p>
                     </Link>
                   )}
-
-                  <a href={`/a/${token}/features/placeholder-examples`} className="card p-4 hover:shadow-md transition-shadow">
-                    <div className="text-2xl mb-2">💡</div>
-                    <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">例示管理</h3>
-                    <p className="text-xs text-[#8B8489]">AI例示生成・管理</p>
-                  </a>
                 </div>
               </div>
             )}
+
+            {/* Placeholder examples (各道場の問い例示 / プレースホルダー). 旧コードでは
+                上の「運用管理」グリッド内に置かれていたため、運用管理セクション
+                自体のフラグ条件 (multiTenant / consultIntervention / knowledgeLibrary)
+                を全部 OFF にすると道連れで非表示になっていた。独立セクションに
+                切り出して常時表示する (admin 機能なので非 admin にはそもそも
+                このページ自体が表示されない)。*/}
+            <div className="mb-6">
+              <h2 className="text-sm font-semibold text-[#5B5560] uppercase tracking-wide px-1 mb-3">参加者向け例示</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Link href={`/a/${token}/features/placeholder-examples`} className="card p-4 hover:shadow-md transition-shadow">
+                  <div className="text-2xl mb-2">💡</div>
+                  <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">例示管理</h3>
+                  <p className="text-xs text-[#8B8489]">各道場の問い・記入欄プレースホルダー (AI 生成可)</p>
+                </Link>
+              </div>
+            </div>
           </>
         )}
 
