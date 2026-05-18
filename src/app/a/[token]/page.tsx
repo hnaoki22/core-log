@@ -188,19 +188,52 @@ export default function AdminDashboard() {
 
   const openEditParticipant = async (p: ParticipantData) => {
     setEditingParticipant(p);
-    // Fetch full participant data including email, startDate, endDate
+    // Load manager options for the dropdown AND the full participant record
+    // (email / startDate / endDate / fbPolicy / emailEnabled were NOT part of
+    // ParticipantData in the dashboard payload, so editForm used to default
+    // them all to "" / true. Saving then overwrote real values with empties
+    // — and PostgreSQL rejects "" for the start_date/end_date `date`
+    // columns entirely, which surfaced as "更新に失敗しました").
     try {
       const tenantParam = selectedTenantSlug ? `&tenant=${selectedTenantSlug}` : "";
-      const res = await fetch(`/api/admin/members?token=${token}${tenantParam}`);
-      const d = await res.json();
-      const managers = d.managers || [];
-      setManagerOptions(managers);
-    } catch { /* use existing managers */ }
-    setEditForm({
-      name: p.name, email: "", department: p.department, dojoPhase: p.dojoPhase,
-      managerId: p.managerId || "", fbPolicy: p.fbPolicy || "",
-      emailEnabled: true, startDate: "", endDate: "",
-    });
+      const [membersRes, detailRes] = await Promise.all([
+        fetch(`/api/admin/members?token=${token}${tenantParam}`),
+        fetch(`/api/admin/participants/${p.id}?token=${token}`),
+      ]);
+      if (membersRes.ok) {
+        const md = await membersRes.json();
+        setManagerOptions(md.managers || []);
+      }
+      if (detailRes.ok) {
+        const dd = await detailRes.json();
+        const detail = dd.participant || {};
+        setEditForm({
+          name: detail.name ?? p.name,
+          email: detail.email ?? "",
+          department: detail.department ?? p.department,
+          dojoPhase: detail.dojoPhase ?? p.dojoPhase,
+          managerId: detail.managerId ?? (p.managerId || ""),
+          fbPolicy: detail.fbPolicy ?? (p.fbPolicy || ""),
+          emailEnabled: detail.emailEnabled ?? true,
+          startDate: detail.startDate ?? "",
+          endDate: detail.endDate ?? "",
+        });
+      } else {
+        // Detail fetch failed — fall back to dashboard fields so the form is
+        // at least populated, accepting that email/dates may be empty.
+        setEditForm({
+          name: p.name, email: "", department: p.department, dojoPhase: p.dojoPhase,
+          managerId: p.managerId || "", fbPolicy: p.fbPolicy || "",
+          emailEnabled: true, startDate: "", endDate: "",
+        });
+      }
+    } catch {
+      setEditForm({
+        name: p.name, email: "", department: p.department, dojoPhase: p.dojoPhase,
+        managerId: p.managerId || "", fbPolicy: p.fbPolicy || "",
+        emailEnabled: true, startDate: "", endDate: "",
+      });
+    }
   };
 
   const handleSaveParticipant = async () => {
