@@ -1,13 +1,13 @@
 ---
 name: core-log-review
-description: Pre-commit / pre-merge structural review checklist for the core-log codebase. Triggers when modifying admin UI (/a/[token]/page.tsx), Supabase queries via @/lib/supabase, tenant-scoped CRUD endpoints under /api/admin/, feature-flag rendering with useFeatures().isOn, or migrating between Client and Server Components. Lists the silent-failure modes observed in this codebase and the patterns that prevent them from recurring.
+description: Pre-commit / pre-merge structural review checklist for the core-log codebase. Triggers when modifying admin UI (/a/[token]/page.tsx), Supabase queries via @/lib/supabase, tenant-scoped CRUD endpoints under /api/admin/, edit modals that round-trip DB columns through React form state, feature-flag rendering with useFeatures().isOn, or migrating between Client and Server Components. Lists the silent-failure modes observed in this codebase and the patterns that prevent them from recurring.
 ---
 
 # core-log review checklist (silent-failure trap prevention)
 
-Bugs observed in this codebase repeatedly came from **silent failures**: code that ran without throwing but produced empty / wrong results. The user only noticed days later. Below are the four trap families and the structural rules that catch them at write-time.
+Bugs observed in this codebase repeatedly came from **silent failures**: code that ran without throwing but produced empty / wrong results. The user only noticed days later. Below are the five trap families and the structural rules that catch them at write-time.
 
-Before merging anything that touches admin UI, Supabase, tenants, or feature flags, run through the corresponding section.
+Before merging anything that touches admin UI, Supabase, tenants, edit modals, or feature flags, run through the corresponding section.
 
 ---
 
@@ -198,16 +198,92 @@ Reference: the participant card and the "参加者一覧" header in `src/app/a/[
 
 ---
 
+## Trap 5: Form ↔ DB column round-trip with type mismatch
+
+### Symptom
+"保存ボタンを押すとエラー / 更新に失敗しました" on an edit modal — even when the user only changed one trivial field (e.g., name). The browser shows a generic alert; the server log has `invalid input syntax for type X: ""` (or NaN, or boolean-as-string, etc.).
+
+### Real example (the participant edit bug)
+
+```ts
+// 1. Dashboard payload doesn't carry email/startDate/endDate/emailEnabled
+type ParticipantData = { id, name, department, dojoPhase, managerId, fbPolicy, ... };
+
+// 2. Edit modal opens. Form initializes the missing fields to ""/true:
+setEditForm({
+  name: p.name, department: p.department, dojoPhase: p.dojoPhase,
+  email: "",        // ← not in ParticipantData
+  startDate: "",    // ← not in ParticipantData
+  endDate: "",      // ← not in ParticipantData
+  emailEnabled: true,
+  ...
+});
+
+// 3. User edits ONLY name, clicks save. The body spreads all of editForm:
+fetch(`/api/admin/participants/${id}`, { body: JSON.stringify({ token, ...editForm }) });
+//                                                                       ^^^^^^^^^^^^
+//                                                                       sends startDate="" etc.
+
+// 4. updateParticipantInSupabase forwards "" verbatim:
+if (updates.startDate !== undefined) updateData.start_date = updates.startDate;
+//                                                            ^^^^^^^^^^^^^^^^^^
+//                                                            "" → "" sent to PG
+
+// 5. PostgreSQL: start_date is `date` type. "" is not a valid date.
+//    → ERROR 22007: invalid input syntax for type date: ""
+//    → 500 → "更新に失敗しました"
+```
+
+The user only edited `name`, but the whole UPDATE was rejected. **The other fields silently corrupted the operation.**
+
+### Why this hides for a long time
+This bug can be masked by *another* bug in the same code path. In our case, before PR #16 the WHERE clause used the actor's home tenant, so cross-tenant edits already failed with 0-row update — the "" → date error never had a chance to surface. PR #16 fixed the WHERE filter and the older latent bug became reachable.
+
+**When you fix a bug that was masking another, expect the next layer to surface.** Don't assume "I'm done" after a single fix; trace the full path and test the happy path end-to-end.
+
+### Rule
+For any edit form that round-trips DB columns:
+
+1. **The form's `initial` values must come from the actual DB row**, not from a lightweight list payload. Add or call a dedicated GET endpoint that returns every editable column (`/api/admin/<resource>/[id]` GET).
+2. **Add a defensive type-aware conversion** in the lib write helper:
+   - DATE / TIMESTAMP column: convert `"" → null`
+   - UUID column: convert `"" → null` (already done for `manager_id` in this repo — same pattern)
+   - BOOLEAN column: do NOT accept strings — coerce or reject
+   - NUMERIC column: do NOT accept NaN — coerce or reject
+3. **Audit columns the form references against the DB schema** when adding/renaming fields. PostgreSQL is strict; empty string is NOT null.
+
+### Detection at write time
+```bash
+# Look for date/timestamp/uuid columns being written from form state without null coercion.
+# In a write helper, every line like:
+#   updateData.<col> = updates.<field>;
+# where <col> is date/timestamp/uuid should be:
+#   updateData.<col> = updates.<field> || null;
+
+git diff main...HEAD -- 'src/lib/supabase.ts' 'src/app/api/admin/**/route.ts' \
+  | grep -E '\b(start_date|end_date|deadline|created_at|updated_at|.*_id)\s*=\s*updates\.[a-zA-Z]+;'
+# If you see one without `|| null`, fix it.
+```
+
+### Reference implementations
+- `src/app/api/admin/participants/[id]/route.ts` (post the PR that fixes participant edit) — GET + PUT with shared `authorizeWithToken()`
+- `src/lib/supabase.ts` `updateParticipantInSupabase` — date columns now use `|| null`
+- `src/app/a/[token]/page.tsx` `openEditParticipant` — calls the new GET in parallel with managers fetch
+
+---
+
 ## Cross-cutting rule: PR review checklist
 
-Before merging any PR that touches the four areas above:
+Before merging any PR that touches the five areas above:
 
 - [ ] **Conditional coupling**: any new UI card / section — is it a descendant of `{flag && ...}`? Intentional or accidental?
 - [ ] **NULL CAS**: any new `.eq(`...`, x)` where `x` can be null? Replace with `.is(col, null)` branch.
 - [ ] **0-row writes**: any new `.update()` / `.delete()` — does it return `.select(...)` and check `data.length > 0`?
 - [ ] **Tenant scope**: any new admin write — does WHERE use the target's tenant_id (not the actor's)?
 - [ ] **Mobile layout**: any new `flex justify-between` — does it have `flex-col sm:flex-row` + `min-w-0` on left + `flex-wrap` on inner rows?
+- [ ] **Form ↔ DB type match**: does the edit modal load real DB values (not defaulting to ""/true)? Does the write helper coerce "" → null for nullable date/uuid/timestamp columns?
 - [ ] **Branch state vs production**: are you testing on **production** (where main may not yet be deployed) or **preview** (which has the PR branch)? When the user reports "no change", verify the branch they're hitting BEFORE optimizing further.
+- [ ] **Layer masking**: when fixing a bug, ask "is there another bug below this one that was being masked?" — fix the SQL/DB layer error AND the UI layer that produced the bad value.
 
 ## Anti-pattern: optimizing blind
 When a user reports performance / behavior regression, **verify the deploy is reachable** before iterating:
