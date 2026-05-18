@@ -806,8 +806,12 @@ export async function updateParticipantInSupabase(
   if (updates.managerId !== undefined) updateData.manager_id = updates.managerId || null;
   if (updates.fbPolicy !== undefined) updateData.fb_policy = updates.fbPolicy;
   if (updates.emailEnabled !== undefined) updateData.email_enabled = updates.emailEnabled;
-  if (updates.startDate !== undefined) updateData.start_date = updates.startDate;
-  if (updates.endDate !== undefined) updateData.end_date = updates.endDate;
+  // start_date / end_date are PostgreSQL `date` columns. Empty string is
+  // NOT a valid date value — `UPDATE ... SET start_date = ''` fails with
+  // "invalid input syntax for type date". Convert "" → null so cleared
+  // form fields round-trip as SQL NULL.
+  if (updates.startDate !== undefined) updateData.start_date = updates.startDate || null;
+  if (updates.endDate !== undefined) updateData.end_date = updates.endDate || null;
 
   if (Object.keys(updateData).length === 0) return true;
 
