@@ -1,13 +1,13 @@
 ---
 name: core-log-review
-description: Pre-commit / pre-merge structural review checklist for the core-log codebase. Triggers when modifying admin UI (/a/[token]/page.tsx), Supabase queries via @/lib/supabase, tenant-scoped CRUD endpoints under /api/admin/, edit modals that round-trip DB columns through React form state, feature-flag rendering with useFeatures().isOn, or migrating between Client and Server Components. Lists the silent-failure modes observed in this codebase and the patterns that prevent them from recurring.
+description: Pre-commit / pre-merge structural review checklist for the core-log codebase. Triggers when modifying admin UI (/a/[token]/page.tsx), Supabase queries via @/lib/supabase, tenant-scoped CRUD endpoints under /api/admin/, edit modals that round-trip DB columns through React form state, mutations to participant/manager names (which cascade to denormalized columns), feature-flag rendering with useFeatures().isOn, or migrating between Client and Server Components. Lists the silent-failure modes observed in this codebase and the patterns that prevent them from recurring.
 ---
 
 # core-log review checklist (silent-failure trap prevention)
 
-Bugs observed in this codebase repeatedly came from **silent failures**: code that ran without throwing but produced empty / wrong results. The user only noticed days later. Below are the five trap families and the structural rules that catch them at write-time.
+Bugs observed in this codebase repeatedly came from **silent failures**: code that ran without throwing but produced empty / wrong results. The user only noticed days later. Below are the six trap families and the structural rules that catch them at write-time.
 
-Before merging anything that touches admin UI, Supabase, tenants, edit modals, or feature flags, run through the corresponding section.
+Before merging anything that touches admin UI, Supabase, tenants, edit modals, denormalized name columns, or feature flags, run through the corresponding section.
 
 ---
 
@@ -272,9 +272,66 @@ git diff main...HEAD -- 'src/lib/supabase.ts' 'src/app/api/admin/**/route.ts' \
 
 ---
 
+## Trap 6: Denormalized name columns out of sync after rename
+
+### Symptom
+A user renames an entity (participant / manager) and reports that "all of their data disappeared". The row physically still exists; queries that filter by the new name return 0 rows. Queries by the old name still find the data — so it's not deleted, it's hidden behind stale denormalized labels.
+
+### Real example (the HMダミー → 本藤　直樹 incident)
+
+Schema state:
+- `participants.id` (uuid PK), `participants.name`
+- 17 child tables (`logs`, `missions`, `feedback`, `aar_entries`, `briefings`, `burnout_scores`, `before_after_assessments`, `growth_metrics`, `hero_assessments`, `hope_designs`, `identity_entries`, `micro_ritual_metrics`, `outsight_tasks`, `rumination_analyses`, `structured_entries`, `unlearn_entries`, `weekly_concepts`) carry both `participant_id` (FK) AND a denormalized `participant_name` text column
+- `peer_reflections` carries `from_participant_id`/`to_participant_id` plus denormalized `from_name`/`to_name`
+- Managers analogously: 2 tables (`manager_reflections`, `psych_safety_analyses`) with denormalized `manager_name`
+
+What happened:
+1. Admin renamed `HMダミー` → `本藤　直樹`
+2. `updateParticipantInSupabase` only updated `participants.name`. No cascade.
+3. All 22 of that user's logs still had `participant_name = "HMダミー"`. Same for 3 missions, 2 feedbacks.
+4. Frontend queries like `getLogsByParticipant(name)` filter by `participant_name = "本藤　直樹"` → return 0 rows.
+5. User reports "data lost".
+
+The audit report (PR #12) had explicitly flagged this denormalization without sync as a risk; it was deferred and the very first rename surfaced the bug.
+
+### Rule
+For any column that **denormalizes a label keyed by FK id**:
+
+1. **The write helper that updates the label MUST cascade** to every table that carries the denormalized copy. Do this in a single helper near the UPDATE, not scattered in API routes.
+2. **The cascade must filter by id**, never by old name (duplicate names across tenants would bleed).
+3. The cascade is best-effort: log per-table failures, do not roll back the parent rename (the user's primary intent succeeded; orphaned rows are recoverable).
+4. **Prefer querying by FK id, not by denormalized name**, in any new code. The denormalization is a legacy artifact, not a contract.
+
+### Detection at write time
+For every new column with `_name` suffix, ask:
+- Is this a cached label keyed by `*_id`?
+- If yes: is there an update helper that cascades this label when the source row's name changes? If not, add it OR refuse to denormalize.
+
+```bash
+# Audit: every table that carries a *_name column also has the *_id FK
+psql -c "SELECT a.table_name, a.column_name AS denorm_col, b.column_name AS fk_col
+FROM information_schema.columns a
+LEFT JOIN information_schema.columns b
+  ON a.table_schema = b.table_schema AND a.table_name = b.table_name
+  AND b.column_name = REPLACE(a.column_name, '_name', '_id')
+WHERE a.table_schema = 'public' AND a.column_name LIKE '%_name'
+ORDER BY a.table_name;"
+```
+
+For every denormalized name pair (id + name), confirm the update path cascades when the parent's name changes.
+
+### Reference implementations
+- `src/lib/supabase.ts` `PARTICIPANT_NAME_DENORM_TABLES` + `cascadeParticipantNameRename` (post the HMダミー fix)
+- `src/lib/supabase.ts` `MANAGER_NAME_DENORM_TABLES` + `cascadeManagerNameRename`
+
+### Long-term fix
+The cleanest end-state is to **drop the denormalized `*_name` columns entirely** and JOIN against the parent table when displaying. Application-layer cascade is a stopgap — it can drift from the schema (someone adds a new child table with `participant_name` and forgets to add it to the array). When time allows, migrate UI queries to JOIN-based reads and drop the cached columns.
+
+---
+
 ## Cross-cutting rule: PR review checklist
 
-Before merging any PR that touches the five areas above:
+Before merging any PR that touches the six areas above:
 
 - [ ] **Conditional coupling**: any new UI card / section — is it a descendant of `{flag && ...}`? Intentional or accidental?
 - [ ] **NULL CAS**: any new `.eq(`...`, x)` where `x` can be null? Replace with `.is(col, null)` branch.
@@ -282,6 +339,7 @@ Before merging any PR that touches the five areas above:
 - [ ] **Tenant scope**: any new admin write — does WHERE use the target's tenant_id (not the actor's)?
 - [ ] **Mobile layout**: any new `flex justify-between` — does it have `flex-col sm:flex-row` + `min-w-0` on left + `flex-wrap` on inner rows?
 - [ ] **Form ↔ DB type match**: does the edit modal load real DB values (not defaulting to ""/true)? Does the write helper coerce "" → null for nullable date/uuid/timestamp columns?
+- [ ] **Denormalized name cascade**: any new `*_name` column? Is the cascade list (`PARTICIPANT_NAME_DENORM_TABLES` / `MANAGER_NAME_DENORM_TABLES`) updated? Any new child table that stores a name copy?
 - [ ] **Branch state vs production**: are you testing on **production** (where main may not yet be deployed) or **preview** (which has the PR branch)? When the user reports "no change", verify the branch they're hitting BEFORE optimizing further.
 - [ ] **Layer masking**: when fixing a bug, ask "is there another bug below this one that was being masked?" — fix the SQL/DB layer error AND the UI layer that produced the bad value.
 

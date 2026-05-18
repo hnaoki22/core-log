@@ -783,6 +783,36 @@ export async function createParticipantInSupabase(
   return { id: data.id, token: data.token };
 }
 
+// Tables that carry a denormalized `participant_name` column. When a
+// participant's name changes, every row in these tables that references the
+// participant by id must be updated to keep the name consistent. Without
+// this cascade, queries that filter by participant_name (e.g.,
+// getLogsByParticipant, the manager dashboard, feedback drafting) return
+// 0 rows after a rename, and the user sees "all data lost" even though the
+// rows physically exist.
+//
+// Long-term fix: drop participant_name from child tables and JOIN against
+// participants. For now we cascade in application code.
+const PARTICIPANT_NAME_DENORM_TABLES = [
+  "aar_entries",
+  "before_after_assessments",
+  "briefings",
+  "burnout_scores",
+  "feedback",
+  "growth_metrics",
+  "hero_assessments",
+  "hope_designs",
+  "identity_entries",
+  "logs",
+  "micro_ritual_metrics",
+  "missions",
+  "outsight_tasks",
+  "rumination_analyses",
+  "structured_entries",
+  "unlearn_entries",
+  "weekly_concepts",
+] as const;
+
 export async function updateParticipantInSupabase(
   participantId: string,
   updates: {
@@ -815,6 +845,11 @@ export async function updateParticipantInSupabase(
 
   if (Object.keys(updateData).length === 0) return true;
 
+  // If the name is changing, capture the new name so we can cascade after
+  // the participants row update succeeds.
+  const nameIsChanging = updates.name !== undefined && typeof updates.name === "string";
+  const newName = nameIsChanging ? (updates.name as string) : null;
+
   const { error, data: updated } = await getClient()
     .from("participants")
     .update(updateData)
@@ -829,7 +864,77 @@ export async function updateParticipantInSupabase(
     logger.warn("Update matched 0 rows", { participantId });
     return false;
   }
+
+  // Cascade name change to denormalized child tables.
+  if (newName !== null) {
+    await cascadeParticipantNameRename(participantId, newName);
+  }
+
   return true;
+}
+
+/**
+ * Sync the participant's new name into every table that carries a
+ * denormalized `participant_name` column. Each table is updated by
+ * `participant_id` (the safe identifier), not by old name, so duplicate
+ * names across tenants can't bleed into each other.
+ *
+ * Errors per-table are logged but do NOT roll back the rename — the user's
+ * primary intent (rename the row) has already succeeded. The cascade is
+ * best-effort consistency repair; a per-table failure surfaces as that
+ * table still showing the old name until a manual fix.
+ */
+async function cascadeParticipantNameRename(participantId: string, newName: string): Promise<void> {
+  const client = getClient();
+  const failures: string[] = [];
+
+  // 1. Tables with a single `participant_name` column keyed by participant_id.
+  await Promise.all(
+    PARTICIPANT_NAME_DENORM_TABLES.map(async (table) => {
+      try {
+        const { error } = await client
+          .from(table)
+          .update({ participant_name: newName })
+          .eq("participant_id", participantId);
+        if (error) {
+          failures.push(`${table}: ${error.message}`);
+        }
+      } catch (e) {
+        failures.push(`${table}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }),
+  );
+
+  // 2. peer_reflections carries from_name + to_name keyed by from_participant_id
+  //    and to_participant_id respectively. Update both directions.
+  try {
+    const { error: fromErr } = await client
+      .from("peer_reflections")
+      .update({ from_name: newName })
+      .eq("from_participant_id", participantId);
+    if (fromErr) failures.push(`peer_reflections.from_name: ${fromErr.message}`);
+    const { error: toErr } = await client
+      .from("peer_reflections")
+      .update({ to_name: newName })
+      .eq("to_participant_id", participantId);
+    if (toErr) failures.push(`peer_reflections.to_name: ${toErr.message}`);
+  } catch (e) {
+    failures.push(`peer_reflections: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  if (failures.length > 0) {
+    logger.error("Participant name cascade had per-table failures", {
+      participantId,
+      newName,
+      failures,
+    });
+  } else {
+    logger.info("Participant name cascaded to all denormalized tables", {
+      participantId,
+      newName,
+      tableCount: PARTICIPANT_NAME_DENORM_TABLES.length + 2, // +2 peer_reflections directions
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -992,6 +1097,14 @@ export async function createManagerInSupabase(
   return { id: data.id, token: data.token };
 }
 
+// Tables with a denormalized `manager_name` column. Same cascade story
+// as participants: queries that filter by manager_name break silently
+// when a manager renames without us syncing.
+const MANAGER_NAME_DENORM_TABLES = [
+  "manager_reflections",
+  "psych_safety_analyses",
+] as const;
+
 export async function updateManagerInSupabase(
   managerId: string,
   updates: {
@@ -1014,6 +1127,9 @@ export async function updateManagerInSupabase(
 
   if (Object.keys(updateData).length === 0) return true;
 
+  const nameIsChanging = updates.name !== undefined && typeof updates.name === "string";
+  const newName = nameIsChanging ? (updates.name as string) : null;
+
   const { error, data: updated } = await getClient()
     .from("managers")
     .update(updateData)
@@ -1028,7 +1144,39 @@ export async function updateManagerInSupabase(
     logger.warn("Update matched 0 rows", { managerId });
     return false;
   }
+
+  if (newName !== null) {
+    await cascadeManagerNameRename(managerId, newName);
+  }
+
   return true;
+}
+
+async function cascadeManagerNameRename(managerId: string, newName: string): Promise<void> {
+  const client = getClient();
+  const failures: string[] = [];
+  await Promise.all(
+    MANAGER_NAME_DENORM_TABLES.map(async (table) => {
+      try {
+        const { error } = await client
+          .from(table)
+          .update({ manager_name: newName })
+          .eq("manager_id", managerId);
+        if (error) failures.push(`${table}: ${error.message}`);
+      } catch (e) {
+        failures.push(`${table}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }),
+  );
+  if (failures.length > 0) {
+    logger.error("Manager name cascade had per-table failures", { managerId, newName, failures });
+  } else {
+    logger.info("Manager name cascaded", {
+      managerId,
+      newName,
+      tableCount: MANAGER_NAME_DENORM_TABLES.length,
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
