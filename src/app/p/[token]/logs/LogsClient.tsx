@@ -40,6 +40,29 @@ const energyLabel: Record<string, string> = {
   low: "低調",
 };
 
+// Plain-text status labels for the CSV export (the in-UI statusConfig also
+// carries Tailwind classes, so we keep a separate label-only map here).
+const statusLabel: Record<string, string> = {
+  morning_only: "朝のみ",
+  complete: "完了",
+  fb_done: "完了",
+  empty: "未記入",
+};
+
+/**
+ * Escape one CSV cell.
+ *  - Formula-injection guard (CWE-1236): a value starting with =,+,-,@,\t,\r
+ *    is treated as a formula by Excel/Sheets; prefix with ' to neutralize.
+ *  - RFC 4180 quoting: wrap in quotes, double embedded quotes.
+ */
+function csvCell(value: unknown): string {
+  let s = value == null ? "" : String(value);
+  if (s.length > 0 && /^[=+\-@\t\r]/.test(s)) {
+    s = "'" + s;
+  }
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
 /** Format time in JST */
 const formatTime = formatTimeJST;
 
@@ -84,13 +107,63 @@ export default function LogsClient({ token, initialData }: Props) {
     empty: { label: "未記入", bg: "bg-gray-50", text: "text-gray-400" },
   };
 
+  // Generate a CSV from the logs already loaded on the page (no server round
+  // trip, no token in URL) and trigger a download. UTF-8 BOM is prepended so
+  // Excel opens Japanese text without mojibake. HM feedback / manager comment
+  // are intentionally excluded — this is the participant's own export.
+  const handleDownloadCsv = () => {
+    const headers = ["日付", "曜日", "朝の意図", "本日の振り返り", "エネルギー", "ステータス"];
+    const rows = [...logs]
+      // Oldest → newest reads naturally in a spreadsheet.
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((log) =>
+        [
+          csvCell(log.date),
+          csvCell(log.dayOfWeek),
+          csvCell(log.morningIntent || ""),
+          csvCell(log.eveningInsight || ""),
+          csvCell(log.energy ? energyLabel[log.energy] : ""),
+          csvCell(statusLabel[log.status] ?? ""),
+        ].join(","),
+      );
+    // ﻿ = UTF-8 BOM. Without it Excel interprets the file as Shift-JIS
+    // and Japanese text becomes mojibake.
+    const csv = "﻿" + [headers.map(csvCell).join(","), ...rows].join("\r\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }); // YYYY-MM-DD
+    a.download = `core-log-${today}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="min-h-screen bg-[#F5F0EB] pb-24">
       {/* Header */}
       <div className="gradient-header text-white px-6 pt-12 pb-6">
-        <div className="max-w-md mx-auto relative z-10">
-          <h1 className="text-xl font-semibold tracking-tight">ログ一覧</h1>
-          <p className="text-indigo-200 text-sm mt-1 font-light">{logs.length}件の記録</p>
+        <div className="max-w-md mx-auto relative z-10 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight">ログ一覧</h1>
+            <p className="text-indigo-200 text-sm mt-1 font-light">{logs.length}件の記録</p>
+          </div>
+          {logs.length > 0 && (
+            <button
+              type="button"
+              onClick={handleDownloadCsv}
+              className="flex-shrink-0 flex items-center gap-1.5 text-xs font-medium bg-white/15 hover:bg-white/25 text-white px-3 py-2 rounded-lg transition-colors whitespace-nowrap"
+              aria-label="ログをCSVでダウンロード"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              CSV
+            </button>
+          )}
         </div>
       </div>
 
