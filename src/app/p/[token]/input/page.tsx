@@ -72,20 +72,5 @@ export default async function InputPageServer({
   const tDone = Date.now();
   console.log(`[perf] /p/[token]/input total=${tDone - t0}ms (fetch=${tFetched - t0}ms, build=${tDone - tFetched}ms)`);
 
-  return (
-    <>
-      {/* TEMPORARY diagnostic: capture client-side errors (incl. React
-          hydration errors, which only surface via console.error) and forward
-          them to the Vercel function log via /api/client-log. Inline so it
-          runs during HTML parse — before React hydrates — and can therefore
-          observe the very first hydration error. Remove once the blank-screen
-          root cause is identified. */}
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `(function(){try{var orig=console.error;function send(k,m,s){try{fetch("/api/client-log",{method:"POST",headers:{"Content-Type":"application/json"},keepalive:true,body:JSON.stringify({kind:k,message:String(m||"").slice(0,4000),stack:String(s||"").slice(0,4000),url:location.href})}).catch(function(){})}catch(e){}}console.error=function(){try{var p=[];for(var i=0;i<arguments.length;i++){var a=arguments[i];p.push(a&&a.stack?(a.message+"\\n"+a.stack):(typeof a==="string"?a:(function(){try{return JSON.stringify(a)}catch(e){return String(a)}})()))}var t=p.join(" ");if(/hydrat|did not match|server rendered|reconcil|Minified React error|Switch to client/i.test(t))send("console.error",t)}catch(e){}return orig.apply(console,arguments)};window.addEventListener("error",function(e){send("window.onerror",e.message,e.error&&e.error.stack)});window.addEventListener("unhandledrejection",function(e){var r=e.reason;send("unhandledrejection",r&&r.message?r.message:String(r),r&&r.stack)})}catch(e){}})();`,
-        }}
-      />
-      <InputClient token={token} initialData={initialData} />
-    </>
-  );
+  return <InputClient token={token} initialData={initialData} />;
 }
