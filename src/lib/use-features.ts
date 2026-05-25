@@ -86,16 +86,21 @@ async function fetchFlags(): Promise<Record<string, boolean>> {
  * consistency matters.
  */
 export function useFeatures(): { flags: Record<string, boolean>; loaded: boolean; isOn: (key: string) => boolean } {
-  // Initialize from in-memory or sessionStorage so the first render is
-  // already meaningful instead of waiting an extra round trip.
+  // Bootstrap ONLY from the in-memory cache — never from sessionStorage here.
+  //
+  // This function runs during render, including the server render's
+  // client-component pass and the client's first (hydration) render. The
+  // server has no sessionStorage, so if we seeded the first client render
+  // from cached flags, a returning visitor's first render would include
+  // feature-gated UI (e.g. the voice-input mic button) that the server did
+  // NOT render. That structural divergence is a React hydration mismatch and
+  // can blank the whole page. The in-memory `globalFlags` is safe because it
+  // is null on every fresh full-page load (module scope resets), so it
+  // matches the server's empty flags. The sessionStorage cache is still used
+  // for an instant fill — but only inside the mount effect below, which runs
+  // client-only after the first render has already matched the server.
   const bootstrap = (): Record<string, boolean> | null => {
-    if (globalFlags) return globalFlags;
-    const cached = readSessionCache(tokenFromLocation());
-    if (cached) {
-      globalFlags = cached;
-      return cached;
-    }
-    return null;
+    return globalFlags;
   };
 
   const initial = bootstrap();
@@ -114,6 +119,16 @@ export function useFeatures(): { flags: Record<string, boolean>; loaded: boolean
         }
       });
       return;
+    }
+    // No in-memory cache yet (fresh full-page load). Reading sessionStorage
+    // here is hydration-safe because effects only run on the client, after
+    // the first render has already matched the server's empty flags. This
+    // gives returning visitors an instant flag fill without the round trip.
+    const cached = readSessionCache(tokenFromLocation());
+    if (cached) {
+      globalFlags = cached;
+      setFlags(cached);
+      setLoaded(true);
     }
     const cb = (f: Record<string, boolean>) => {
       setFlags(f);
