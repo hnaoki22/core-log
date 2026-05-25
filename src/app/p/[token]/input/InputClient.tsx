@@ -61,7 +61,13 @@ export default function InputPage({ token, initialData }: Props) {
   const [completed, setCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [now, setNow] = useState(new Date());
+  // Start null so the server-rendered HTML and the first client render are
+  // identical (no date/time text). Filling it from `new Date()` during render
+  // would print the server's UTC clock on the server and the browser's JST
+  // clock on the client — a hydration mismatch that, across the morning UTC
+  // date boundary (when the reminder mail is opened), diverges on the whole
+  // date + weekday and can blank the page. We set it in the mount effect.
+  const [now, setNow] = useState<Date | null>(null);
   const [todayLog, setTodayLog] = useState<TodayLog | null>(initialData.todayLog);
   const [isMorning, setIsMorning] = useState(initialData.initialIsMorning);
   const [morningClosed, setMorningClosed] = useState(initialData.initialMorningClosed);
@@ -125,6 +131,7 @@ export default function InputPage({ token, initialData }: Props) {
   const today = getTodayJST();
 
   useEffect(() => {
+    setNow(new Date());
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -173,16 +180,20 @@ export default function InputPage({ token, initialData }: Props) {
     return () => { cancelled = true; };
   }, [token, today]);
 
-  const displayDate = now.toLocaleDateString("ja-JP", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    weekday: "short",
-  });
-  const displayTime = now.toLocaleTimeString("ja-JP", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const displayDate = now
+    ? now.toLocaleDateString("ja-JP", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        weekday: "short",
+      })
+    : "";
+  const displayTime = now
+    ? now.toLocaleTimeString("ja-JP", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
 
   if (alreadyCompleted) {
     return (
