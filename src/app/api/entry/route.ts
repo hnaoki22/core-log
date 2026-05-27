@@ -9,6 +9,7 @@ import { sendNotificationEmail } from "@/lib/email";
 import { isProgramEnded, isProgramNotStarted, getCurrentHourJST, isGracePeriod } from "@/lib/date-utils";
 import { sanitizeInput } from "@/lib/sanitize";
 import { logger } from "@/lib/logger";
+import { resolvePhaseMode, triggerBodyPromptIfNeeded } from "@/lib/kan-no-ki";
 
 export async function POST(request: NextRequest) {
   try {
@@ -69,13 +70,21 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const phaseMode = await resolvePhaseMode(participantId, tenantId);
+      const sanitizedBodyIntent = body.bodyIntent ? sanitizeInput(String(body.bodyIntent)) : null;
       const pageId = await createMorningEntry(
         participantName, date, sanitizedMorningIntent, energy,
         dojoPhase, weekNum, tenantId, participantId,
-        typeof morningDurationSec === "number" ? morningDurationSec : null
+        typeof morningDurationSec === "number" ? morningDurationSec : null,
+        phaseMode,
+        sanitizedBodyIntent && sanitizedBodyIntent.length > 0 ? sanitizedBodyIntent : null,
       );
       if (!pageId) {
         return NextResponse.json({ error: "Failed to create entry" }, { status: 500 });
+      }
+      // 観の期参加者で強い感情語が含まれていたら身体への問いかけを添える
+      if (phaseMode === "kan-no-ki") {
+        await triggerBodyPromptIfNeeded(participantId, tenantId, sanitizedMorningIntent, pageId);
       }
       // duration を含めて応答（フロントの「N 分 N 秒で書きました」表示用）
       const respDuration = typeof morningDurationSec === "number" && morningDurationSec >= 0 && morningDurationSec <= 1800
@@ -121,6 +130,15 @@ export async function POST(request: NextRequest) {
       if (!success) {
         return NextResponse.json({ error: "Failed to update entry" }, { status: 500 });
       }
+      // 観の期参加者で強い感情語が含まれていたら身体への問いかけを添える
+      try {
+        const phaseModeE = await resolvePhaseMode(participantId, tenantId);
+        if (phaseModeE === "kan-no-ki") {
+          await triggerBodyPromptIfNeeded(participantId, tenantId, sanitizedEveningInsight, pageId);
+        }
+      } catch (e) {
+        logger.warn("Body prompt trigger skipped (evening)", { error: String(e) });
+      }
       const respDurationE = typeof eveningDurationSec === "number" && eveningDurationSec >= 0 && eveningDurationSec <= 1800
         ? Math.round(eveningDurationSec) : null;
 
@@ -163,13 +181,21 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const phaseModeEO = await resolvePhaseMode(participantId, tenantId);
+      const sanitizedBodyCheckEO = body.bodyCheck ? sanitizeInput(String(body.bodyCheck)) : null;
       const pageId = await createEveningOnlyEntry(
         participantName, date, sanitizedEveningInsight, energy,
         dojoPhase, weekNum, tenantId, participantId,
-        typeof eveningDurationSec === "number" ? eveningDurationSec : null
+        typeof eveningDurationSec === "number" ? eveningDurationSec : null,
+        phaseModeEO,
+        sanitizedBodyCheckEO && sanitizedBodyCheckEO.length > 0 ? sanitizedBodyCheckEO : null,
       );
       if (!pageId) {
         return NextResponse.json({ error: "Failed to create entry" }, { status: 500 });
+      }
+      // 観の期参加者で強い感情語が含まれていたら身体への問いかけを添える
+      if (phaseModeEO === "kan-no-ki") {
+        await triggerBodyPromptIfNeeded(participantId, tenantId, sanitizedEveningInsight, pageId);
       }
       const respDurationEO = typeof eveningDurationSec === "number" && eveningDurationSec >= 0 && eveningDurationSec <= 1800
         ? Math.round(eveningDurationSec) : null;

@@ -416,7 +416,9 @@ export async function createMorningEntry(
   weekNum: number,
   tenantId: string,
   participantId: string,
-  morningDurationSec: number | null = null
+  morningDurationSec: number | null = null,
+  phaseMode: "kan-no-ki" | "dojo-1" = "dojo-1",
+  bodyIntent: string | null = null
 ): Promise<string | null> {
   const now = new Date();
   const d = new Date(date);
@@ -437,6 +439,8 @@ export async function createMorningEntry(
       week_num: weekNum,
       morning_time: now.toISOString(),
       morning_duration_sec: sanitizeDurationSec(morningDurationSec),
+      phase_mode: phaseMode,
+      body_intent: bodyIntent,
     })
     .select("id")
     .single();
@@ -494,7 +498,9 @@ export async function createEveningOnlyEntry(
   weekNum: number,
   tenantId: string,
   participantId: string,
-  eveningDurationSec: number | null = null
+  eveningDurationSec: number | null = null,
+  phaseMode: "kan-no-ki" | "dojo-1" = "dojo-1",
+  bodyCheck: string | null = null
 ): Promise<string | null> {
   const now = new Date();
   const d = new Date(date);
@@ -515,6 +521,8 @@ export async function createEveningOnlyEntry(
       week_num: weekNum,
       evening_time: now.toISOString(),
       evening_duration_sec: sanitizeDurationSec(eveningDurationSec),
+      phase_mode: phaseMode,
+      body_check: bodyCheck,
     })
     .select("id")
     .single();

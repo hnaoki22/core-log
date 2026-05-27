@@ -17,6 +17,7 @@ import { getClient } from "@/lib/supabase";
 export type FlagCategory =
   | "core"          // Core input (always on — shown as read-only)
   | "existing"      // Existing features (mission, streak, feedback, etc)
+  | "tier-0"        // Tier 0: 観の期(KAN のキー)— 介入前の自己観想フェーズ
   | "tier-s"        // Tier S: Differentiators
   | "tier-a"        // Tier A: Manager Safety Net
   | "tier-b"        // Tier B: Cultural Engine
@@ -484,6 +485,108 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     phase1Enabled: false,
     implemented: true,
     recommendedPhase: 3,
+  },
+
+  // ===== Tier 0: 観の期(KAN のキー)=====
+  // 介入前の自己観想フェーズ。装置は観た事を映し返すのみ。reflection-lab で MVP 試験運用。
+  {
+    key: "tier-0.kanNoKi",
+    label: "観の期(KAN のキー)",
+    description: "介入前の自己観想フェーズ。装置は観た事を映し返すのみ。新規参加者専用、既存参加者には遡及適用しない。",
+    category: "tier-0",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    implemented: true,
+  },
+  {
+    key: "tier-0.kanNoKi.weeklyMirror",
+    label: "観の期 週次の映し返し",
+    description: "週次サマリーで観た事をファクトとして返す。記録のリズム・言葉の輪郭・感情の引き金・静かな抵抗。",
+    category: "tier-0",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    implemented: true,
+    dependencies: ["tier-0.kanNoKi"],
+  },
+  {
+    key: "tier-0.kanNoKi.bodyPrompt",
+    label: "観の期 身体への問いかけ",
+    description: "強い感情語を検出した日にソフトに「その時、身体にはどんな感覚がありましたか」と添える。",
+    category: "tier-0",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    implemented: true,
+    dependencies: ["tier-0.kanNoKi"],
+  },
+  {
+    key: "tier-0.kanNoKi.silenceObservation",
+    label: "観の期 静かな抵抗の観想",
+    description: "書かない日・書く時間帯のずれ・文章の長短を観の対象として可視化する。",
+    category: "tier-0",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    implemented: true,
+    dependencies: ["tier-0.kanNoKi"],
+  },
+  {
+    key: "tier-0.kanNoKi.peerComparison",
+    label: "観の期 集合像との対比",
+    description: "テナント参加者の集合像と、本人の地形図を並べて映す。観の期 AI MVP の核心機能。",
+    category: "tier-0",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    implemented: true,
+    dependencies: ["tier-0.kanNoKi"],
+  },
+  {
+    key: "tier-0.kanNoKi.peerComparison.tenant",
+    label: "観の期 集合像 同テナント",
+    description: "同じテナントの参加者全員を集合像のスコープとする。",
+    category: "tier-0",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    implemented: true,
+    dependencies: ["tier-0.kanNoKi.peerComparison"],
+  },
+  {
+    key: "tier-0.kanNoKi.peerComparison.crossTenant",
+    label: "観の期 集合像 横断",
+    description: "複数テナント横断の集合像を返す。",
+    category: "tier-0",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    implemented: true,
+    dependencies: ["tier-0.kanNoKi.peerComparison"],
+  },
+  {
+    key: "tier-0.kanNoKi.peerComparison.industry",
+    label: "観の期 集合像 業界別",
+    description: "tenants.industry を共有するテナント横断の集合像を返す。",
+    category: "tier-0",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    implemented: true,
+    dependencies: ["tier-0.kanNoKi.peerComparison"],
+  },
+  {
+    key: "tier-0.kanNoKi.peerComparison.global",
+    label: "観の期 集合像 全体",
+    description: "CORE Log 全体の集合像を返す。",
+    category: "tier-0",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    implemented: true,
+    dependencies: ["tier-0.kanNoKi.peerComparison"],
+  },
+  {
+    key: "tier-0.kanNoKi.transitionSignal",
+    label: "観の期 段階的シグナル",
+    description: "初期の輪郭/言葉の癖の観想可能/より深い観想可能 の3段階通知。本人の道場1 移行判断を補助する。",
+    category: "tier-0",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    implemented: true,
+    dependencies: ["tier-0.kanNoKi"],
   },
 ];
 
