@@ -408,6 +408,27 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
         <div>
           <h3 className="font-semibold text-sm text-[#1A1A2E] mb-3">機能メニュー</h3>
 
+          {/* 観の期(KAN のキー)— 介入前の自己観想フェーズ。Tier 0、機能メニュー先頭に出す */}
+          {isOn("tier-0.kanNoKi") && (
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-[#5B5560] tracking-wide uppercase mb-2 flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-[#1A1A2E] rounded-full"></div>
+                観の期(KAN のキー)
+              </p>
+              <Link href={`/p/${token}/features/kan-no-ki`}>
+                <div className="card p-4 hover:bg-[#FBF8F4] transition-colors cursor-pointer">
+                  <div className="flex items-center gap-3">
+                    <div className="text-xl">🪟</div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-[#1A1A2E]">週次の観た事</p>
+                      <p className="text-[11px] text-[#8B8489] mt-0.5">装置が観た事をお返しします</p>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            </div>
+          )}
+
           {/* 内省深化 */}
           {(() => {
             const features = [

@@ -86,6 +86,15 @@ export default function InputPage({ token, initialData }: Props) {
     day: "",
   });
   const [dailyQuestionsEnabled, setDailyQuestionsEnabled] = useState(false);
+
+  // 観の期(KAN のキー)関連 state — null なら観の期外、オブジェクトなら観の期参加者
+  const [kanNoKiPhase, setKanNoKiPhase] = useState<{
+    current_stage: string;
+    weeks_elapsed: number;
+    next_stage_hint: string | null;
+  } | null>(null);
+  const [bodyIntent, setBodyIntent] = useState("");
+  const [bodyCheck, setBodyCheck] = useState("");
   const eveningTextareaRef = useRef<HTMLTextAreaElement>(null);
   const morningTextareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -135,6 +144,26 @@ export default function InputPage({ token, initialData }: Props) {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // 観の期参加者かどうかを判定するため、観の期 API から phase 情報を取得
+  // 403 が返ったら観の期外として扱う(エラー扱いせずバナーを出さない)
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/features/kan-no-ki?token=${encodeURIComponent(token)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.phase) return;
+        setKanNoKiPhase({
+          current_stage: data.phase.current_stage,
+          weeks_elapsed: data.phase.weeks_elapsed,
+          next_stage_hint: data.phase.next_stage_hint ?? null,
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -237,7 +266,7 @@ export default function InputPage({ token, initialData }: Props) {
         eveningText = `【事実】\n${structuredInput.fact}\n\n【観察】\n${structuredInput.observation}\n\n【教訓】\n${structuredInput.lesson}`;
       }
 
-      let body;
+      let body: Record<string, unknown>;
       if (isMorning) {
         body = {
           type: "morning",
@@ -250,6 +279,9 @@ export default function InputPage({ token, initialData }: Props) {
           weekNum: participant.weekNum || 1,
           morningDurationSec: durationSec,
         };
+        if (kanNoKiPhase && bodyIntent.trim().length > 0) {
+          body.bodyIntent = bodyIntent.trim();
+        }
       } else if (morningClosed && !todayLog) {
         body = {
           type: "evening_only",
@@ -262,6 +294,9 @@ export default function InputPage({ token, initialData }: Props) {
           weekNum: participant.weekNum || 1,
           eveningDurationSec: durationSec,
         };
+        if (kanNoKiPhase && bodyCheck.trim().length > 0) {
+          body.bodyCheck = bodyCheck.trim();
+        }
       } else {
         body = {
           type: "evening",
@@ -271,6 +306,9 @@ export default function InputPage({ token, initialData }: Props) {
           energy,
           eveningDurationSec: durationSec,
         };
+        if (kanNoKiPhase && bodyCheck.trim().length > 0) {
+          body.bodyCheck = bodyCheck.trim();
+        }
       }
 
       const res = await fetch("/api/entry", {
@@ -387,6 +425,22 @@ export default function InputPage({ token, initialData }: Props) {
       </div>
 
       <div className="max-w-md mx-auto px-5 pt-6 animate-fade-up">
+        {/* 観の期(KAN のキー)バナー — 観の期参加者にのみ表示 */}
+        {kanNoKiPhase && (
+          <div className="mb-5 bg-stone-50 border border-stone-200 rounded-2xl p-4">
+            <div className="flex items-baseline justify-between mb-1">
+              <div className="text-xs uppercase tracking-wider text-stone-500">観の期(KAN のキー)</div>
+              <div className="text-xs text-stone-500">Week {kanNoKiPhase.weeks_elapsed}</div>
+            </div>
+            <p className="text-sm text-stone-700 leading-relaxed">
+              {kanNoKiPhase.next_stage_hint ?? "今は、観の素材を貯める段階です。書き続けてください。"}
+            </p>
+            <p className="text-[11px] text-stone-400 mt-2">
+              装置は、観た事をお返しするだけです。解釈・診断・処方箋を出しません。
+            </p>
+          </div>
+        )}
+
         {step === 1 && useDoubleLoop && isMorning && showDoubleLoop && (
           <DoubleLoopPrompt
             token={token}
@@ -478,6 +532,34 @@ export default function InputPage({ token, initialData }: Props) {
             )}
             {useRumination && !isMorning && ruminationEveningState.showBreathingPrompt && (
               <BreathingPrompt onDismiss={ruminationEveningState.handleDismiss} />
+            )}
+
+            {/* 観の期 ── 身体への参照欄(任意)。空欄でも送信可 */}
+            {kanNoKiPhase && isMorning && (
+              <div className="mt-4 pt-4 border-t border-stone-100">
+                <label className="text-[11px] text-stone-500 tracking-wide block mb-2">
+                  今日、身体で気をつけたいこと(任意)
+                </label>
+                <textarea
+                  value={bodyIntent}
+                  onChange={(e) => setBodyIntent(e.target.value)}
+                  placeholder="空欄のままでも記入できます。お気づきがあれば添えてください。"
+                  className="input-field min-h-[64px] resize-none text-sm leading-relaxed"
+                />
+              </div>
+            )}
+            {kanNoKiPhase && !isMorning && (
+              <div className="mt-4 pt-4 border-t border-stone-100">
+                <label className="text-[11px] text-stone-500 tracking-wide block mb-2">
+                  身体は今、どう感じていますか(任意)
+                </label>
+                <textarea
+                  value={bodyCheck}
+                  onChange={(e) => setBodyCheck(e.target.value)}
+                  placeholder="空欄のままでも記入できます。お気づきがあれば添えてください。"
+                  className="input-field min-h-[64px] resize-none text-sm leading-relaxed"
+                />
+              </div>
             )}
           </div>
         )}
