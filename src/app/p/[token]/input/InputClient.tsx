@@ -42,6 +42,13 @@ export type InputPageInitialData = {
   initialIsMorning: boolean;
   initialMorningClosed: boolean;
   initialAlreadyCompleted: boolean;
+  // SSR で先読みしてフリッカーを抑えるための初期値
+  initialFlags: Record<string, boolean>;
+  initialKanNoKiPhase: {
+    current_stage: string;
+    weeks_elapsed: number;
+    next_stage_hint: string | null;
+  } | null;
 };
 
 interface Props {
@@ -51,7 +58,15 @@ interface Props {
 
 export default function InputPage({ token, initialData }: Props) {
   const router = useRouter();
-  const { isOn } = useFeatures();
+  // フラグは SSR で先読みした initialFlags をシードとして使い、
+  // クライアントの useFeatures が loaded になるまでは SSR 値を採用。
+  // これで「最初は simple textarea → flags 読込後に structured に切替」
+  // という1→3のフリッカーを抑える。
+  const { isOn: isOnLive, loaded: featuresLoaded } = useFeatures();
+  const isOn = (key: string): boolean => {
+    if (featuresLoaded) return isOnLive(key);
+    return initialData.initialFlags[key] === true;
+  };
 
   const [participant, setParticipant] = useState<ParticipantBasic>(initialData.participant);
   const [step, setStep] = useState(1);
@@ -87,12 +102,13 @@ export default function InputPage({ token, initialData }: Props) {
   });
   const [dailyQuestionsEnabled, setDailyQuestionsEnabled] = useState(false);
 
-  // 観の期(KAN のキー)関連 state — null なら観の期外、オブジェクトなら観の期参加者
+  // 観の期(KAN のキー)関連 state — SSR で先読みした値を初期値に
+  // null なら観の期外、オブジェクトなら観の期参加者
   const [kanNoKiPhase, setKanNoKiPhase] = useState<{
     current_stage: string;
     weeks_elapsed: number;
     next_stage_hint: string | null;
-  } | null>(null);
+  } | null>(initialData.initialKanNoKiPhase);
   const [bodyIntent, setBodyIntent] = useState("");
   const [bodyCheck, setBodyCheck] = useState("");
   const eveningTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -145,25 +161,10 @@ export default function InputPage({ token, initialData }: Props) {
     return () => clearInterval(timer);
   }, []);
 
-  // 観の期参加者かどうかを判定するため、観の期 API から phase 情報を取得
-  // 403 が返ったら観の期外として扱う(エラー扱いせずバナーを出さない)
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`/api/features/kan-no-ki?token=${encodeURIComponent(token)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (cancelled || !data?.phase) return;
-        setKanNoKiPhase({
-          current_stage: data.phase.current_stage,
-          weeks_elapsed: data.phase.weeks_elapsed,
-          next_stage_hint: data.phase.next_stage_hint ?? null,
-        });
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [token]);
+  // 観の期の状態は SSR で先読み済み(initialData.initialKanNoKiPhase)。
+  // クライアント側で再フェッチする必要はない(force-dynamic で毎回再描画される)。
+  // setKanNoKiPhase は将来「観の期を途中で抜ける」UIで使うため、未使用警告だけ抑える。
+  void setKanNoKiPhase;
 
   useEffect(() => {
     let cancelled = false;

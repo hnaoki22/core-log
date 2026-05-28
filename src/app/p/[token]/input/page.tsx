@@ -8,6 +8,8 @@
 import { notFound } from "next/navigation";
 import { getParticipantWithLogsByToken } from "@/lib/supabase";
 import { getTodayJST, getCurrentHourJST, isGracePeriod, calculateWeekNum } from "@/lib/date-utils";
+import { getFlagsForTenant } from "@/lib/feature-flags";
+import { getKanNoKiPhase } from "@/lib/kan-no-ki";
 import InputClient, { type InputPageInitialData } from "./InputClient";
 
 export const dynamic = "force-dynamic";
@@ -57,6 +59,35 @@ export default async function InputPageServer({
     initialMorningClosed = true;
   }
 
+  // 初期描画でフォームが「1枠→3枠→4枠」とチラつかないよう、
+  // 機能フラグと観の期の状態をサーバー側で先読みしてクライアントに渡す。
+  // フェッチは並列化(Promise.all)で SSR レイテンシへの影響を最小化。
+  const [flagMap, knkPhase] = await Promise.all([
+    getFlagsForTenant(participant.tenantId).catch(() => ({} as Record<string, boolean>)),
+    getKanNoKiPhase(participant.id, participant.tenantId).catch(() => null),
+  ]);
+
+  const initialKanNoKiPhase = knkPhase
+    ? {
+        current_stage: knkPhase.current_stage,
+        // weeks_elapsed は started_at からの経過週数
+        weeks_elapsed: Math.max(
+          1,
+          Math.floor((Date.now() - new Date(knkPhase.started_at).getTime()) / (1000 * 60 * 60 * 24 * 7)) + 1
+        ),
+        next_stage_hint:
+          knkPhase.current_stage === "observation"
+            ? "今は、観の素材を貯める段階です。書き続けてください。"
+            : knkPhase.current_stage === "initial-contour"
+              ? "初期の輪郭が立ち上がってきました。"
+              : knkPhase.current_stage === "word-pattern"
+                ? "言葉の癖の観想が可能になりました。"
+                : knkPhase.current_stage === "deeper-observation"
+                  ? "より深い観想が可能になりました。ここで観の期を続けてもよいですし、道場1 に進むこともできます。"
+                  : null,
+      }
+    : null;
+
   const initialData: InputPageInitialData = {
     participant: {
       name: participant.name,
@@ -67,6 +98,8 @@ export default async function InputPageServer({
     initialIsMorning,
     initialMorningClosed,
     initialAlreadyCompleted,
+    initialFlags: flagMap,
+    initialKanNoKiPhase,
   };
 
   const tDone = Date.now();
