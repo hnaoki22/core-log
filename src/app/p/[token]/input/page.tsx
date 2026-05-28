@@ -10,6 +10,7 @@ import { getParticipantWithLogsByToken } from "@/lib/supabase";
 import { getTodayJST, getCurrentHourJST, isGracePeriod, calculateWeekNum } from "@/lib/date-utils";
 import { getFlagsForTenant } from "@/lib/feature-flags";
 import { getKanNoKiPhase } from "@/lib/kan-no-ki";
+import { getTodayQuestionsForTenant, getTodayDayKey } from "@/lib/daily-questions";
 import InputClient, { type InputPageInitialData } from "./InputClient";
 
 export const dynamic = "force-dynamic";
@@ -59,12 +60,14 @@ export default async function InputPageServer({
     initialMorningClosed = true;
   }
 
-  // 初期描画でフォームが「1枠→3枠→4枠」とチラつかないよう、
-  // 機能フラグと観の期の状態をサーバー側で先読みしてクライアントに渡す。
+  // 初期描画でフォームが「シンプル入力 → デイリークエスチョン → 観の期バナー」
+  // とチラつかないよう、機能フラグ・観の期状態・デイリークエスチョンを
+  // すべてサーバー側で先読みしてクライアントに渡す。
   // フェッチは並列化(Promise.all)で SSR レイテンシへの影響を最小化。
-  const [flagMap, knkPhase] = await Promise.all([
+  const [flagMap, knkPhase, dailyQ] = await Promise.all([
     getFlagsForTenant(participant.tenantId).catch(() => ({} as Record<string, boolean>)),
     getKanNoKiPhase(participant.id, participant.tenantId).catch(() => null),
+    getTodayQuestionsForTenant(participant.tenantId).catch(() => null),
   ]);
 
   const initialKanNoKiPhase = knkPhase
@@ -88,6 +91,18 @@ export default async function InputPageServer({
       }
     : null;
 
+  // デイリークエスチョン: 機能フラグ ON かつ今日の質問が登録されていれば有効
+  const dailyQuestionsFlagOn = flagMap["feature.dailyQuestions"] === true;
+  const dailyQuestionsHasData =
+    dailyQ != null && ((dailyQ.morning?.length ?? 0) > 0 || (dailyQ.evening?.length ?? 0) > 0);
+  const initialDailyQuestions = {
+    enabled: dailyQuestionsFlagOn && dailyQuestionsHasData,
+    morning: dailyQ?.morning ?? [],
+    evening: dailyQ?.evening ?? [],
+    axis: dailyQ?.axis ?? "",
+    day: getTodayDayKey(),
+  };
+
   const initialData: InputPageInitialData = {
     participant: {
       name: participant.name,
@@ -100,6 +115,7 @@ export default async function InputPageServer({
     initialAlreadyCompleted,
     initialFlags: flagMap,
     initialKanNoKiPhase,
+    initialDailyQuestions,
   };
 
   const tDone = Date.now();

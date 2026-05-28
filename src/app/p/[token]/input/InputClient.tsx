@@ -49,6 +49,13 @@ export type InputPageInitialData = {
     weeks_elapsed: number;
     next_stage_hint: string | null;
   } | null;
+  initialDailyQuestions: {
+    enabled: boolean;
+    morning: string[];
+    evening: string[];
+    axis: string;
+    day: string;
+  };
 };
 
 interface Props {
@@ -94,13 +101,15 @@ export default function InputPage({ token, initialData }: Props) {
     observation: "",
     lesson: "",
   });
+  // デイリークエスチョンも SSR で先読みした値を初期値に。
+  // これがないと「シンプル入力 → 質問群に切替」のフリッカーが残る。
   const [dailyQuestions, setDailyQuestions] = useState<{ morning: string[]; evening: string[]; axis: string; day: string }>({
-    morning: [],
-    evening: [],
-    axis: "",
-    day: "",
+    morning: initialData.initialDailyQuestions.morning,
+    evening: initialData.initialDailyQuestions.evening,
+    axis: initialData.initialDailyQuestions.axis,
+    day: initialData.initialDailyQuestions.day,
   });
-  const [dailyQuestionsEnabled, setDailyQuestionsEnabled] = useState(false);
+  const [dailyQuestionsEnabled, setDailyQuestionsEnabled] = useState(initialData.initialDailyQuestions.enabled);
 
   // 観の期(KAN のキー)関連 state — SSR で先読みした値を初期値に
   // null なら観の期外、オブジェクトなら観の期参加者
