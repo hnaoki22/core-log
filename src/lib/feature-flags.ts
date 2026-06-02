@@ -234,8 +234,8 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
   {
     key: "tier-a.burnoutScore",
-    label: "離職・燃え尽き予兆スコア",
-    description: "エネルギー × 記入率 × 反芻スコアの複合指標。マネージャーにのみアラート。",
+    label: "変化のサイン",
+    description: "エネルギー・記入リズム・反芻傾向の変化を組み合わせ、コンディションの気になる変化にマネージャーが気づくための手がかり。",
     category: "tier-a",
     defaultEnabled: false,
     phase1Enabled: false,

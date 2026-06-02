@@ -2,7 +2,7 @@
 
 このファイルは Claude Code が `core-log` リポを開いた時に自動で読み込む。ここに書かれたことは、すべての作業の前提として扱われる。
 
-最終更新: 2026-05-18（本藤直樹）
+最終更新: 2026-06-02（本藤直樹）
 
 ---
 
@@ -144,12 +144,13 @@ PR タイトル例（リポの履歴に合わせる）:
 
 ## 5. 機能フラグ（FEATURE_CATALOG 実数）
 
-`src/lib/feature-flags.ts` の `FEATURE_CATALOG` は **2026-05-18 時点で 43 件 / 10 カテゴリ**。
+`src/lib/feature-flags.ts` の `FEATURE_CATALOG` は **2026-06-02 時点で 53 件 / 11 カテゴリ**（観の期 tier-0 の 10 件を 081f3d9 で追加）。
 
 | カテゴリ | 件数 | 代表 |
 |---|---:|---|
 | `core` | 3 | morningInput / eveningInput / logHistory |
 | `existing` | 11 | energyTracking, mission, streak, badges, animations, reminderMail, managerFeedback, csvExport, otpAuth, managerAnalytics, **dailyQuestions** |
+| `tier-0` 観の期(KAN のキー) | 10 | kanNoKi / weeklyMirror / bodyPrompt / silenceObservation / peerComparison(.tenant/.crossTenant/.industry/.global) / transitionSignal（reflection-lab 限定・大幸薬品は非表示&強制OFF） |
 | `tier-s` Differentiators | 4 | ruminationDetection, doubleLoopPrompt, weeklyConceptualization, structuredInput |
 | `tier-a` Manager Safety Net | 5 | oneOnOneBriefing, burnoutScore, consultantSpotlight, psychSafetyMonitor, managerSelfReflection |
 | `tier-b` Cultural Engine | 4 | aar, knowledgeLibrary, cultureScore, peerReflection |
@@ -169,8 +170,9 @@ PR タイトル例（リポの履歴に合わせる）:
 1. `FEATURE_CATALOG` にエントリを追加（label / description / category / defaultEnabled / implemented）
 2. コード内に少なくとも 1 つの `isFeatureEnabled(...)` か `isOn(...)` 呼び出しを置く（grep 可能に）
 3. 飾りフラグ（UI に出るがコードに繋がっていない）禁止
+4. **新しいカテゴリ（`tier-*` 等）を追加する場合は、同一 PR で `src/app/a/[token]/features/page.tsx` の `FlagCategory` 型 / `CATEGORY_META` / `CATEGORY_ORDER` を 1:1 で更新する。** 未更新だと features ページのグルーピングで `grouped[未知カテゴリ]` が undefined となり `undefined.push` で白画面クラッシュする（2026-06-02 / PR #30 の事故）。グルーピングは `(grouped[cat] ??= []).push(f)` で動的初期化し、未知カテゴリでも落ちない構造を保つこと。
 
-参考：core-log-engineer SKILL.md は「660 行・28 機能・7 ティア」と古い数値を持っている。**現状の真実は 729 行・43 機能・10 カテゴリ**。スキル本文の数値より、このリポの `src/lib/feature-flags.ts` を信用する。
+参考：core-log-engineer SKILL.md は「660 行・28 機能・7 ティア」と古い数値を持っている。**現状の真実は 53 機能・11 カテゴリ**。スキル本文の数値より、このリポの `src/lib/feature-flags.ts` を信用する。
 
 ---
 
