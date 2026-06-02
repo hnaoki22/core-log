@@ -37,9 +37,9 @@ export default function BurnoutPage() {
         const res = await fetch(`/api/features/burnout?token=${token}`);
         if (!res.ok) {
           if (res.status === 403) {
-            setError("バーンアウトスコア機能が有効化されていません");
+            setError("「変化のサイン」機能が有効化されていません");
           } else {
-            setError("スコアの取得に失敗しました");
+            setError("データの取得に失敗しました");
           }
           return;
         }
@@ -49,7 +49,7 @@ export default function BurnoutPage() {
           return riskOrder[a.riskLevel] - riskOrder[b.riskLevel];
         }));
       } catch {
-        setError("スコア取得中にエラーが発生しました");
+        setError("データ取得中にエラーが発生しました");
       } finally {
         setLoading(false);
       }
@@ -73,11 +73,11 @@ export default function BurnoutPage() {
   const getRiskLabel = (level: string): string => {
     switch (level) {
       case "high":
-        return "高リスク";
+        return "大きな変化";
       case "medium":
-        return "中程度";
+        return "気になる変化";
       case "low":
-        return "低リスク";
+        return "落ち着いている";
       default:
         return "不明";
     }
@@ -123,8 +123,8 @@ export default function BurnoutPage() {
               </svg>
             </button>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight mb-1">バーンアウトスコア</h1>
-          <p className="text-indigo-300 text-sm font-light">リスク評価と監視</p>
+          <h1 className="text-2xl font-semibold tracking-tight mb-1">変化のサイン</h1>
+          <p className="text-indigo-300 text-sm font-light">コンディションの変化に気づく</p>
         </div>
       </div>
 
@@ -160,7 +160,7 @@ export default function BurnoutPage() {
                       <div className={`text-xl font-bold ${colors.text}`}>
                         {(score.composite * 100).toFixed(0)}
                       </div>
-                      <p className={`text-[10px] ${colors.text} opacity-75`}>総合スコア</p>
+                      <p className={`text-[10px] ${colors.text} opacity-75`}>変化の度合い</p>
                     </div>
                   </div>
 
@@ -184,7 +184,7 @@ export default function BurnoutPage() {
                   {score.riskLevel === "high" && (
                     <div className="mt-3 p-2 rounded-lg bg-red-100/50 border border-red-200">
                       <p className="text-[10px] text-red-700 font-medium">
-                        ⚠️ 早期の対応が必要です。1on1面談やサポートを検討してください。
+                        コンディションに気になる変化が見られます。1on1などで声をかけてみてください。
                       </p>
                     </div>
                   )}
@@ -196,7 +196,7 @@ export default function BurnoutPage() {
 
         {/* Footer */}
         <div className="text-center py-6 text-[11px] text-[#C9BDAE]">
-          CORE Log — バーンアウト監視
+          CORE Log — コンディションの変化
         </div>
       </div>
     </div>

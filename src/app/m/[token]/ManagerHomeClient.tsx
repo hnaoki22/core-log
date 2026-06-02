@@ -119,7 +119,7 @@ export default function ManagerHomeClient({ token, initialData }: Props) {
   const getStatusIndicator = (participant: ParticipantData) => {
     if (participant.streak > 0) return { color: "bg-emerald-500", label: "活動中" };
     if (participant.entryRate > 50) return { color: "bg-amber-500", label: "スローダウン" };
-    if (participant.entryDays > 0) return { color: "bg-red-500", label: "要注意" };
+    if (participant.entryDays > 0) return { color: "bg-red-500", label: "気になる変化" };
     return { color: "bg-gray-300", label: "未開始" };
   };
 
@@ -162,7 +162,7 @@ export default function ManagerHomeClient({ token, initialData }: Props) {
                 <span className="text-lg flex-shrink-0">⚠️</span>
                 <div className="flex-1">
                   <p className="text-xs font-semibold text-red-700">
-                    要注意: {highRiskParticipants.map((h) => h.participantName).join("・")}さんのバーンアウトリスクが高まっています
+                    気になる変化: {highRiskParticipants.map((h) => h.participantName).join("・")}さんのコンディションに変化のサインがあります
                   </p>
                   <p className="text-[10px] text-red-600 mt-0.5">詳細を確認する →</p>
                 </div>
@@ -220,8 +220,8 @@ export default function ManagerHomeClient({ token, initialData }: Props) {
                           <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
                         </svg>
                       </div>
-                      <h3 className="text-xs font-semibold text-[#1A1A2E]">バーンアウトスコア</h3>
-                      <p className="text-[10px] text-[#8B8489] mt-1 leading-relaxed">リスク監視と評価</p>
+                      <h3 className="text-xs font-semibold text-[#1A1A2E]">変化のサイン</h3>
+                      <p className="text-[10px] text-[#8B8489] mt-1 leading-relaxed">コンディションの変化に気づく</p>
                     </div>
                   </Link>
                 )}
