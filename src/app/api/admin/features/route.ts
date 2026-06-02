@@ -19,6 +19,7 @@ import {
   PRESETS,
   getFlagsForTenant,
   setFlagsForTenant,
+  applyTenantFlagGuards,
 } from "@/lib/feature-flags";
 import {
   getTenantById,
@@ -159,6 +160,11 @@ export async function POST(request: NextRequest) {
   } else {
     return NextResponse.json({ error: "Missing flags or presetId" }, { status: 400 });
   }
+
+  // Enforce per-tenant invariants regardless of save path (manual toggle,
+  // preset, or crafted body): the daiko production tenant can never persist
+  // 観の期(tier-0) ON. Pairs with the admin UI hiding the category.
+  flagsToSave = applyTenantFlagGuards(resolved.tenantId, flagsToSave);
 
   const ok = await setFlagsForTenant(resolved.tenantId, flagsToSave);
   if (!ok) {

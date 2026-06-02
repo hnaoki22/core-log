@@ -3,9 +3,11 @@
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { DAIKO_TENANT_ID } from "@/lib/tenants";
 
 type FlagCategory =
   | "core" | "existing"
+  | "tier-0"
   | "tier-s" | "tier-a" | "tier-b" | "tier-c" | "tier-d" | "tier-e" | "tier-f" | "tier-g";
 
 type FeatureFlag = {
@@ -49,6 +51,7 @@ type ApiData = {
 const CATEGORY_META: Record<FlagCategory, { label: string; color: string; desc: string }> = {
   "core":     { label: "コア機能",              color: "bg-gray-100 text-gray-700 border-gray-300",   desc: "CORE Logの中核。基本的に常時ON推奨" },
   "existing": { label: "既存機能",              color: "bg-blue-50 text-blue-700 border-blue-200",    desc: "現在実装済みの機能群" },
+  "tier-0":   { label: "Tier 0: 観の期（KAN のキー）", color: "bg-slate-100 text-slate-700 border-slate-300", desc: "介入前の自己観想フェーズ。装置は観た事を映し返すのみ（reflection-lab で試験運用）" },
   "tier-s":   { label: "Tier S: 差別化機能",    color: "bg-orange-50 text-orange-700 border-orange-200", desc: "反芻検知・持論化等、CORE Logの独自性を生む機能" },
   "tier-a":   { label: "Tier A: マネージャー支援", color: "bg-indigo-50 text-indigo-700 border-indigo-200", desc: "Safety Net層。1on1ブリーフィング・離職予兆等" },
   "tier-b":   { label: "Tier B: 組織学習",      color: "bg-emerald-50 text-emerald-700 border-emerald-200", desc: "Cultural Engine層。AAR・組織ナレッジ等" },
@@ -61,6 +64,7 @@ const CATEGORY_META: Record<FlagCategory, { label: string; color: string; desc: 
 
 const CATEGORY_ORDER: FlagCategory[] = [
   "core", "existing",
+  "tier-0",
   "tier-s", "tier-a", "tier-b", "tier-c", "tier-d", "tier-e", "tier-f", "tier-g",
 ];
 
@@ -186,11 +190,27 @@ export default function FeatureFlagsAdminPage() {
     );
   }
 
-  const grouped: Record<FlagCategory, FeatureFlag[]> = {
-    "core": [], "existing": [],
-    "tier-s": [], "tier-a": [], "tier-b": [], "tier-c": [], "tier-d": [], "tier-e": [], "tier-f": [], "tier-g": [],
-  };
-  for (const f of data.catalog) grouped[f.category].push(f);
+  // 観の期(tier-0)は当面 reflection-lab 限定。本番テナント(大幸薬品)では管理画面に
+  // 出さない＝管理者の誤ONを物理的に防ぐ。保存経路はサーバー側(applyTenantFlagGuards)
+  // でも tier-0 を強制 false にして二重で守る。
+  const hideTier0 = data.tenantId === DAIKO_TENANT_ID;
+  const visibleCatalog = hideTier0
+    ? data.catalog.filter((f) => f.category !== "tier-0")
+    : data.catalog;
+
+  // Group dynamically so a newly added catalog category can never white-screen
+  // this page again. (Regression: a static `grouped` object missing the new
+  // "tier-0" key made grouped[f.category] undefined → undefined.push() crash.)
+  const grouped: Record<string, FeatureFlag[]> = {};
+  for (const f of visibleCatalog) (grouped[f.category] ??= []).push(f);
+
+  // Render known categories in the defined order, then surface any categories
+  // present in the catalog but not yet listed in CATEGORY_ORDER (so a future
+  // category is shown with a fallback label rather than silently dropped).
+  const orderedCategories: string[] = [
+    ...CATEGORY_ORDER,
+    ...Object.keys(grouped).filter((c) => !(CATEGORY_ORDER as string[]).includes(c)),
+  ];
 
   return (
     <div className="min-h-screen bg-[#F5F0EB] pb-32">
@@ -281,10 +301,14 @@ export default function FeatureFlagsAdminPage() {
         )}
 
         {/* Categories */}
-        {CATEGORY_ORDER.map((cat) => {
-          const items = grouped[cat];
+        {orderedCategories.map((cat) => {
+          const items = grouped[cat] ?? [];
           if (items.length === 0) return null;
-          const meta = CATEGORY_META[cat];
+          const meta = CATEGORY_META[cat as FlagCategory] ?? {
+            label: cat,
+            color: "bg-gray-100 text-gray-700 border-gray-300",
+            desc: "",
+          };
           const enabledCount = items.filter((f) => flags[f.key]).length;
           const isCollapsed = collapsed[cat];
           return (

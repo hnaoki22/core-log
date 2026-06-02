@@ -10,6 +10,7 @@
 //   if (await isFeatureEnabled("feature.managerFeedback")) { ... }
 
 import { getClient } from "@/lib/supabase";
+import { DAIKO_TENANT_ID } from "@/lib/tenants";
 
 // ===== Catalog =====
 // Every feature (existing or new) is declared here. Adding a flag = one entry.
@@ -829,3 +830,32 @@ export async function setFlagsForTenant(
 }
 
 // (No backwards-compat shims — all callers updated to per-tenant API.)
+
+// ===== Per-tenant flag policy guards =====
+
+/**
+ * Enforce per-tenant feature-flag invariants that must hold no matter how the
+ * flag map was produced (manual admin toggles, a preset like "full", or a
+ * crafted/legacy POST body).
+ *
+ * 観の期(tier-0) is reflection-lab only for now. The daiko production tenant must
+ * never *persist* it ON: hiding the toggle in the admin UI is not sufficient,
+ * because the "full" preset (implemented=true → ON) and any direct POST could
+ * otherwise enable it. This is the server-side half of that guard, paired with
+ * the client hiding the category (production-security-guard 原則1/7: never trust
+ * a client-side gate to protect a server-side invariant).
+ *
+ * Returns a new map; the input is never mutated.
+ */
+export function applyTenantFlagGuards(
+  tenantId: string,
+  flags: FlagMap
+): FlagMap {
+  const guarded: FlagMap = { ...flags };
+  if (tenantId === DAIKO_TENANT_ID) {
+    for (const f of FEATURE_CATALOG) {
+      if (f.category === "tier-0") guarded[f.key] = false;
+    }
+  }
+  return guarded;
+}
