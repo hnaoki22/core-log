@@ -294,14 +294,20 @@ async function getTenantIdBySlug(slug: string): Promise<string | null> {
 // ---------------------------------------------------------------------------
 export async function getLogsByParticipant(
   participantName: string,
-  tenantId: string
+  tenantId: string,
+  options?: { includeKanNoKi?: boolean }
 ): Promise<NotionLogEntry[]> {
-  const { data, error } = await getClient()
+  let query = getClient()
     .from("logs")
     .select("*")
     .eq("tenant_id", tenantId)
-    .eq("participant_name", participantName)
-    .order("date", { ascending: false });
+    .eq("participant_name", participantName);
+  // 観の期(kan-no-ki)のログは「本人と装置だけ」。上司・伴走者・コンサル向けの読み取り
+  // からは既定で除外する。本人向けの読み取りのみ includeKanNoKi=true で含める。
+  if (!options?.includeKanNoKi) {
+    query = query.neq("phase_mode", "kan-no-ki");
+  }
+  const { data, error } = await query.order("date", { ascending: false });
   if (error) {
     logger.error("Query failed", { error: error.message, participantName, tenantId });
   }
@@ -319,7 +325,7 @@ const ADMIN_LOGS_MAX_ROWS = 5000;
 
 export async function getAllLogsForTenant(
   tenantId?: string,
-  options?: { sinceDate?: string; limit?: number },
+  options?: { sinceDate?: string; limit?: number; includeKanNoKi?: boolean },
 ): Promise<Map<string, NotionLogEntry[]>> {
   const since = options?.sinceDate
     ?? new Date(Date.now() - ADMIN_LOGS_DEFAULT_WINDOW_DAYS * 24 * 60 * 60 * 1000)
@@ -335,6 +341,11 @@ export async function getAllLogsForTenant(
     .limit(limit);
   if (tenantId) {
     query = query.eq("tenant_id", tenantId);
+  }
+  // 観の期(kan-no-ki)のログは管理者/伴走者/コンサル向けの集計・一覧から既定で除外。
+  // この関数の呼び出し元は全て管理者/伴走者/cron なので本人向け opt-in は不要。
+  if (!options?.includeKanNoKi) {
+    query = query.neq("phase_mode", "kan-no-ki");
   }
   const { data, error } = await query;
   if (error) {
@@ -691,7 +702,8 @@ export async function getParticipantWithLogsByToken(
     // Fall back to two sequential calls. Same observable behavior, slower.
     const p = await getParticipantByTokenFromSupabase(token);
     if (!p) return { participant: null, logs: [] };
-    const logs = await getLogsByParticipant(p.name, p.tenantId);
+    // 本人の自分用ビュー(参加者ルートの Server Component)。観の期ログも本人には見える。
+    const logs = await getLogsByParticipant(p.name, p.tenantId, { includeKanNoKi: true });
     return { participant: p, logs };
   }
   if (!data) return { participant: null, logs: [] };

@@ -139,6 +139,7 @@ export async function GET(req: NextRequest) {
       .select("date, morning_intent, evening_insight, energy")
       .eq("tenant_id", tenantId)
       .eq("participant_id", participantId)
+      .neq("phase_mode", "kan-no-ki") // 観の期ログは上司向け 1on1 ブリーフィングから除外
       .gte("date", sevenDaysAgoDate)
       .order("date", { ascending: true });
 

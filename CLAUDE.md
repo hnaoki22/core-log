@@ -229,6 +229,7 @@ PR タイトル例（リポの履歴に合わせる）:
    - 「育てる」禁止・「調える」中心動詞・「整える」≠「調える」は両層共通
    - 主正典：`書籍_v3.0_素材/book_v2.7_full.md` 補章 A（用語集）+ `書籍_v2.6/00_ボイス指針.md`
    - 詳細：`~/.claude/skills/human-mature-canonical-vocabulary-guard/SKILL.md` の Step 1（正典パス）と Step 2.5（二層構造）
+10. **観の期（`phase_mode='kan-no-ki'`）のログは「本人と装置だけ」。** 上司・伴走者・コンサル（spotlight）・briefing・burnout など管理者向けに logs を読む全経路で kan-no-ki を除外する。共有関数 `getLogsByParticipant` / `getAllLogsForTenant` は**既定で除外**し、本人向けの読み取りのみ `{ includeKanNoKi: true }` を渡す。logs を直クエリする新規の管理者向けコードは `.neq("phase_mode","kan-no-ki")` を必須とする。道場1 移行後も過去の観の期ログは上司へ開かない（2026-06-02 確認・恒久対策）。
 
 ---
 
