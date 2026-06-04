@@ -11,6 +11,7 @@ import { rateLimit, getClientIp, buildRateLimitKey } from "@/lib/rate-limit";
 import { isSessionValid, getSessionCookieName, createSignedSessionValue, SESSION_MAX_AGE } from "@/lib/session";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { DEFAULT_TENANT_ID } from "@/lib/supabase";
+import { resolveTenantFromToken } from "@/lib/tenant-from-token";
 import { checkSession } from "@/lib/session-store";
 import { validateEnv } from "@/lib/env";
 
@@ -158,12 +159,23 @@ export async function middleware(request: NextRequest) {
 
   // Slow path: no valid session, OR not a protected page. Now check the OTP
   // feature flag to decide whether to enforce auth or pass through.
+  //
+  // Per-tenant: resolve the token's OWN tenant and read THAT tenant's otpAuth
+  // flag, so one tenant's setting can't govern another tenant's auth (tenant
+  // isolation). Only protected pages (/p /m /a) carry a token, so we resolve
+  // only there. Falls back to DEFAULT_TENANT_ID when the token can't be
+  // resolved (unknown token / Supabase error) so behavior never regresses and
+  // unknown tokens still hit the (currently ON) default gate.
   let otpEnabled = false;
-  try {
-    otpEnabled = await isFeatureEnabled("feature.otpAuth", DEFAULT_TENANT_ID); // global toggle
-  } catch {
-    // Fallback to env var if Supabase is unreachable
-    otpEnabled = process.env.OTP_ENABLED === "true";
+  if (isProtectedPage) {
+    const [, , otpToken] = tokenMatch!;
+    try {
+      const otpTenantId = (await resolveTenantFromToken(otpToken)) ?? DEFAULT_TENANT_ID;
+      otpEnabled = await isFeatureEnabled("feature.otpAuth", otpTenantId);
+    } catch {
+      // Fallback to env var if Supabase is unreachable
+      otpEnabled = process.env.OTP_ENABLED === "true";
+    }
   }
 
   if (otpEnabled && isProtectedPage) {
