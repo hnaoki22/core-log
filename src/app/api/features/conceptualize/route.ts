@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
     // sporadic user's most recent 5 entries can span a month, which made
     // the "weekly concepts" misleading and the week_start/end_date columns
     // lie about coverage).
-    const allLogs = await getLogsByParticipant(participant.name, participant.tenantId);
+    const allLogs = await getLogsByParticipant(participant.name, participant.tenantId, { includeKanNoKi: true }); // 本人の自己分析：観の期も対象
     const sevenDaysAgoStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
       .toISOString()
       .slice(0, 10);

@@ -90,6 +90,7 @@ export async function GET(req: NextRequest) {
         .select("*")
         .eq("tenant_id", tenantId)
         .eq("participant_id", participantId)
+        .neq("phase_mode", "kan-no-ki") // 観の期ログは「変化のサイン」の集計から除外
         .gte("datetime", fourteenDaysAgo.toISOString());
 
       // Calculate energy average

@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   const tenantId = participant.tenantId;
 
   const [logs, missions, feedbacks] = await Promise.all([
-    getLogsByParticipant(participant.name, tenantId),
+    getLogsByParticipant(participant.name, tenantId, { includeKanNoKi: true }), // 本人の自分用ログ履歴：観の期も表示
     getMissionsByParticipant(participant.name, tenantId),
     getFeedbackByParticipant(participant.name, tenantId),
   ]);
