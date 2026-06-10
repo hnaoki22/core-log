@@ -25,6 +25,10 @@ type TodayLog = {
   id: string;
   morningIntent: string;
   status: string;
+  // 夕②「今朝の記録」カード用（2026-06-10 本藤さんフィードバック）:
+  // 朝に選んだ気分・書いた体調も参照しながら振り返れるようにする
+  morningEnergy?: string | null;
+  morningCondition?: string | null;
 };
 
 type ParticipantBasic = {
@@ -87,6 +91,12 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
   };
 
   const today = getTodayJST();
+
+  // 夕②/③で参照する「今朝の記録」。気分は絵文字・ラベルに解決しておく
+  const morningMood = todayLog?.morningEnergy
+    ? moodOptions.find((o) => o.id === todayLog.morningEnergy) ?? null
+    : null;
+  const hasMorningRecord = !!(morningMood || todayLog?.morningCondition || todayLog?.morningIntent);
 
   if (initialData.initialAlreadyCompleted) {
     return (
@@ -354,11 +364,34 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
               </>
             ) : (
               <>
-                {todayLog && todayLog.morningIntent && (
-                  <div className="bg-[#F2F2F7] border border-indigo-100 p-4 rounded-2xl">
-                    <p className="text-[10px] text-[#4D4D6D] font-medium tracking-wide uppercase mb-1">今朝の意図</p>
-                    <p className="text-sm text-[#1A1A2E] leading-relaxed">{todayLog.morningIntent}</p>
+                {/* 今朝の記録カード — 気分→体調→意図の順で、あるものだけを再掲。
+                    参照であって主役ではない（muted 配色・入力欄より目立たせない） */}
+                {hasMorningRecord ? (
+                  <div className="bg-[#FBF8F4] border border-[#EFE8DD] p-4 rounded-2xl space-y-2.5">
+                    <p className="text-[10px] text-[#8B8489] font-medium tracking-wide uppercase">今朝の記録</p>
+                    {morningMood && (
+                      <p className="text-sm text-[#5B5560] leading-relaxed">
+                        <span className="text-[#8B8489] text-xs mr-2">気分</span>
+                        {morningMood.emoji} {morningMood.label}
+                      </p>
+                    )}
+                    {todayLog?.morningCondition && (
+                      <p className="text-sm text-[#5B5560] leading-relaxed">
+                        <span className="text-[#8B8489] text-xs mr-2">体調</span>
+                        {todayLog.morningCondition}
+                      </p>
+                    )}
+                    {todayLog?.morningIntent && (
+                      <p className="text-sm text-[#5B5560] leading-relaxed whitespace-pre-wrap">
+                        <span className="text-[#8B8489] text-xs mr-2">意図</span>
+                        {todayLog.morningIntent}
+                      </p>
+                    )}
                   </div>
+                ) : (
+                  <p className="text-xs text-[#8B8489] leading-relaxed">
+                    今朝の記録はありません。夕方だけの記入でも大丈夫です。
+                  </p>
                 )}
                 <p className="text-[#1A1A2E] font-medium text-base leading-relaxed">
                   {todayLog && todayLog.morningIntent
@@ -381,8 +414,14 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
         {step === 3 && (
           <div className="space-y-4">
             <p className="text-[#1A1A2E] font-medium text-base leading-relaxed">
-              {isMorning ? "いまの気分に近いものは？" : "いまの気分に近いものは？"}
+              いまの気分に近いものは？
             </p>
+            {/* 夕は今朝の気分を1行だけ参照表示（朝夕差を意識して選べるように） */}
+            {!isMorning && morningMood && (
+              <p className="text-xs text-[#8B8489]">
+                今朝の気分: {morningMood.emoji} {morningMood.label}
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-3">
               {moodOptions.map((option) => (
                 <button

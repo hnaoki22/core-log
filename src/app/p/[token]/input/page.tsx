@@ -96,6 +96,32 @@ export default async function InputPageServer({
   // クライアントのフラグ読込タイミングに依存しないため、§10 で報告された
   // 「個人ごとに画面が違う」類の表示差がフロー選択には発生しない。
   if (flagMap["standalone_mode"] === true) {
+    // standalone 専用の todayLog 構築（2026-06-10 夜・本藤さんフィードバック対応）:
+    // 夕②で「今朝の記録」（気分・体調・意図）を完全再掲するため、
+    // morningIntent の有無に関わらず todayEntry があれば全フィールドを渡す。
+    // （共通ロジックは morningIntent 非空が条件のため、夕のみ記入で complete に
+    //   なった日が「完了済み」と判定されない既存挙動もここで補正する。
+    //   従来フロー（InputClient/大幸）には触れない）
+    let saTodayLog: {
+      id: string;
+      morningIntent: string;
+      status: string;
+      morningEnergy: string | null;
+      morningCondition: string | null;
+    } | null = null;
+    let saAlreadyCompleted = initialAlreadyCompleted;
+    if (todayEntry) {
+      saTodayLog = {
+        id: todayEntry.id,
+        morningIntent: todayEntry.morningIntent || "",
+        status: todayEntry.status,
+        morningEnergy: todayEntry.energy ?? null,
+        morningCondition: todayEntry.morningCondition ?? null,
+      };
+      if (todayEntry.status === "complete" || todayEntry.status === "fb_done") {
+        saAlreadyCompleted = true;
+      }
+    }
     return (
       <StandaloneInputClient
         token={token}
@@ -105,10 +131,10 @@ export default async function InputPageServer({
             dojoPhase: participant.dojoPhase,
             weekNum: calculateWeekNum(participant.startDate || ""),
           },
-          todayLog: initialTodayLog,
+          todayLog: saTodayLog,
           initialIsMorning,
           initialMorningClosed,
-          initialAlreadyCompleted,
+          initialAlreadyCompleted: saAlreadyCompleted,
         }}
       />
     );
