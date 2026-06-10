@@ -12,6 +12,7 @@ import { getFlagsForTenant } from "@/lib/feature-flags";
 import { getKanNoKiPhase } from "@/lib/kan-no-ki";
 import { getTodayQuestionsForTenant, getTodayDayKey } from "@/lib/daily-questions";
 import InputClient, { type InputPageInitialData } from "./InputClient";
+import StandaloneInputClient from "./StandaloneInputClient";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -90,6 +91,28 @@ export default async function InputPageServer({
                   : null,
       }
     : null;
+
+  // standalone商品モード（§3）: 入力フローはサーバー側で確定して分岐する。
+  // クライアントのフラグ読込タイミングに依存しないため、§10 で報告された
+  // 「個人ごとに画面が違う」類の表示差がフロー選択には発生しない。
+  if (flagMap["standalone_mode"] === true) {
+    return (
+      <StandaloneInputClient
+        token={token}
+        initialData={{
+          participant: {
+            name: participant.name,
+            dojoPhase: participant.dojoPhase,
+            weekNum: calculateWeekNum(participant.startDate || ""),
+          },
+          todayLog: initialTodayLog,
+          initialIsMorning,
+          initialMorningClosed,
+          initialAlreadyCompleted,
+        }}
+      />
+    );
+  }
 
   // デイリークエスチョン: 機能フラグ ON かつ今日の質問が登録されていれば有効
   const dailyQuestionsFlagOn = flagMap["feature.dailyQuestions"] === true;

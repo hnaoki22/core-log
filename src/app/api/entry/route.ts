@@ -10,6 +10,7 @@ import { isProgramEnded, isProgramNotStarted, getCurrentHourJST, isGracePeriod }
 import { sanitizeInput } from "@/lib/sanitize";
 import { logger } from "@/lib/logger";
 import { resolvePhaseMode, triggerBodyPromptIfNeeded } from "@/lib/kan-no-ki";
+import { isFeatureEnabled } from "@/lib/feature-flags";
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,6 +32,8 @@ export async function POST(request: NextRequest) {
     }
     const tenantId = participant.tenantId;
     const participantId = participant.id;
+    // standalone商品モード（§1/§3）: 朝夕の気分を分離保存し、体調自由記述を受け付ける
+    const standalone = await isFeatureEnabled("standalone_mode", tenantId);
     if (participant.endDate && isProgramEnded(participant.endDate)) {
       return NextResponse.json({
         error: "プログラムは終了しています。日報の入力はできません。",
@@ -72,12 +75,17 @@ export async function POST(request: NextRequest) {
 
       const phaseMode = await resolvePhaseMode(participantId, tenantId);
       const sanitizedBodyIntent = body.bodyIntent ? sanitizeInput(String(body.bodyIntent)) : null;
+      // standalone §3 画面①: 朝の体調（自由記述・空可）
+      const sanitizedMorningCondition = standalone && body.morningCondition
+        ? sanitizeInput(String(body.morningCondition))
+        : null;
       const pageId = await createMorningEntry(
         participantName, date, sanitizedMorningIntent, energy,
         dojoPhase, weekNum, tenantId, participantId,
         typeof morningDurationSec === "number" ? morningDurationSec : null,
         phaseMode,
         sanitizedBodyIntent && sanitizedBodyIntent.length > 0 ? sanitizedBodyIntent : null,
+        sanitizedMorningCondition && sanitizedMorningCondition.length > 0 ? sanitizedMorningCondition : null,
       );
       if (!pageId) {
         return NextResponse.json({ error: "Failed to create entry" }, { status: 500 });
@@ -126,10 +134,23 @@ export async function POST(request: NextRequest) {
       // 観の期の身体欄（任意）。InputClient は kan-no-ki 時のみ bodyCheck を送る。
       // 従来この値を読まずに捨てていた（朝→夕フローで夕の身体欄が喪失するバグ）。
       const sanitizedBodyCheckE = body.bodyCheck ? sanitizeInput(String(body.bodyCheck)) : null;
+      // standalone §2/§3: 夕の気分は evening_energy へ分離保存し、
+      // energy（朝の気分）を上書きしない（energy=null で呼ぶ）。
+      // 従来テナントは energy 上書きの既存挙動を完全維持（evening_energy も
+      // 送らない＝migration とのデプロイ順序に依存しない・大幸無回帰）。
+      const sanitizedEveningCondition = standalone && body.eveningCondition
+        ? sanitizeInput(String(body.eveningCondition))
+        : null;
       const success = await updateEveningEntry(
-        pageId, sanitizedEveningInsight, energy,
+        pageId, sanitizedEveningInsight, standalone ? null : energy,
         typeof eveningDurationSec === "number" ? eveningDurationSec : null,
-        sanitizedBodyCheckE && sanitizedBodyCheckE.length > 0 ? sanitizedBodyCheckE : null
+        sanitizedBodyCheckE && sanitizedBodyCheckE.length > 0 ? sanitizedBodyCheckE : null,
+        standalone
+          ? {
+              eveningEnergy: energy || null,
+              eveningCondition: sanitizedEveningCondition && sanitizedEveningCondition.length > 0 ? sanitizedEveningCondition : null,
+            }
+          : undefined
       );
       if (!success) {
         return NextResponse.json({ error: "Failed to update entry" }, { status: 500 });
@@ -187,12 +208,24 @@ export async function POST(request: NextRequest) {
 
       const phaseModeEO = await resolvePhaseMode(participantId, tenantId);
       const sanitizedBodyCheckEO = body.bodyCheck ? sanitizeInput(String(body.bodyCheck)) : null;
+      // standalone §2/§3: 夕のみ記入では energy（朝の気分）は null のまま、
+      // 夕の気分は evening_energy へ。従来テナントは既存挙動（energy=夕の値、
+      // evening_energy は送らない）を完全維持。
+      const sanitizedEveningConditionEO = standalone && body.eveningCondition
+        ? sanitizeInput(String(body.eveningCondition))
+        : null;
       const pageId = await createEveningOnlyEntry(
-        participantName, date, sanitizedEveningInsight, energy,
+        participantName, date, sanitizedEveningInsight, standalone ? null : energy,
         dojoPhase, weekNum, tenantId, participantId,
         typeof eveningDurationSec === "number" ? eveningDurationSec : null,
         phaseModeEO,
         sanitizedBodyCheckEO && sanitizedBodyCheckEO.length > 0 ? sanitizedBodyCheckEO : null,
+        standalone
+          ? {
+              eveningEnergy: energy || null,
+              eveningCondition: sanitizedEveningConditionEO && sanitizedEveningConditionEO.length > 0 ? sanitizedEveningConditionEO : null,
+            }
+          : undefined
       );
       if (!pageId) {
         return NextResponse.json({ error: "Failed to create entry" }, { status: 500 });
