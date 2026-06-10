@@ -123,9 +123,13 @@ export async function POST(request: NextRequest) {
       // Sanitize user input
       const sanitizedEveningInsight = sanitizeInput(eveningInsight || "");
 
+      // 観の期の身体欄（任意）。InputClient は kan-no-ki 時のみ bodyCheck を送る。
+      // 従来この値を読まずに捨てていた（朝→夕フローで夕の身体欄が喪失するバグ）。
+      const sanitizedBodyCheckE = body.bodyCheck ? sanitizeInput(String(body.bodyCheck)) : null;
       const success = await updateEveningEntry(
         pageId, sanitizedEveningInsight, energy,
-        typeof eveningDurationSec === "number" ? eveningDurationSec : null
+        typeof eveningDurationSec === "number" ? eveningDurationSec : null,
+        sanitizedBodyCheckE && sanitizedBodyCheckE.length > 0 ? sanitizedBodyCheckE : null
       );
       if (!success) {
         return NextResponse.json({ error: "Failed to update entry" }, { status: 500 });

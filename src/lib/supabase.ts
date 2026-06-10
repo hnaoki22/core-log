@@ -470,7 +470,8 @@ export async function updateEveningEntry(
   pageId: string,
   eveningInsight: string,
   energy: string | null,
-  eveningDurationSec: number | null = null
+  eveningDurationSec: number | null = null,
+  bodyCheck: string | null = null
 ): Promise<boolean> {
   const now = new Date();
   const sanitized = sanitizeDurationSec(eveningDurationSec);
@@ -483,6 +484,12 @@ export async function updateEveningEntry(
   // duration が計測できた場合のみ更新（null の場合はカラムを触らない）
   if (sanitized !== null) {
     updateData.evening_duration_sec = sanitized;
+  }
+  // 観の期の身体欄（任意）。値がある場合のみ更新。
+  // 既存バグ修正: InputClient は type="evening" でも bodyCheck を送るが、
+  // この関数が受け取らず「朝→夕」フローで夕の身体欄が暗黙裡に失われていた。
+  if (bodyCheck !== null && bodyCheck.length > 0) {
+    updateData.body_check = bodyCheck;
   }
   const { error, data: updated } = await getClient()
     .from("logs")
