@@ -100,7 +100,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // No recent cache â generate fresh
+    // No recent cache — generate fresh
     return generateAndStore(req, manager, tenantCtx);
   } catch (error) {
     console.error("Consultant spotlight GET error:", error);
@@ -154,7 +154,7 @@ async function generateAndStore(
   if (participantSummaries.length === 0) {
     return NextResponse.json({
       success: true,
-      spotlight: { spotlight: [], orgPulse: "ã­ã°ãããã¾ãã", weekSummary: "åæå¯¾è±¡ã®ã­ã°ãããã¾ãã" },
+      spotlight: { spotlight: [], orgPulse: "ログがありません", weekSummary: "分析対象のログがありません" },
       depthAnalyses: [],
       generatedAt: new Date().toISOString(),
       cached: false,
