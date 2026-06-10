@@ -216,10 +216,14 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
         <div className="max-w-md mx-auto relative z-10">
           <p className="text-indigo-200 text-sm font-light tracking-wide mb-1">{getGreeting()}</p>
           <h1 className="text-2xl font-semibold tracking-tight mb-3">{participant.name}</h1>
-          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs font-medium text-indigo-100">
-            <div className="w-1.5 h-1.5 bg-indigo-300 rounded-full"></div>
-            {participant.dojoPhase || "守"}
-          </div>
+          {/* フェーズバッジは standalone では非表示（道場プログラムの語彙を
+              商品UIに出さない・本藤さん指摘 2026-06-10夜）。道場1系は従来通り */}
+          {!sa && (
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs font-medium text-indigo-100">
+              <div className="w-1.5 h-1.5 bg-indigo-300 rounded-full"></div>
+              {participant.dojoPhase || "守"}
+            </div>
+          )}
         </div>
       </div>
 
