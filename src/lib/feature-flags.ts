@@ -18,6 +18,7 @@ import { DAIKO_TENANT_ID } from "@/lib/tenants";
 export type FlagCategory =
   | "core"          // Core input (always on — shown as read-only)
   | "existing"      // Existing features (mission, streak, feedback, etc)
+  | "mode"          // テナント全体の動作モード（standalone商品モード等）
   | "tier-0"        // Tier 0: 観の期(KAN のキー)— 介入前の自己観想フェーズ
   | "tier-s"        // Tier S: Differentiators
   | "tier-a"        // Tier A: Manager Safety Net
@@ -589,6 +590,23 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     implemented: true,
     dependencies: ["tier-0.kanNoKi"],
   },
+
+  // ===== Mode: standalone商品モード =====
+  // 商品版最終型仕様書 v1.0 §1。テナント単位の動作モード。
+  // ON のテナント:「最初の3週間（観の期）は誰も見れない」をコードで保証。
+  //   - 朝夕の新3画面入力フロー（体調→意図/結果→気分、evening_energy 分離保存）
+  //   - 気分ローソク足・分析機能の段階開示（21日経過+記入10日でアンロック）
+  //   - マネージャー/管理者のログ本文閲覧を API レベルで遮断・通知メール停止
+  // 道場1系テナント（大幸等）は OFF のまま。applyTenantFlagGuards で大幸は強制 OFF。
+  {
+    key: "standalone_mode",
+    label: "standalone商品モード",
+    description: "商品版の動作モード。最初の3週間は誰も見ないことをコードで保証する（入力3画面・気分ローソク足・段階開示・ログ本文閲覧の遮断・投稿通知メール停止）。テナント単位でON/OFF。",
+    category: "mode",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    implemented: true,
+  },
 ];
 
 // ===== Presets =====
@@ -792,7 +810,10 @@ export function invalidateFlagCache(tenantId?: string) {
 export async function getFlagsForTenant(tenantId: string): Promise<FlagMap> {
   const stored = await getFlagsCached(tenantId);
   const defaults = defaultFlagsFor();
-  return { ...defaults, ...stored };
+  // 読み取り時にもテナント不変条件を適用（書き込み側ガードのすり抜けや
+  // 過去に保存された値が残っていても、大幸で tier-0 / standalone_mode が
+  // 実行時に ON と評価されることはない）。
+  return applyTenantFlagGuards(tenantId, { ...defaults, ...stored });
 }
 
 export async function isFeatureEnabled(
@@ -854,7 +875,10 @@ export function applyTenantFlagGuards(
   const guarded: FlagMap = { ...flags };
   if (tenantId === DAIKO_TENANT_ID) {
     for (const f of FEATURE_CATALOG) {
-      if (f.category === "tier-0") guarded[f.key] = false;
+      // 観の期(tier-0)と standalone商品モードは大幸では常に OFF。
+      // standalone_mode が大幸で ON になると、入力フロー差し替え・
+      // 管理者のログ閲覧遮断・通知メール停止が発動してしまう（仕様書 §1）。
+      if (f.category === "tier-0" || f.category === "mode") guarded[f.key] = false;
     }
   }
   return guarded;
