@@ -45,6 +45,7 @@ const moodOptions = [
 export type SkipFollowup = {
   gapWeekdays: number;
   question: string;
+  returnLogId: string;
 };
 
 export type StandaloneInputInitialData = {
@@ -196,16 +197,18 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
   };
 
   const submitSkipReason = async (reason: string | null) => {
-    // 回答（空含む）を skip_reasons に記録。失敗してもユーザー体験は止めない。
+    // ギャップの事実はサーバーが記録済み。ここでは回答テキストだけを追記する。
+    // 失敗してもユーザー体験は止めない（咎めない・引き止めない）。
     setSkipCardDone(true);
+    if (!skipFollowup || !reason) return; // スキップ＝事実のみ記録（既に保存済み）
     try {
       await fetch("/api/standalone/skip-reason", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, reason }),
+        body: JSON.stringify({ token, reason, returnLogId: skipFollowup.returnLogId }),
       });
     } catch {
-      // 記録失敗は黙って許容（咎めない・引き止めない）
+      // 記録失敗は黙って許容
     }
   };
 

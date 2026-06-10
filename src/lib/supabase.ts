@@ -596,6 +596,98 @@ export async function createEveningOnlyEntry(
   return data.id;
 }
 
+// ---------------------------------------------------------------------------
+// SKIP REASONS（standalone §5 未記入フォローアップ）
+// ---------------------------------------------------------------------------
+
+/**
+ * 復帰日のギャップ事実を記録する（reason は後から任意で埋まる）。
+ * 「空＝スキップした事実だけ記録」を満たすため、カード表示時点で先に INSERT する。
+ */
+export async function insertSkipReason(args: {
+  tenantId: string;
+  participantId: string;
+  gapStart: string;
+  gapEnd: string;
+  gapWeekdays: number;
+  returnLogId: string | null;
+}): Promise<string | null> {
+  const { data, error } = await getClient()
+    .from("skip_reasons")
+    .insert({
+      tenant_id: args.tenantId,
+      participant_id: args.participantId,
+      gap_start: args.gapStart,
+      gap_end: args.gapEnd,
+      gap_weekdays: args.gapWeekdays,
+      reason: null,
+      return_log_id: args.returnLogId,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    logger.error("insertSkipReason failed", { error: error.message, participantId: args.participantId });
+    return null;
+  }
+  return data?.id ?? null;
+}
+
+/**
+ * フォローアップの回答を記録する。該当行（return_log_id 一致・未回答）のみ更新。
+ */
+export async function updateSkipReasonAnswer(
+  returnLogId: string,
+  participantId: string,
+  tenantId: string,
+  reason: string
+): Promise<boolean> {
+  const { data, error } = await getClient()
+    .from("skip_reasons")
+    .update({ reason })
+    .eq("return_log_id", returnLogId)
+    .eq("participant_id", participantId)
+    .eq("tenant_id", tenantId)
+    .is("reason", null)
+    .select("id");
+  if (error) {
+    logger.error("updateSkipReasonAnswer failed", { error: error.message, returnLogId });
+    return false;
+  }
+  if (!data || data.length === 0) {
+    logger.warn("updateSkipReasonAnswer matched 0 rows", { returnLogId, participantId });
+    return false;
+  }
+  return true;
+}
+
+/**
+ * 21日レポート用: 参加者のスキップ記録を取得（standalone §8）。
+ */
+export async function getSkipReasonsByParticipant(
+  participantId: string,
+  tenantId: string
+): Promise<{ gapStart: string; gapEnd: string; gapWeekdays: number; reason: string | null; createdAt: string }[]> {
+  const { data, error } = await getClient()
+    .from("skip_reasons")
+    .select("gap_start, gap_end, gap_weekdays, reason, created_at")
+    .eq("participant_id", participantId)
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: true });
+  if (error) {
+    logger.error("getSkipReasonsByParticipant failed", { error: error.message, participantId });
+    return [];
+  }
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  return (data ?? []).map((r: any) => ({
+    gapStart: r.gap_start,
+    gapEnd: r.gap_end,
+    gapWeekdays: r.gap_weekdays,
+    reason: r.reason ?? null,
+    createdAt: r.created_at,
+  }));
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+}
+
 export async function addManagerComment(
   pageId: string,
   comment: string,

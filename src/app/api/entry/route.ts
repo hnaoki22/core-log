@@ -3,7 +3,8 @@
 // Prevents duplicate entries for the same day
 
 import { NextRequest, NextResponse } from "next/server";
-import { createMorningEntry, createEveningOnlyEntry, updateEveningEntry, hasLoggedToday } from "@/lib/supabase";
+import { createMorningEntry, createEveningOnlyEntry, updateEveningEntry, hasLoggedToday, getLogsByParticipant, insertSkipReason } from "@/lib/supabase";
+import { computeSkipFollowup } from "@/lib/standalone";
 import { getParticipantByToken, getManagerById } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
 import { isProgramEnded, isProgramNotStarted, getCurrentHourJST, isGracePeriod } from "@/lib/date-utils";
@@ -11,6 +12,37 @@ import { sanitizeInput } from "@/lib/sanitize";
 import { logger } from "@/lib/logger";
 import { resolvePhaseMode, triggerBodyPromptIfNeeded } from "@/lib/kan-no-ki";
 import { isFeatureEnabled } from "@/lib/feature-flags";
+
+// standalone §5: 復帰日の未記入フォローアップ。
+// その日最初のエントリ作成（morning / evening_only）後にのみ判定する。
+// ギャップの事実は回答を待たず skip_reasons に先に記録する（空＝事実だけ記録）。
+async function buildSkipFollowup(
+  standalone: boolean,
+  participantName: string,
+  tenantId: string,
+  participantId: string,
+  date: string,
+  pageId: string
+): Promise<{ question: string; gapWeekdays: number; returnLogId: string } | null> {
+  if (!standalone) return null;
+  try {
+    const logs = await getLogsByParticipant(participantName, tenantId, { includeKanNoKi: true });
+    const fu = computeSkipFollowup(logs, date);
+    if (!fu) return null;
+    await insertSkipReason({
+      tenantId,
+      participantId,
+      gapStart: fu.gapStart,
+      gapEnd: fu.gapEnd,
+      gapWeekdays: fu.gapWeekdays,
+      returnLogId: pageId,
+    });
+    return { question: fu.question, gapWeekdays: fu.gapWeekdays, returnLogId: pageId };
+  } catch (e) {
+    logger.warn("skip followup computation failed (non-fatal)", { error: String(e), participantName });
+    return null;
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -118,8 +150,11 @@ export async function POST(request: NextRequest) {
         logger.error("Failed to send manager notification", { error: String(e), participantName });
       }
 
+      // standalone §5: 復帰日ならフォローアップ1問を完了画面に添える
+      const skipFollowupM = await buildSkipFollowup(standalone, participantName, tenantId, participantId, date, pageId);
+
       logger.info("Morning entry created", { participantName, date, pageId, durationSec: respDuration });
-      return NextResponse.json({ success: true, pageId, durationSec: respDuration });
+      return NextResponse.json({ success: true, pageId, durationSec: respDuration, skipFollowup: skipFollowupM });
     }
 
     if (type === "evening") {
@@ -257,8 +292,11 @@ export async function POST(request: NextRequest) {
         logger.error("Failed to send manager notification", { error: String(e), participantName });
       }
 
+      // standalone §5: 復帰日ならフォローアップ1問を完了画面に添える
+      const skipFollowupEO = await buildSkipFollowup(standalone, participantName, tenantId, participantId, date, pageId);
+
       logger.info("Evening-only entry created", { participantName, date, pageId, durationSec: respDurationEO });
-      return NextResponse.json({ success: true, pageId, durationSec: respDurationEO });
+      return NextResponse.json({ success: true, pageId, durationSec: respDurationEO, skipFollowup: skipFollowupEO });
     }
 
     return NextResponse.json({ error: "Invalid type" }, { status: 400 });
