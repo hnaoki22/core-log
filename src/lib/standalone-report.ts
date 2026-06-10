@@ -24,6 +24,10 @@ export type StandaloneReport = {
   correlationLens: string;
   themeLens: string;
   skipNote: string | null;
+  // プロンプト v1（2026-06-10夜 本藤さん承認）で追加。観た事から自然に
+  // 立ち上がる「次の問い」を1文だけ置く（助言・提案の形にしない）。
+  // standalone_reports.report は jsonb のため既存行とは後方互換。
+  nextQuestion: string;
 };
 
 export type StoredStandaloneReport = {
@@ -118,6 +122,8 @@ export async function generateStandaloneReport(
     return `${s.gapStart}〜${s.gapEnd}（平日${s.gapWeekdays}日） ${r}`;
   });
 
+  // プロンプト v1（2026-06-10夜 本藤さん承認済みの確定版。本藤さん実ログでの
+  // サンプル生成を承認済み。雰囲気=「静かな観察＋原文引用＋最後に問いがひとつ」）
   const systemPrompt = `あなたはCORE Logの「装置」です。参加者の約3週間分のログを観て、観た事を本人にだけ映し返します。
 
 絶対の規律:
@@ -129,14 +135,17 @@ export async function generateStandaloneReport(
 - 文体は丁寧で静か。煽らない。
 
 2つのレンズで観ます（両方必須。素材が薄いレンズは薄いなりに正直に書く）:
-1. 相関レンズ: 朝の気分と夕の気分の動き（朝より上がった日・下がった日のパターン）、気分の動きと朝の意図・夕の振り返りの関係、体調の記述と気分の関係。
+1. 相関レンズ: 朝の気分と夕の気分の動き（朝より上がった日・下がった日のパターン）。気分の高い日と低めの日とで、朝の意図のテーマがどう変わるか、そして意図がどこまで果たされたか（達成の勾配）。体調の記述と気分の関係。
 2. テーマ反復レンズ: 朝の意図に繰り返し現れるテーマや言葉。期間の最初と最近とで、同じテーマの言葉の使い方・扱いがどう変わったか（反復と習熟の輪郭）。気分があまり動かない人ではこちらを主役に。
+
+最後に「次の問い」をひとつだけ置きます。観た事から自然に立ち上がる問いを1文で。助言や提案の形にしない。可能なら本人の言葉をひとつ含める。
 
 JSON形式のみで返答:
 {
   "correlationLens": "相関レンズで観た事（300〜450字。本人の言葉の引用を含める）",
   "themeLens": "テーマ反復レンズで観た事（300〜450字。本人の言葉の引用を含める）",
-  "skipNote": "書かなかった日があれば、その前後で観えた事を咎めずに1〜2文。なければ null"
+  "skipNote": "書かなかった日があれば、その前後で観えた事を咎めずに1〜2文。なければ null",
+  "nextQuestion": "次の問い（1文。助言にしない）"
 }`;
 
   const userContent = `## 参加者: ${participant.name}
@@ -150,6 +159,7 @@ ${skipLines.length > 0 ? `\n### 書かなかった期間（本人の任意回答
     correlationLens: "（レポートの生成に失敗しました。少し時間をおいてから、もう一度お試しください。）",
     themeLens: "",
     skipNote: null,
+    nextQuestion: "",
   };
 
   const report = await llmJson<StandaloneReport>(systemPrompt, userContent, fallback, {

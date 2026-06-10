@@ -11,6 +11,8 @@ type ReportPayload = {
     correlationLens: string;
     themeLens: string;
     skipNote: string | null;
+    // プロンプト v1 で追加。それ以前に生成・キャッシュされた行には無い（後方互換）
+    nextQuestion?: string;
   };
   periodStart: string;
   periodEnd: string;
@@ -79,7 +81,7 @@ export default function StandaloneReportPage() {
             </svg>
             ホームに戻る
           </button>
-          <h1 className="text-xl font-semibold tracking-tight">AI分析</h1>
+          <h1 className="text-lg font-semibold tracking-tight">あなたの3週間 ── CORE Logが観た事</h1>
           {data && (
             <p className="text-indigo-200 text-sm mt-1.5 font-light">
               {data.periodStart.replace(/-/g, "/")} 〜 {data.periodEnd.replace(/-/g, "/")}（記入{data.entryDays}日）
@@ -107,11 +109,11 @@ export default function StandaloneReportPage() {
 
         {data && (
           <>
-            {/* 相関レンズ */}
+            {/* 相関レンズ（内部名は画面に出さない） */}
             <div className="card p-5">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-lg">🕯️</span>
-                <h2 className="font-semibold text-sm text-[#1A1A2E]">気分の動きから</h2>
+                <h2 className="font-semibold text-sm text-[#1A1A2E]">気分と意図の動き</h2>
               </div>
               <p className="text-sm text-[#1A1A2E] leading-relaxed whitespace-pre-wrap">
                 {data.report.correlationLens}
@@ -122,7 +124,7 @@ export default function StandaloneReportPage() {
             <div className="card p-5">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-lg">🔁</span>
-                <h2 className="font-semibold text-sm text-[#1A1A2E]">繰り返し現れる言葉から</h2>
+                <h2 className="font-semibold text-sm text-[#1A1A2E]">繰り返し現れるテーマ</h2>
               </div>
               <p className="text-sm text-[#1A1A2E] leading-relaxed whitespace-pre-wrap">
                 {data.report.themeLens}
@@ -132,7 +134,16 @@ export default function StandaloneReportPage() {
             {/* スキップの一言（任意） */}
             {data.report.skipNote && (
               <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4">
+                <p className="text-[10px] text-stone-500 font-medium tracking-wide uppercase mb-1.5">書かなかった日について</p>
                 <p className="text-xs text-stone-600 leading-relaxed">{data.report.skipNote}</p>
+              </div>
+            )}
+
+            {/* 次の問い（プロンプト v1。旧キャッシュには無いので条件表示） */}
+            {data.report.nextQuestion && (
+              <div className="card p-5 border-l-2 border-l-[#1A1A2E]">
+                <p className="text-[10px] text-[#8B8489] font-medium tracking-wide uppercase mb-2">次の問い</p>
+                <p className="text-sm text-[#1A1A2E] leading-relaxed">{data.report.nextQuestion}</p>
               </div>
             )}
 
