@@ -24,6 +24,7 @@ import {
 } from "@/lib/supabase";
 import { computeParticipantStats } from "@/lib/stats";
 import { getTodayJST, calculateWeekNum } from "@/lib/date-utils";
+import { isStandaloneTenant, computeUnlockState } from "@/lib/standalone";
 import ParticipantHomeClient, { type ParticipantHomeInitialData } from "./ParticipantHomeClient";
 
 // Avoid Next.js trying to cache this — data is per-token and changes on each
@@ -62,6 +63,16 @@ export default async function ParticipantHome({
   const todayJST = getTodayJST();
   const stats = computeParticipantStats(logs, todayJST);
 
+  // standalone商品モード（§6 段階開示）: サーバー側で判定して描画を確定する。
+  // 初期状態は分析系UIをすべて非表示、21日経過+記入10日でアンロック。
+  const standaloneOn = await isStandaloneTenant(tenantId);
+  const standalone = standaloneOn
+    ? (() => {
+        const u = computeUnlockState(logs, todayJST);
+        return { unlocked: u.unlocked, daysElapsed: u.daysElapsed, entryDays: u.entryDays };
+      })()
+    : null;
+
   const initialData: ParticipantHomeInitialData = {
     participant: {
       id: participant.id,
@@ -79,9 +90,11 @@ export default async function ParticipantHome({
       morningIntent: l.morningIntent,
       eveningInsight: l.eveningInsight,
       energy: l.energy,
+      eveningEnergy: l.eveningEnergy,
       status: l.status,
       hasFeedback: l.hasFeedback,
     })),
+    standalone,
     badges: {
       feedback: unreadCount,
       feedbackTotal: feedbacks.length,

@@ -7,6 +7,8 @@
 
 import { notFound } from "next/navigation";
 import { getParticipantWithLogsByToken, getUnreadFeedbackCount, getFeedbackByParticipant } from "@/lib/supabase";
+import { getTodayJST } from "@/lib/date-utils";
+import { isStandaloneTenant, computeUnlockState } from "@/lib/standalone";
 import LogsClient, { type LogsInitialData } from "./LogsClient";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +39,11 @@ export default async function LogsPageServer({
   ]);
   const tFetch2 = Date.now();
 
+  // standalone §6: 解禁後のみ「ローソク足の長期表示」をログ一覧の上に出す
+  const standaloneOn = await isStandaloneTenant(tenantId);
+  const unlock = standaloneOn ? computeUnlockState(result.logs, getTodayJST()) : null;
+  const standaloneCandle = standaloneOn && unlock?.unlocked === true;
+
   const initialData: LogsInitialData = {
     logs: result.logs.map((l) => ({
       id: l.id,
@@ -47,6 +54,7 @@ export default async function LogsPageServer({
       morningIntent: l.morningIntent,
       eveningInsight: l.eveningInsight,
       energy: l.energy,
+      eveningEnergy: l.eveningEnergy,
       status: l.status,
       hasFeedback: l.hasFeedback,
       hmFeedback: l.hmFeedback,
@@ -61,6 +69,7 @@ export default async function LogsPageServer({
       feedbackTotal: feedbacks.length,
       mission: 0, // filled by client-side background revalidate
     },
+    standaloneCandle,
   };
 
   console.log(
