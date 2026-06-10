@@ -541,7 +541,6 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
               { key: "tier-d.heroAssessment", label: "HERO自己評価", icon: "📊", path: "hero" },
               { key: "tier-d.efficacyBooster", label: "効力感", icon: "💪", path: "efficacy" },
               { key: "tier-d.hopeDesign", label: "希望設計", icon: "🎯", path: "hope" },
-              { key: "tier-f.beforeAfter", label: "ビフォー・アフター", icon: "📈", path: "before-after" },
             ];
             const enabledFeatures = features.filter(f => isOn(f.key));
             return enabledFeatures.length > 0 && (

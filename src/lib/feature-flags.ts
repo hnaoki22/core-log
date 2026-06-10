@@ -436,16 +436,10 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     implemented: true,
     recommendedPhase: 2,
   },
-  {
-    key: "tier-f.beforeAfter",
-    label: "Before/Afterアセスメント",
-    description: "導入時と3ヶ月後で同じ自己評価を実施。変化量を表示。",
-    category: "tier-f",
-    defaultEnabled: false,
-    phase1Enabled: false,
-    implemented: true,
-    recommendedPhase: 2,
-  },
+  // tier-f.beforeAfter（Before/Afterアセスメント＝評価項目を自分で設定して
+  // 自分で入力する自己評価機能）は 2026-06-10 本藤さん決定で削除（仕様書 §9）。
+  // 全テナントで使用実態ゼロ（before_after_assessments 0行）を確認の上、
+  // UI/ルート/フラグのみ撤去。テーブルとデータは残置。
   {
     key: "tier-f.clientReport",
     label: "組織導入効果レポート自動生成",
