@@ -301,43 +301,39 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
           </div>
         </div>
 
-        {/* standalone §6: アンロックの瞬間だけ「ふっと現れる」カード（一回性・控えめ） */}
+        {/* standalone §6: アンロックの瞬間だけ「ふっと現れる」カード。
+            解禁ゲートは AI分析 のみ（2026-06-10夜 本藤さん決定）— タップで AI分析へ */}
         {sa?.unlocked && !unlockSeen && (
-          <button
-            onClick={markUnlockSeen}
-            className="w-full text-left bg-gradient-to-br from-indigo-50 to-stone-50 border border-indigo-200 p-5 rounded-2xl animate-fade-up hover:shadow-md transition-all"
-          >
-            <p className="text-[10px] text-[#4D4D6D] font-medium tracking-wide uppercase mb-1.5">3週間の節目</p>
-            <p className="text-base font-semibold text-[#1A1A2E] leading-relaxed mb-1">
-              3週間分のログが貯まりました。
-            </p>
-            <p className="text-sm text-[#5B5560] leading-relaxed">あなたのパターンを見てみますか？</p>
-            <p className="text-xs text-[#8B8489] mt-3">タップして開く</p>
-          </button>
+          <Link href={`/p/${token}/standalone-report`} onClick={markUnlockSeen}>
+            <div className="w-full text-left bg-gradient-to-br from-indigo-50 to-stone-50 border border-indigo-200 p-5 rounded-2xl animate-fade-up hover:shadow-md transition-all cursor-pointer">
+              <p className="text-[10px] text-[#4D4D6D] font-medium tracking-wide uppercase mb-1.5">3週間の節目</p>
+              <p className="text-base font-semibold text-[#1A1A2E] leading-relaxed mb-1">
+                3週間分のログが貯まりました。
+              </p>
+              <p className="text-sm text-[#5B5560] leading-relaxed">あなたのパターンを見てみますか？</p>
+              <p className="text-xs text-[#8B8489] mt-3">タップして開く</p>
+            </div>
+          </Link>
         )}
 
-        {/* standalone §6: 解禁後の入口 ①振り返り ②AI分析 */}
+        {/* standalone §6: 解禁後の AI分析 入口 */}
         {sa?.unlocked && unlockSeen && (
-          <div className="grid grid-cols-2 gap-3 animate-fade-up">
-            <Link href={`/p/${token}/logs`}>
-              <div className="card p-4 hover:bg-[#FBF8F4] transition-colors cursor-pointer h-full">
-                <div className="text-xl mb-1.5">🕯️</div>
-                <p className="text-sm font-medium text-[#1A1A2E]">振り返り</p>
-                <p className="text-[10px] text-[#8B8489] mt-0.5">ログ一覧とローソク足の長期表示</p>
+          <Link href={`/p/${token}/standalone-report`}>
+            <div className="card p-4 hover:bg-[#FBF8F4] transition-colors cursor-pointer animate-fade-up">
+              <div className="flex items-center gap-3">
+                <div className="text-xl">🔍</div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-[#1A1A2E]">AI分析</p>
+                  <p className="text-[10px] text-[#8B8489] mt-0.5">あなたの3週間 ── CORE Logが観た事</p>
+                </div>
               </div>
-            </Link>
-            <Link href={`/p/${token}/standalone-report`}>
-              <div className="card p-4 hover:bg-[#FBF8F4] transition-colors cursor-pointer h-full">
-                <div className="text-xl mb-1.5">🔍</div>
-                <p className="text-sm font-medium text-[#1A1A2E]">AI分析</p>
-                <p className="text-[10px] text-[#8B8489] mt-0.5">21日分のパターンを2つのレンズで</p>
-              </div>
-            </Link>
-          </div>
+            </div>
+          </Link>
         )}
 
-        {/* standalone §4: 気分ローソク足（解禁後のみ） */}
-        {sa?.unlocked && unlockSeen && logs.length > 0 && (
+        {/* standalone §4: 気分ローソク足 — 初日から常時表示（2026-06-10夜 本藤さん決定。
+            朝のみ/夕のみの日は点マーカー。解禁を待つのは AI分析のみ） */}
+        {sa && logs.length > 0 && (
           <MoodCandlestick
             logs={logs.map((l) => ({
               date: l.date,

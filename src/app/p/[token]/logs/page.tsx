@@ -7,8 +7,7 @@
 
 import { notFound } from "next/navigation";
 import { getParticipantWithLogsByToken, getUnreadFeedbackCount, getFeedbackByParticipant } from "@/lib/supabase";
-import { getTodayJST } from "@/lib/date-utils";
-import { isStandaloneTenant, computeUnlockState } from "@/lib/standalone";
+import { isStandaloneTenant } from "@/lib/standalone";
 import LogsClient, { type LogsInitialData } from "./LogsClient";
 
 export const dynamic = "force-dynamic";
@@ -39,10 +38,9 @@ export default async function LogsPageServer({
   ]);
   const tFetch2 = Date.now();
 
-  // standalone §6: 解禁後のみ「ローソク足の長期表示」をログ一覧の上に出す
-  const standaloneOn = await isStandaloneTenant(tenantId);
-  const unlock = standaloneOn ? computeUnlockState(result.logs, getTodayJST()) : null;
-  const standaloneCandle = standaloneOn && unlock?.unlocked === true;
+  // standalone: ローソク足の長期表示は初日から常時（2026-06-10夜 本藤さん決定。
+  // 解禁ゲートが残るのは AI分析のみ）
+  const standaloneCandle = await isStandaloneTenant(tenantId);
 
   const initialData: LogsInitialData = {
     logs: result.logs.map((l) => ({
