@@ -8,13 +8,48 @@
 //     最終ログ日と当日の間に平日（土日祝除く）ベースで1日以上の空きが
 //     ある場合、ギャップ幅に応じた問いを 1 問だけ返す
 
+import { NextResponse } from "next/server";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { isBusinessDay } from "@/lib/calendar";
 import { NotionLogEntry } from "@/lib/supabase";
 import { isLogSubmitted } from "@/lib/stats";
+import { logger } from "@/lib/logger";
 
 export async function isStandaloneTenant(tenantId: string): Promise<boolean> {
   return isFeatureEnabled("standalone_mode", tenantId);
+}
+
+// ===== §7 プライバシー遮断 =====
+//
+// standalone テナントの約束＝「最初の3週間（観の期）は誰も見れない」。
+// UI 非表示だけでは不可（仕様書 §7-1）。マネージャー/管理者がログ本文に
+// 到達する全 API ルートでサーバー側でも拒否する。
+//
+// 遮断対象（§7-1/§7-3）:
+//   ログ本文閲覧（manager/admin の詳細・export）、manager_comment、
+//   hm_feedback（作成・下書き生成）、リアクション、spotlight、
+//   1on1ブリーフィング、変化のサイン(burnout)、心理的安全性、ペア交換系
+// 通知メール（§7-2）は /api/entry 側で停止する。
+
+/**
+ * standalone テナントなら 403 レスポンスを返す。そうでなければ null。
+ * 使い方: `const blocked = await standaloneGuard(tenantId, "comment"); if (blocked) return blocked;`
+ */
+export async function standaloneGuard(
+  tenantId: string | null | undefined,
+  surface: string
+): Promise<NextResponse | null> {
+  if (!tenantId) return null;
+  const standalone = await isStandaloneTenant(tenantId);
+  if (!standalone) return null;
+  logger.info("standalone privacy guard blocked access", { surface, tenantId });
+  return NextResponse.json(
+    {
+      error: "このテナントでは利用できません（standaloneモード: ログは本人と装置だけが見ます）",
+      standaloneBlocked: true,
+    },
+    { status: 403 }
+  );
 }
 
 // ===== §6 段階開示 =====

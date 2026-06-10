@@ -7,6 +7,7 @@ import { getClient } from "@/lib/supabase";
 import { getManagerByTokenFromSupabase } from "@/lib/supabase";
 import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 import { resolveManagerTenantStrict } from "@/lib/tenant-context";
+import { standaloneGuard } from "@/lib/standalone";
 
 type EnergyLevel = "excellent" | "good" | "okay" | "low" | null;
 
@@ -65,6 +66,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
     }
     const tenantId = tenantResult.tenantId;
+
+    // standalone §7-1: 変化のサインは部下のログ・反芻分析を読む経路。無効。
+    const blocked = await standaloneGuard(tenantId, "burnout");
+    if (blocked) return blocked;
 
     const client = getClient();
     const now = new Date();

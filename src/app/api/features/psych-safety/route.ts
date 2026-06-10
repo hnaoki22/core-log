@@ -8,6 +8,7 @@ import { getManagerByToken } from "@/lib/participant-db";
 import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 import { analyzePsychSafety } from "@/lib/llm";
 import { resolveManagerTenantStrict } from "@/lib/tenant-context";
+import { standaloneGuard } from "@/lib/standalone";
 
 
 
@@ -58,6 +59,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
     }
     const tenantId = tenantResult.tenantId;
+
+    // standalone §7-3: 心理的安全性モニターはFB/コメント文面を解析する経路。無効。
+    const blocked = await standaloneGuard(tenantId, "psych-safety");
+    if (blocked) return blocked;
 
     const client = getClient();
     const now = new Date();

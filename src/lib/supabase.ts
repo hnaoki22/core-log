@@ -94,6 +94,9 @@ export type NotionParticipant = {
   role: string;
   managerId: string;
   fbPolicy: string;
+  // 行の実テナントID。クロステナント取得（全テナントビュー）でも参加者ごとの
+  // 所属テナントを判別できるようにする（standalone §7 のテナント別遮断で使用）
+  tenantId?: string;
 };
 
 export type NotionManager = {
@@ -203,6 +206,7 @@ function rowToParticipant(r: any): NotionParticipant {
     role: r.role || "参加者",
     managerId: r.manager_id || "",
     fbPolicy: r.fb_policy || "",
+    tenantId: r.tenant_id || undefined,
   };
 }
 

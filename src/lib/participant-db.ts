@@ -79,6 +79,9 @@ export type ParticipantInfo = {
   // Backend routing info
   backend?: BackendType;
   tenantId?: string;
+  // 行の実テナントID。tenantId は全テナントビューで "all" になるため、
+  // 参加者ごとの所属テナント判定にはこちらを使う（standalone §7）
+  rowTenantId?: string;
   // Mock-only fields (for backward compatibility in mock mode)
   weekNum?: number;
   startDate?: string;
@@ -125,6 +128,7 @@ function notionParticipantToInfo(np: NotionParticipant): ParticipantInfo {
     startDate: np.startDate,
     endDate: np.endDate,
     fbPolicy: np.fbPolicy || "",
+    rowTenantId: np.tenantId,
   };
 }
 

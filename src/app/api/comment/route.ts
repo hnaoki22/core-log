@@ -6,6 +6,7 @@ import { addManagerComment, getLogEntryOwner } from "@/lib/supabase";
 import { getManagerByToken, getParticipantByName } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
 import { sanitizeInput } from "@/lib/sanitize";
+import { standaloneGuard } from "@/lib/standalone";
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,6 +31,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Tenant unresolved" }, { status: 500 });
     }
     const managerTenantId = manager.tenantId;
+    // standalone §7-3: manager_comment は機能ごと無効（API側でも拒否）
+    const blocked = await standaloneGuard(managerTenantId, "comment");
+    if (blocked) return blocked;
     if (!participantId) {
       return NextResponse.json({ error: "participantId (log id) required" }, { status: 400 });
     }

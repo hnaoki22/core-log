@@ -131,8 +131,10 @@ export async function POST(request: NextRequest) {
         ? Math.round(morningDurationSec) : null;
 
       // Notify manager that subordinate submitted morning log
+      // standalone §7-2: 通知メールは本文スニペットを含む＝「誰も見れない」と
+      // 矛盾するため送らない（6/15時点の最小実装）
       try {
-        const participant = await getParticipantByToken(token);
+        const participant = standalone ? null : await getParticipantByToken(token);
         if (participant?.managerId) {
           const mgr = await getManagerById(participant.managerId);
           if (mgr?.email && !mgr.email.includes("example.com")) {
@@ -203,8 +205,9 @@ export async function POST(request: NextRequest) {
         ? Math.round(eveningDurationSec) : null;
 
       // Notify manager that subordinate submitted evening log
+      // standalone §7-2: 通知メールは送らない（本文スニペット掲載のため）
       try {
-        const participant = await getParticipantByToken(token);
+        const participant = standalone ? null : await getParticipantByToken(token);
         if (participant?.managerId) {
           const mgr = await getManagerById(participant.managerId);
           if (mgr?.email && !mgr.email.includes("example.com")) {
@@ -273,8 +276,9 @@ export async function POST(request: NextRequest) {
         ? Math.round(eveningDurationSec) : null;
 
       // Notify manager
+      // standalone §7-2: 通知メールは送らない（本文スニペット掲載のため）
       try {
-        const participant = await getParticipantByToken(token);
+        const participant = standalone ? null : await getParticipantByToken(token);
         if (participant?.managerId) {
           const mgr = await getManagerById(participant.managerId);
           if (mgr?.email && !mgr.email.includes("example.com")) {

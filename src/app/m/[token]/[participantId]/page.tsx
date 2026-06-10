@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { getLogsByParticipant, getMissionsByParticipant, getParticipantByNameCrossTenant, NotionLogEntry } from "@/lib/supabase";
 import { getManagerByToken } from "@/lib/participant-db";
+import { isStandaloneTenant } from "@/lib/standalone";
 import { formatTimeJST, formatFullDateTimeJST } from "@/lib/date-utils";
 import CommentForm from "./CommentForm";
 import ReactionStamps from "./ReactionStamps";
@@ -49,6 +50,25 @@ export default async function ParticipantDetailPage({ params }: Params) {
     } else {
       const manager = await getManagerByToken(token);
       tenantId = manager?.tenantId ?? null;
+    }
+
+    // standalone §7-1: マネージャーの個別ログ閲覧ページはサーバー側で遮断
+    // （UI 非表示だけでは不可。本文を一切取得しない）
+    if (tenantId && (await isStandaloneTenant(tenantId))) {
+      return (
+        <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
+          <div className="max-w-md mx-auto text-center">
+            <h2 className="text-lg font-semibold text-[#1A1A2E] mb-2">このログは本人と装置だけが見ます</h2>
+            <p className="text-sm text-[#5B5560] mb-6 leading-relaxed">
+              このテナントは standalone モードで運用されています。
+              ログの本文はマネージャー・管理者には表示されません。
+            </p>
+            <Link href={`/m/${token}`} className="text-[#1A1A2E] font-medium text-sm hover:underline">
+              一覧に戻る
+            </Link>
+          </div>
+        </div>
+      );
     }
 
     if (tenantId) {

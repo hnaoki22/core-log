@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/supabase";
 import { getParticipantByToken } from "@/lib/participant-db";
 import { isFeatureEnabledForToken } from "@/lib/feature-flags";
+import { standaloneGuard } from "@/lib/standalone";
 
 
 
@@ -42,6 +43,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Tenant unresolved" }, { status: 500 });
     }
     const tenantId = participant.tenantId;
+
+    // standalone §7-3: ペア交換系は機能ごと無効（誰も見れない3週間の保証）
+    const blocked = await standaloneGuard(tenantId, "peer-reflection");
+    if (blocked) return blocked;
 
     // Look up the target participant — REQUIRE the same tenant so a sender
     // in tenant A cannot create a peer_reflections row pointing at a
@@ -120,6 +125,10 @@ export async function GET(req: NextRequest) {
     }
     const tenantId = participant.tenantId || "default";
 
+    // standalone §7-3: ペア交換系は機能ごと無効
+    const blockedGet = await standaloneGuard(participant.tenantId, "peer-reflection");
+    if (blockedGet) return blockedGet;
+
     const client = getClient();
 
     // Fetch team members (same tenant, exclude self)
@@ -195,6 +204,10 @@ export async function PUT(req: NextRequest) {
     if (!participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    // standalone §7-3: ペア交換系は機能ごと無効
+    const blockedPut = await standaloneGuard(participant.tenantId, "peer-reflection");
+    if (blockedPut) return blockedPut;
 
     // Verify this participant can answer this reflection
     const client = getClient();

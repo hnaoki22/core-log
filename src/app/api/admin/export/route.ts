@@ -9,6 +9,7 @@ import { getAllParticipants, getManagerByToken } from "@/lib/participant-db";
 import { getAllLogsForTenant } from "@/lib/supabase";
 import { getDayOfWeekJPShort } from "@/lib/date-utils";
 import { resolveAdminTenantContext } from "@/lib/tenant-context";
+import { standaloneGuard, isStandaloneTenant } from "@/lib/standalone";
 
 /**
  * Make a single CSV cell safe for Excel/Sheets/Numbers.
@@ -41,12 +42,36 @@ export async function GET(request: NextRequest) {
   try {
     const ctx = await resolveAdminTenantContext(request, manager);
 
+    // standalone §7-1: ログ本文を含む CSV export は standalone テナントでは拒否。
+    // 単一テナント指定の場合は 403、全テナント export の場合は standalone
+    // テナント所属の参加者行を除外する。
+    if (ctx.tenantId) {
+      const blocked = await standaloneGuard(ctx.tenantId, "csv-export");
+      if (blocked) return blocked;
+    }
+
     // Batch-fetch participants and all their logs in 2 queries (not N+1)
     // When ctx.tenantId is null, both fetch across every tenant.
-    const [participants, logsByName] = await Promise.all([
+    const [participantsAll, logsByName] = await Promise.all([
       getAllParticipants(ctx.tenantId),
       getAllLogsForTenant(ctx.tenantId ?? undefined),
     ]);
+
+    // 全テナント export: standalone テナントの参加者を除外（本文を一切出さない）
+    const standaloneCache = new Map<string, boolean>();
+    const participants = [] as typeof participantsAll;
+    for (const p of participantsAll) {
+      const tid = p.rowTenantId;
+      if (tid) {
+        let v = standaloneCache.get(tid);
+        if (v === undefined) {
+          v = await isStandaloneTenant(tid);
+          standaloneCache.set(tid, v);
+        }
+        if (v) continue;
+      }
+      participants.push(p);
+    }
 
     const csvRows: string[] = [];
 

@@ -10,6 +10,7 @@ import {
 import { getParticipantByToken, getManagerByToken, getParticipantByName } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
 import { resolveAdminTenantContext } from "@/lib/tenant-context";
+import { standaloneGuard } from "@/lib/standalone";
 
 /**
  * GET /api/feedback?token=xxx
@@ -54,6 +55,11 @@ export async function GET(req: NextRequest) {
     if (!tenantId) {
       return NextResponse.json({ error: "対象参加者が見つかりませんでした" }, { status: 404 });
     }
+
+    // standalone §7-1: マネージャー/管理者によるフィードバック・ログ閲覧経路を遮断
+    // （includeLogs=true はログ本文を返すルートでもある）
+    const blockedGet = await standaloneGuard(tenantId, "feedback-manager-read");
+    if (blockedGet) return blockedGet;
 
     const includeLogs = req.nextUrl.searchParams.get("includeLogs") === "true";
     const feedback = await getFeedbackByParticipant(participantName, tenantId);
@@ -117,6 +123,9 @@ export async function POST(req: NextRequest) {
     if (!tenantId) {
       return NextResponse.json({ error: "Tenant unresolved" }, { status: 500 });
     }
+    // standalone §7-3: hm_feedback は機能ごと無効（API側でも拒否）
+    const blocked = await standaloneGuard(tenantId, "feedback-create");
+    if (blocked) return blocked;
     // participant_id column is UUID type; participant.id may be a string ID (e.g. "p-shimoji")
     // Only pass it if it looks like a valid UUID, otherwise pass null to omit it
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
