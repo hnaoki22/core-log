@@ -18,6 +18,7 @@ import { DAIKO_TENANT_ID } from "@/lib/tenants";
 export type FlagCategory =
   | "core"          // Core input (always on — shown as read-only)
   | "existing"      // Existing features (mission, streak, feedback, etc)
+  | "mode"          // テナント全体の動作モード（standalone商品モード等）
   | "tier-0"        // Tier 0: 観の期(KAN のキー)— 介入前の自己観想フェーズ
   | "tier-s"        // Tier S: Differentiators
   | "tier-a"        // Tier A: Manager Safety Net
@@ -351,16 +352,10 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
 
   // ===== Tier D: PsyCap =====
-  {
-    key: "tier-d.heroAssessment",
-    label: "HERO自己評価(月次)",
-    description: "Hope / Efficacy / Resilience / Optimism の4軸評価。時系列グラフで可視化。",
-    category: "tier-d",
-    defaultEnabled: false,
-    phase1Enabled: false,
-    implemented: true,
-    recommendedPhase: 2,
-  },
+  // tier-d.heroAssessment（HERO自己評価＝Hope/Efficacy/Resilience/Optimism の
+  // 4軸を月次で自己入力）は 2026-06-10 本藤さん決定で削除（仕様書 §9。打合せの
+  // 「色軸評価」は「4軸評価」の誤変換と確認）。全テナント使用0行を確認の上、
+  // UI/ルート/フラグ/プリセット参照を撤去。hero_assessments テーブルは残置。
   {
     key: "tier-d.efficacyBooster",
     label: "自己効力感ブースター",
@@ -435,16 +430,10 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     implemented: true,
     recommendedPhase: 2,
   },
-  {
-    key: "tier-f.beforeAfter",
-    label: "Before/Afterアセスメント",
-    description: "導入時と3ヶ月後で同じ自己評価を実施。変化量を表示。",
-    category: "tier-f",
-    defaultEnabled: false,
-    phase1Enabled: false,
-    implemented: true,
-    recommendedPhase: 2,
-  },
+  // tier-f.beforeAfter（Before/Afterアセスメント＝評価項目を自分で設定して
+  // 自分で入力する自己評価機能）は 2026-06-10 本藤さん決定で削除（仕様書 §9）。
+  // 全テナントで使用実態ゼロ（before_after_assessments 0行）を確認の上、
+  // UI/ルート/フラグのみ撤去。テーブルとデータは残置。
   {
     key: "tier-f.clientReport",
     label: "組織導入効果レポート自動生成",
@@ -589,6 +578,23 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     implemented: true,
     dependencies: ["tier-0.kanNoKi"],
   },
+
+  // ===== Mode: standalone商品モード =====
+  // 商品版最終型仕様書 v1.0 §1。テナント単位の動作モード。
+  // ON のテナント:「最初の3週間（観の期）は誰も見れない」をコードで保証。
+  //   - 朝夕の新3画面入力フロー（体調→意図/結果→気分、evening_energy 分離保存）
+  //   - 気分ローソク足・分析機能の段階開示（21日経過+記入10日でアンロック）
+  //   - マネージャー/管理者のログ本文閲覧を API レベルで遮断・通知メール停止
+  // 道場1系テナント（大幸等）は OFF のまま。applyTenantFlagGuards で大幸は強制 OFF。
+  {
+    key: "standalone_mode",
+    label: "standalone商品モード",
+    description: "商品版の動作モード。最初の3週間は誰も見ないことをコードで保証する（入力3画面・気分ローソク足・段階開示・ログ本文閲覧の遮断・投稿通知メール停止）。テナント単位でON/OFF。",
+    category: "mode",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    implemented: true,
+  },
 ];
 
 // ===== Presets =====
@@ -629,7 +635,7 @@ export const PRESETS: Preset[] = [
   {
     id: "daiko-phase2",
     label: "大幸薬品 Phase 2",
-    description: "Phase 1 + マネージャーFB + 週次ダブルループ問い + HERO評価。",
+    description: "Phase 1 + マネージャーFB + 週次ダブルループ問い。",
     getFlags: () => {
       const flags: Record<string, boolean> = {};
       for (const f of FEATURE_CATALOG) {
@@ -638,7 +644,6 @@ export const PRESETS: Preset[] = [
       flags["feature.managerFeedback"] = true;
       flags["tier-s.doubleLoopPrompt"] = true;
       flags["tier-s.structuredInput"] = true;
-      flags["tier-d.heroAssessment"] = true;
       flags["tier-a.managerSelfReflection"] = true;
       return flags;
     },
@@ -660,7 +665,6 @@ export const PRESETS: Preset[] = [
       flags["tier-a.oneOnOneBriefing"] = true;
       flags["tier-a.burnoutScore"] = true;
       flags["tier-a.managerSelfReflection"] = true;
-      flags["tier-d.heroAssessment"] = true;
       flags["tier-b.aar"] = true;
       flags["tier-b.knowledgeLibrary"] = true;
       flags["tier-f.growthRoi"] = true;
@@ -792,7 +796,10 @@ export function invalidateFlagCache(tenantId?: string) {
 export async function getFlagsForTenant(tenantId: string): Promise<FlagMap> {
   const stored = await getFlagsCached(tenantId);
   const defaults = defaultFlagsFor();
-  return { ...defaults, ...stored };
+  // 読み取り時にもテナント不変条件を適用（書き込み側ガードのすり抜けや
+  // 過去に保存された値が残っていても、大幸で tier-0 / standalone_mode が
+  // 実行時に ON と評価されることはない）。
+  return applyTenantFlagGuards(tenantId, { ...defaults, ...stored });
 }
 
 export async function isFeatureEnabled(
@@ -854,7 +861,10 @@ export function applyTenantFlagGuards(
   const guarded: FlagMap = { ...flags };
   if (tenantId === DAIKO_TENANT_ID) {
     for (const f of FEATURE_CATALOG) {
-      if (f.category === "tier-0") guarded[f.key] = false;
+      // 観の期(tier-0)と standalone商品モードは大幸では常に OFF。
+      // standalone_mode が大幸で ON になると、入力フロー差し替え・
+      // 管理者のログ閲覧遮断・通知メール停止が発動してしまう（仕様書 §1）。
+      if (f.category === "tier-0" || f.category === "mode") guarded[f.key] = false;
     }
   }
   return guarded;

@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getManagerByToken } from "@/lib/participant-db";
 import { getAiSystemPrompt as getAiSystemPromptFromSupabase } from "@/lib/supabase";
 import { resolveManagerTenantStrict } from "@/lib/tenant-context";
+import { standaloneGuard } from "@/lib/standalone";
 import { logger } from "@/lib/logger";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
@@ -35,6 +36,10 @@ export async function POST(request: NextRequest) {
     if (!manager || !manager.isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
+
+    // standalone §7-1/§7-3: FB下書き生成はログ本文をLLMへ渡す経路。機能ごと無効。
+    const blocked = await standaloneGuard(manager.tenantId, "feedback-draft");
+    if (blocked) return blocked;
 
     if (!participantName || !logs || logs.length === 0) {
       return NextResponse.json({ error: "参加者名とログデータが必要です" }, { status: 400 });

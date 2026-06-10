@@ -62,6 +62,11 @@ export type NotionLogEntry = {
   morningIntent: string;
   eveningInsight: string | null;
   energy: "excellent" | "good" | "okay" | "low" | null;
+  // standalone（§2）: 夕の気分。energy は「朝の気分」として継続し、
+  // 夕の判定に energy を使わない（bug_energy_morning_evening_ambiguity 再発防止）
+  eveningEnergy: "excellent" | "good" | "okay" | "low" | null;
+  morningCondition: string | null;  // 朝の体調・自由記述（standalone §3、空可）
+  eveningCondition: string | null;  // 夕の体調・自由記述（standalone §3、空可）
   status: "complete" | "morning_only" | "empty" | "fb_done";
   hasFeedback: boolean;
   hmFeedback: string | null;
@@ -89,6 +94,9 @@ export type NotionParticipant = {
   role: string;
   managerId: string;
   fbPolicy: string;
+  // 行の実テナントID。クロステナント取得（全テナントビュー）でも参加者ごとの
+  // 所属テナントを判別できるようにする（standalone §7 のテナント別遮断で使用）
+  tenantId?: string;
 };
 
 export type NotionManager = {
@@ -166,6 +174,9 @@ function rowToLog(r: any): NotionLogEntry {
     morningIntent: r.morning_intent || "",
     eveningInsight: r.evening_insight || null,
     energy: r.energy || null,
+    eveningEnergy: r.evening_energy || null,
+    morningCondition: r.morning_condition || null,
+    eveningCondition: r.evening_condition || null,
     status: r.status || "empty",
     hasFeedback: r.has_feedback || false,
     hmFeedback: r.hm_feedback || null,
@@ -195,6 +206,7 @@ function rowToParticipant(r: any): NotionParticipant {
     role: r.role || "参加者",
     managerId: r.manager_id || "",
     fbPolicy: r.fb_policy || "",
+    tenantId: r.tenant_id || undefined,
   };
 }
 
@@ -429,30 +441,37 @@ export async function createMorningEntry(
   participantId: string,
   morningDurationSec: number | null = null,
   phaseMode: "kan-no-ki" | "dojo-1" = "dojo-1",
-  bodyIntent: string | null = null
+  bodyIntent: string | null = null,
+  morningCondition: string | null = null
 ): Promise<string | null> {
   const now = new Date();
   const d = new Date(date);
+  const insertData: Record<string, unknown> = {
+    tenant_id: tenantId,
+    participant_id: participantId,
+    participant_name: participantName,
+    date,
+    datetime: now.toISOString(),
+    day_of_week: getDayOfWeekJPShort(d) || "",
+    day_num: d.getDate(),
+    morning_intent: morningIntent,
+    energy: energy || null,
+    status: "morning_only",
+    dojo_phase: dojoPhase,
+    week_num: weekNum,
+    morning_time: now.toISOString(),
+    morning_duration_sec: sanitizeDurationSec(morningDurationSec),
+    phase_mode: phaseMode,
+    body_intent: bodyIntent,
+  };
+  // standalone §3: 朝の体調（空可）。値がある時のみカラムを送る
+  // （migration 未適用環境でも従来フローが壊れないように）。
+  if (morningCondition !== null && morningCondition.length > 0) {
+    insertData.morning_condition = morningCondition;
+  }
   const { data, error } = await getClient()
     .from("logs")
-    .insert({
-      tenant_id: tenantId,
-      participant_id: participantId,
-      participant_name: participantName,
-      date,
-      datetime: now.toISOString(),
-      day_of_week: getDayOfWeekJPShort(d) || "",
-      day_num: d.getDate(),
-      morning_intent: morningIntent,
-      energy: energy || null,
-      status: "morning_only",
-      dojo_phase: dojoPhase,
-      week_num: weekNum,
-      morning_time: now.toISOString(),
-      morning_duration_sec: sanitizeDurationSec(morningDurationSec),
-      phase_mode: phaseMode,
-      body_intent: bodyIntent,
-    })
+    .insert(insertData)
     .select("id")
     .single();
   if (error) {
@@ -470,7 +489,15 @@ export async function updateEveningEntry(
   pageId: string,
   eveningInsight: string,
   energy: string | null,
-  eveningDurationSec: number | null = null
+  eveningDurationSec: number | null = null,
+  bodyCheck: string | null = null,
+  extras?: {
+    // standalone §2/§3: 夕の気分は evening_energy に分離保存。
+    // energy（朝の気分）を上書きしたくない場合は energy=null で呼ぶ
+    // （energy: null → undefined → PostgREST はカラムを更新しない）。
+    eveningEnergy?: string | null;
+    eveningCondition?: string | null;
+  }
 ): Promise<boolean> {
   const now = new Date();
   const sanitized = sanitizeDurationSec(eveningDurationSec);
@@ -483,6 +510,18 @@ export async function updateEveningEntry(
   // duration が計測できた場合のみ更新（null の場合はカラムを触らない）
   if (sanitized !== null) {
     updateData.evening_duration_sec = sanitized;
+  }
+  // 観の期の身体欄（任意）。値がある場合のみ更新。
+  // 既存バグ修正: InputClient は type="evening" でも bodyCheck を送るが、
+  // この関数が受け取らず「朝→夕」フローで夕の身体欄が暗黙裡に失われていた。
+  if (bodyCheck !== null && bodyCheck.length > 0) {
+    updateData.body_check = bodyCheck;
+  }
+  if (extras?.eveningEnergy) {
+    updateData.evening_energy = extras.eveningEnergy;
+  }
+  if (extras?.eveningCondition && extras.eveningCondition.length > 0) {
+    updateData.evening_condition = extras.eveningCondition;
   }
   const { error, data: updated } = await getClient()
     .from("logs")
@@ -511,30 +550,43 @@ export async function createEveningOnlyEntry(
   participantId: string,
   eveningDurationSec: number | null = null,
   phaseMode: "kan-no-ki" | "dojo-1" = "dojo-1",
-  bodyCheck: string | null = null
+  bodyCheck: string | null = null,
+  extras?: {
+    // standalone §2/§3: 夕の気分は evening_energy へ。energy（朝の気分）は
+    // 夕のみ記入の場合 null のまま残す（呼び出し側が energy=null を渡す）。
+    eveningEnergy?: string | null;
+    eveningCondition?: string | null;
+  }
 ): Promise<string | null> {
   const now = new Date();
   const d = new Date(date);
+  const insertData: Record<string, unknown> = {
+    tenant_id: tenantId,
+    participant_id: participantId,
+    participant_name: participantName,
+    date,
+    datetime: now.toISOString(),
+    day_of_week: getDayOfWeekJPShort(d) || "",
+    day_num: d.getDate(),
+    evening_insight: eveningInsight,
+    energy: energy || null,
+    status: "complete",
+    dojo_phase: dojoPhase,
+    week_num: weekNum,
+    evening_time: now.toISOString(),
+    evening_duration_sec: sanitizeDurationSec(eveningDurationSec),
+    phase_mode: phaseMode,
+    body_check: bodyCheck,
+  };
+  if (extras?.eveningEnergy) {
+    insertData.evening_energy = extras.eveningEnergy;
+  }
+  if (extras?.eveningCondition && extras.eveningCondition.length > 0) {
+    insertData.evening_condition = extras.eveningCondition;
+  }
   const { data, error } = await getClient()
     .from("logs")
-    .insert({
-      tenant_id: tenantId,
-      participant_id: participantId,
-      participant_name: participantName,
-      date,
-      datetime: now.toISOString(),
-      day_of_week: getDayOfWeekJPShort(d) || "",
-      day_num: d.getDate(),
-      evening_insight: eveningInsight,
-      energy: energy || null,
-      status: "complete",
-      dojo_phase: dojoPhase,
-      week_num: weekNum,
-      evening_time: now.toISOString(),
-      evening_duration_sec: sanitizeDurationSec(eveningDurationSec),
-      phase_mode: phaseMode,
-      body_check: bodyCheck,
-    })
+    .insert(insertData)
     .select("id")
     .single();
   if (error) {
@@ -546,6 +598,98 @@ export async function createEveningOnlyEntry(
     return null;
   }
   return data.id;
+}
+
+// ---------------------------------------------------------------------------
+// SKIP REASONS（standalone §5 未記入フォローアップ）
+// ---------------------------------------------------------------------------
+
+/**
+ * 復帰日のギャップ事実を記録する（reason は後から任意で埋まる）。
+ * 「空＝スキップした事実だけ記録」を満たすため、カード表示時点で先に INSERT する。
+ */
+export async function insertSkipReason(args: {
+  tenantId: string;
+  participantId: string;
+  gapStart: string;
+  gapEnd: string;
+  gapWeekdays: number;
+  returnLogId: string | null;
+}): Promise<string | null> {
+  const { data, error } = await getClient()
+    .from("skip_reasons")
+    .insert({
+      tenant_id: args.tenantId,
+      participant_id: args.participantId,
+      gap_start: args.gapStart,
+      gap_end: args.gapEnd,
+      gap_weekdays: args.gapWeekdays,
+      reason: null,
+      return_log_id: args.returnLogId,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    logger.error("insertSkipReason failed", { error: error.message, participantId: args.participantId });
+    return null;
+  }
+  return data?.id ?? null;
+}
+
+/**
+ * フォローアップの回答を記録する。該当行（return_log_id 一致・未回答）のみ更新。
+ */
+export async function updateSkipReasonAnswer(
+  returnLogId: string,
+  participantId: string,
+  tenantId: string,
+  reason: string
+): Promise<boolean> {
+  const { data, error } = await getClient()
+    .from("skip_reasons")
+    .update({ reason })
+    .eq("return_log_id", returnLogId)
+    .eq("participant_id", participantId)
+    .eq("tenant_id", tenantId)
+    .is("reason", null)
+    .select("id");
+  if (error) {
+    logger.error("updateSkipReasonAnswer failed", { error: error.message, returnLogId });
+    return false;
+  }
+  if (!data || data.length === 0) {
+    logger.warn("updateSkipReasonAnswer matched 0 rows", { returnLogId, participantId });
+    return false;
+  }
+  return true;
+}
+
+/**
+ * 21日レポート用: 参加者のスキップ記録を取得（standalone §8）。
+ */
+export async function getSkipReasonsByParticipant(
+  participantId: string,
+  tenantId: string
+): Promise<{ gapStart: string; gapEnd: string; gapWeekdays: number; reason: string | null; createdAt: string }[]> {
+  const { data, error } = await getClient()
+    .from("skip_reasons")
+    .select("gap_start, gap_end, gap_weekdays, reason, created_at")
+    .eq("participant_id", participantId)
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: true });
+  if (error) {
+    logger.error("getSkipReasonsByParticipant failed", { error: error.message, participantId });
+    return [];
+  }
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  return (data ?? []).map((r: any) => ({
+    gapStart: r.gap_start,
+    gapEnd: r.gap_end,
+    gapWeekdays: r.gap_weekdays,
+    reason: r.reason ?? null,
+    createdAt: r.created_at,
+  }));
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 }
 
 export async function addManagerComment(

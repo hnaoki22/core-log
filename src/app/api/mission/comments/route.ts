@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
           }
         }
       } else if (participant) {
-        // Participant commented â notify their manager
+        // Participant commented → notify their manager
         const mgr = participant.managerId ? await getManagerById(participant.managerId) : null;
         if (mgr?.email && !mgr.email.includes("example.com")) {
           await sendNotificationEmail({

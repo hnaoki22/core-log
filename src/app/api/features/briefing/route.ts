@@ -8,6 +8,7 @@ import { getManagerByTokenFromSupabase } from "@/lib/supabase";
 import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 import { generate1on1Briefing } from "@/lib/llm";
 import { resolveManagerTenantStrict } from "@/lib/tenant-context";
+import { standaloneGuard } from "@/lib/standalone";
 
 
 
@@ -107,6 +108,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
     }
     const tenantId = tenantResult.tenantId;
+
+    // standalone §7-1: 1on1ブリーフィングは部下のログ本文を読む経路。無効。
+    const blocked = await standaloneGuard(tenantId, "briefing");
+    if (blocked) return blocked;
 
     if (!participantId) {
       return NextResponse.json({ error: "Participant ID required" }, { status: 400 });

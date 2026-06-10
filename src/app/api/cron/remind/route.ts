@@ -89,8 +89,14 @@ export async function GET(request: NextRequest) {
     for (const tenant of tenants) {
       // Get all active participants for this tenant
       const participants = await getAllParticipants(tenant.id);
+      // email_enabled=false の参加者を除外する。
+      // 従来は sendReminderEmail 内の getParticipantByEmail(to) が tenantId 無しで
+      // 呼ばれて常に null（=チェック素通り）だったため、このフラグは本番で
+      // 一度も効いていなかった。テナントループ内でフィルタすれば、同一メール
+      // アドレスが複数テナントに居る場合（太田氏: HMデモ + reflection-lab）も
+      // テナント単位で正しく停止できる（§11-3 二重受信解消）。
       const activeParticipants = participants.filter(
-        (p) => p.email && p.email !== "" && !p.email.includes("example.com")
+        (p) => p.email && p.email !== "" && !p.email.includes("example.com") && p.emailEnabled !== false
       );
 
       for (const p of activeParticipants) {

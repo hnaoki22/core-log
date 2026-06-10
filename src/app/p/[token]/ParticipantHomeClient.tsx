@@ -3,6 +3,7 @@
 import { getTodayJST, getCurrentHourJST, formatDateTimeJST } from "@/lib/date-utils";
 import { BottomNav } from "@/components/BottomNav";
 import { useFeatures } from "@/lib/use-features";
+import { MoodCandlestick } from "@/components/features/MoodCandlestick";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 
@@ -18,6 +19,8 @@ type LogEntry = {
   morningIntent: string;
   eveningInsight: string | null;
   energy: "excellent" | "good" | "okay" | "low" | null;
+  // standalone §4: 夕の気分（ローソク足の終値）。従来テナントでは undefined/null
+  eveningEnergy?: "excellent" | "good" | "okay" | "low" | null;
   status: "complete" | "morning_only" | "empty" | "fb_done";
   hasFeedback: boolean;
 };
@@ -57,6 +60,10 @@ export type ParticipantHomeInitialData = {
     todayStatus: string;
     businessDaysElapsed: number;
   } | null;
+  // standalone商品モード（§6 段階開示）。null/undefined = 従来テナント（挙動不変）。
+  // unlocked=false の間は分析系UI（チャート・トレンド・機能メニュー）を非表示、
+  // unlocked=true で「ふっと現れる」カード＋ローソク足＋振り返り/AI分析が解禁。
+  standalone?: { unlocked: boolean; daysElapsed: number; entryDays: number } | null;
 };
 
 interface Props {
@@ -81,6 +88,28 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [error, _setError] = useState("");
   const { isOn } = useFeatures(); // features hook is still used by BottomNav via context
+
+  // standalone §6: サーバーが確定した段階開示の状態（null=従来テナント）
+  const sa = initialData.standalone ?? null;
+  // 「ふっと現れる」一回性の演出: 初回表示のみ大きなカードを fade-in。
+  // 既読は端末ローカル（localStorage）に記録し、以降は通常メニューとして残す。
+  const [unlockSeen, setUnlockSeen] = useState(true); // SSR と初回描画を一致させるため true 始まり
+  useEffect(() => {
+    if (!sa?.unlocked) return;
+    try {
+      setUnlockSeen(localStorage.getItem(`core-log:standalone-unlock-seen:${token}`) === "1");
+    } catch {
+      setUnlockSeen(false);
+    }
+  }, [sa?.unlocked, token]);
+  const markUnlockSeen = () => {
+    try {
+      localStorage.setItem(`core-log:standalone-unlock-seen:${token}`, "1");
+    } catch {
+      // localStorage が使えない環境では毎回表示されるだけ（実害なし）
+    }
+    setUnlockSeen(true);
+  };
 
   useEffect(() => {
     // Background refresh — never blocks first paint. Fires once on mount;
@@ -272,8 +301,55 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
           </div>
         </div>
 
-        {/* Streak & Insights Cards */}
-        {logs.length > 0 && (() => {
+        {/* standalone §6: アンロックの瞬間だけ「ふっと現れる」カード（一回性・控えめ） */}
+        {sa?.unlocked && !unlockSeen && (
+          <button
+            onClick={markUnlockSeen}
+            className="w-full text-left bg-gradient-to-br from-indigo-50 to-stone-50 border border-indigo-200 p-5 rounded-2xl animate-fade-up hover:shadow-md transition-all"
+          >
+            <p className="text-[10px] text-[#4D4D6D] font-medium tracking-wide uppercase mb-1.5">3週間の節目</p>
+            <p className="text-base font-semibold text-[#1A1A2E] leading-relaxed mb-1">
+              3週間分のログが貯まりました。
+            </p>
+            <p className="text-sm text-[#5B5560] leading-relaxed">あなたのパターンを見てみますか？</p>
+            <p className="text-xs text-[#8B8489] mt-3">タップして開く</p>
+          </button>
+        )}
+
+        {/* standalone §6: 解禁後の入口 ①振り返り ②AI分析 */}
+        {sa?.unlocked && unlockSeen && (
+          <div className="grid grid-cols-2 gap-3 animate-fade-up">
+            <Link href={`/p/${token}/logs`}>
+              <div className="card p-4 hover:bg-[#FBF8F4] transition-colors cursor-pointer h-full">
+                <div className="text-xl mb-1.5">🕯️</div>
+                <p className="text-sm font-medium text-[#1A1A2E]">振り返り</p>
+                <p className="text-[10px] text-[#8B8489] mt-0.5">ログ一覧とローソク足の長期表示</p>
+              </div>
+            </Link>
+            <Link href={`/p/${token}/standalone-report`}>
+              <div className="card p-4 hover:bg-[#FBF8F4] transition-colors cursor-pointer h-full">
+                <div className="text-xl mb-1.5">🔍</div>
+                <p className="text-sm font-medium text-[#1A1A2E]">AI分析</p>
+                <p className="text-[10px] text-[#8B8489] mt-0.5">21日分のパターンを2つのレンズで</p>
+              </div>
+            </Link>
+          </div>
+        )}
+
+        {/* standalone §4: 気分ローソク足（解禁後のみ） */}
+        {sa?.unlocked && unlockSeen && logs.length > 0 && (
+          <MoodCandlestick
+            logs={logs.map((l) => ({
+              date: l.date,
+              energy: l.energy,
+              eveningEnergy: l.eveningEnergy ?? null,
+            }))}
+            days={21}
+          />
+        )}
+
+        {/* Streak & Insights Cards（standalone では §6 により非表示） */}
+        {!sa && logs.length > 0 && (() => {
           // Energy trend analysis
           const recentEnergies = logs.slice(0, 5).map(l => l.energy ? energyValue[l.energy] : 0).filter(v => v > 0);
           const olderEnergies = logs.slice(5, 10).map(l => l.energy ? energyValue[l.energy] : 0).filter(v => v > 0);
@@ -332,8 +408,8 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
           );
         })()}
 
-        {/* Energy Chart - Line Graph */}
-        {logs.length > 0 && (
+        {/* Energy Chart - Line Graph（standalone では §6 により非表示・解禁後はローソク足に置換） */}
+        {!sa && logs.length > 0 && (
           <div className="card p-5">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-sm text-[#1A1A2E]">エネルギーの推移</h3>
@@ -404,7 +480,8 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
           </div>
         )}
 
-        {/* Feature Menu Section */}
+        {/* Feature Menu Section（standalone では §6 により非表示。コードは温存、表示制御のみ） */}
+        {!sa && (
         <div>
           <h3 className="font-semibold text-sm text-[#1A1A2E] mb-3">機能メニュー</h3>
 
@@ -461,10 +538,8 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
           {/* 成長測定 */}
           {(() => {
             const features = [
-              { key: "tier-d.heroAssessment", label: "HERO自己評価", icon: "📊", path: "hero" },
               { key: "tier-d.efficacyBooster", label: "効力感", icon: "💪", path: "efficacy" },
               { key: "tier-d.hopeDesign", label: "希望設計", icon: "🎯", path: "hope" },
-              { key: "tier-f.beforeAfter", label: "ビフォー・アフター", icon: "📈", path: "before-after" },
             ];
             const enabledFeatures = features.filter(f => isOn(f.key));
             return enabledFeatures.length > 0 && (
@@ -515,6 +590,7 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
             );
           })()}
         </div>
+        )}
 
         {/* Recent Logs */}
         <div className="card overflow-hidden">

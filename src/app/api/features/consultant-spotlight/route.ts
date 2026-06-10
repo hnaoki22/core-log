@@ -11,6 +11,7 @@ import { getClient } from "@/lib/supabase";
 import { getManagerByTokenFromSupabase, getAllLogsForTenant } from "@/lib/supabase";
 import { isFeatureEnabledForToken } from "@/lib/feature-flags";
 import { resolveAdminTenantContext } from "@/lib/tenant-context";
+import { standaloneGuard } from "@/lib/standalone";
 import {
   generateConsultantSpotlight,
   analyzeReflectionDepth,
@@ -75,6 +76,10 @@ export async function GET(req: NextRequest) {
 
     const tenantCtx = await resolveAdminTenantContext(req, manager);
 
+    // standalone §7-3: spotlight は機能ごと無効（キャッシュ読みも生成も拒否）
+    const blocked = await standaloneGuard(tenantCtx.tenantId || manager.tenantId, "consultant-spotlight");
+    if (blocked) return blocked;
+
     // Fetch cached spotlight from DB (less than 24h old)
     const client = getClient();
     let query = client
@@ -100,7 +105,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // No recent cache â generate fresh
+    // No recent cache — generate fresh
     return generateAndStore(req, manager, tenantCtx);
   } catch (error) {
     console.error("Consultant spotlight GET error:", error);
@@ -133,6 +138,11 @@ export async function POST(req: NextRequest) {
     }
 
     const tenantCtx = await resolveAdminTenantContext(req, manager);
+
+    // standalone §7-3: spotlight は機能ごと無効
+    const blocked = await standaloneGuard(tenantCtx.tenantId || manager.tenantId, "consultant-spotlight");
+    if (blocked) return blocked;
+
     return generateAndStore(req, manager, tenantCtx);
   } catch (error) {
     console.error("Consultant spotlight POST error:", error);
@@ -154,7 +164,7 @@ async function generateAndStore(
   if (participantSummaries.length === 0) {
     return NextResponse.json({
       success: true,
-      spotlight: { spotlight: [], orgPulse: "ã­ã°ãããã¾ãã", weekSummary: "åæå¯¾è±¡ã®ã­ã°ãããã¾ãã" },
+      spotlight: { spotlight: [], orgPulse: "ログがありません", weekSummary: "分析対象のログがありません" },
       depthAnalyses: [],
       generatedAt: new Date().toISOString(),
       cached: false,

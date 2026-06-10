@@ -10,6 +10,7 @@ import {
 import { computeParticipantStats } from "@/lib/stats";
 import { getTodayJST } from "@/lib/date-utils";
 import { resolveManagerTenantStrict } from "@/lib/tenant-context";
+import { isStandaloneTenant } from "@/lib/standalone";
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
@@ -30,10 +31,11 @@ export async function GET(request: NextRequest) {
   const tenantId = tenantResult.tenantId;
 
   // Fetch participants and ALL logs in parallel (2 queries instead of N+1)
-  const [participantMocks, allLogsMap, feedbackCounts] = await Promise.all([
+  const [participantMocks, allLogsMap, feedbackCounts, standalone] = await Promise.all([
     getParticipantsForManager(manager.id, tenantId),
     getAllLogsForTenant(tenantId),
     getFeedbackCountsByTenant(tenantId),
+    isStandaloneTenant(tenantId),
   ]);
   const todayJST = getTodayJST();
 
@@ -59,16 +61,20 @@ export async function GET(request: NextRequest) {
         streak: stats.streak,
         fbCount: feedbackCounts.get(p.name) || 0,
         todayHasLog: stats.todayStatus !== "none",
-        latestLog: latestLog
-          ? {
-              date: latestLog.date,
-              morningIntent: latestLog.morningIntent,
-            eveningInsight: latestLog.eveningInsight,
-              status: latestLog.status,
-              energy: latestLog.energy,
-            }
-          : null,
-        recentEnergy: logs.slice(0, 5).map((l) => l.energy),
+        // standalone §7-1:「誰も見れない3週間」— ログ本文（と日次の気分値）は
+        // マネージャーへ返さない。継続率等の統計のみ可（§7-2）。
+        latestLog: standalone
+          ? null
+          : latestLog
+            ? {
+                date: latestLog.date,
+                morningIntent: latestLog.morningIntent,
+                eveningInsight: latestLog.eveningInsight,
+                status: latestLog.status,
+                energy: latestLog.energy,
+              }
+            : null,
+        recentEnergy: standalone ? [] : logs.slice(0, 5).map((l) => l.energy),
       };
     } catch (error) {
       console.error(`Error processing data for ${p.name}:`, error);

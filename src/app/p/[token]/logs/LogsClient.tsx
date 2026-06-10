@@ -1,6 +1,7 @@
 "use client";
 
 import { BottomNav } from "@/components/BottomNav";
+import { MoodCandlestick } from "@/components/features/MoodCandlestick";
 import { formatDateTimeJST, formatTimeJST } from "@/lib/date-utils";
 import { useState, useEffect } from "react";
 
@@ -16,6 +17,8 @@ type LogEntry = {
   morningIntent: string;
   eveningInsight: string | null;
   energy: "excellent" | "good" | "okay" | "low" | null;
+  // standalone §4: 夕の気分（ローソク足の終値）。従来テナントでは undefined/null
+  eveningEnergy?: "excellent" | "good" | "okay" | "low" | null;
   status: "complete" | "morning_only" | "empty" | "fb_done";
   hasFeedback: boolean;
   hmFeedback?: string | null;
@@ -69,6 +72,8 @@ const formatTime = formatTimeJST;
 export type LogsInitialData = {
   logs: LogEntry[];
   badges: { feedback: number; feedbackTotal: number; mission: number };
+  // standalone §6: 解禁後のみ true。ローソク足の長期表示をログ一覧の上に出す
+  standaloneCandle?: boolean;
 };
 
 interface Props {
@@ -168,6 +173,20 @@ export default function LogsClient({ token, initialData }: Props) {
       </div>
 
       <div className="max-w-md mx-auto px-5 pt-5 animate-fade-up relative z-10">
+        {/* standalone §6: 振り返り＝ログ一覧＋ローソク足の長期表示（解禁後のみ） */}
+        {initialData.standaloneCandle && logs.length > 0 && (
+          <div className="mb-4">
+            <MoodCandlestick
+              logs={logs.map((l) => ({
+                date: l.date,
+                energy: l.energy,
+                eveningEnergy: l.eveningEnergy ?? null,
+              }))}
+              days={42}
+              title="気分の推移（長期）"
+            />
+          </div>
+        )}
         {logs.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-12 h-12 bg-[#EFE8DD] rounded-2xl flex items-center justify-center mx-auto mb-4">

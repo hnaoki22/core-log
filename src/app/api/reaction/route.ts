@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { toggleManagerReaction } from "@/lib/supabase";
 import { getManagerByToken } from "@/lib/participant-db";
+import { standaloneGuard } from "@/lib/standalone";
 
 const ALLOWED_REACTIONS = ["👍", "👏", "🔥", "💪", "❤️", "💡"];
 
@@ -27,6 +28,10 @@ export async function POST(request: NextRequest) {
     if (!manager.tenantId) {
       return NextResponse.json({ error: "Tenant unresolved" }, { status: 500 });
     }
+
+    // standalone §7-3: マネージャーのリアクションも介入経路のひとつ。機能ごと無効。
+    const blocked = await standaloneGuard(manager.tenantId, "reaction");
+    if (blocked) return blocked;
 
     // Validate reaction
     if (!ALLOWED_REACTIONS.includes(reaction)) {

@@ -7,6 +7,7 @@ import { DAIKO_TENANT_ID } from "@/lib/tenants";
 
 type FlagCategory =
   | "core" | "existing"
+  | "mode"
   | "tier-0"
   | "tier-s" | "tier-a" | "tier-b" | "tier-c" | "tier-d" | "tier-e" | "tier-f" | "tier-g";
 
@@ -51,18 +52,20 @@ type ApiData = {
 const CATEGORY_META: Record<FlagCategory, { label: string; color: string; desc: string }> = {
   "core":     { label: "コア機能",              color: "bg-gray-100 text-gray-700 border-gray-300",   desc: "CORE Logの中核。基本的に常時ON推奨" },
   "existing": { label: "既存機能",              color: "bg-blue-50 text-blue-700 border-blue-200",    desc: "現在実装済みの機能群" },
+  "mode":     { label: "動作モード",            color: "bg-stone-100 text-stone-800 border-stone-300", desc: "テナント全体の動作を切り替える基幹フラグ（standalone商品モード等）。通常の機能フラグより影響が大きいため切替は慎重に" },
   "tier-0":   { label: "Tier 0: 観の期（KAN のキー）", color: "bg-slate-100 text-slate-700 border-slate-300", desc: "介入前の自己観想フェーズ。装置は観た事を映し返すのみ（reflection-lab で試験運用）" },
   "tier-s":   { label: "Tier S: 差別化機能",    color: "bg-orange-50 text-orange-700 border-orange-200", desc: "反芻検知・持論化等、CORE Logの独自性を生む機能" },
   "tier-a":   { label: "Tier A: マネージャー支援", color: "bg-indigo-50 text-indigo-700 border-indigo-200", desc: "Safety Net層。1on1ブリーフィング・離職予兆等" },
   "tier-b":   { label: "Tier B: 組織学習",      color: "bg-emerald-50 text-emerald-700 border-emerald-200", desc: "Cultural Engine層。AAR・組織ナレッジ等" },
-  "tier-c":   { label: "Tier C: アンラーン",     color: "bg-amber-50 text-amber-700 border-amber-200", desc: "コンピテンシートラップ脱却・リーダー育成" },
-  "tier-d":   { label: "Tier D: PsyCap",       color: "bg-pink-50 text-pink-700 border-pink-200",    desc: "心理的資本(HERO)の育成" },
+  "tier-c":   { label: "Tier C: アンラーン",     color: "bg-amber-50 text-amber-700 border-amber-200", desc: "コンピテンシートラップ脱却・リーダーの転換支援" },
+  "tier-d":   { label: "Tier D: PsyCap",       color: "bg-pink-50 text-pink-700 border-pink-200",    desc: "心理的資本(HERO)を調える" },
   "tier-e":   { label: "Tier E: UX強化",        color: "bg-purple-50 text-purple-700 border-purple-200", desc: "マイクロリチュアル・音声入力等" },
   "tier-f":   { label: "Tier F: ROI証明",       color: "bg-teal-50 text-teal-700 border-teal-200",    desc: "成長ROI・導入効果レポート" },
   "tier-g":   { label: "Tier G: ビジネスモデル", color: "bg-rose-50 text-rose-700 border-rose-200",    desc: "マルチテナント・コンサル連携" },
 };
 
 const CATEGORY_ORDER: FlagCategory[] = [
+  "mode",
   "core", "existing",
   "tier-0",
   "tier-s", "tier-a", "tier-b", "tier-c", "tier-d", "tier-e", "tier-f", "tier-g",
@@ -190,12 +193,12 @@ export default function FeatureFlagsAdminPage() {
     );
   }
 
-  // 観の期(tier-0)は当面 reflection-lab 限定。本番テナント(大幸薬品)では管理画面に
-  // 出さない＝管理者の誤ONを物理的に防ぐ。保存経路はサーバー側(applyTenantFlagGuards)
-  // でも tier-0 を強制 false にして二重で守る。
+  // 観の期(tier-0)と standalone商品モード(mode)は道場1系の本番テナント(大幸薬品)
+  // では管理画面に出さない＝管理者の誤ONを物理的に防ぐ。保存経路はサーバー側
+  // (applyTenantFlagGuards)でも両カテゴリを強制 false にして二重で守る。
   const hideTier0 = data.tenantId === DAIKO_TENANT_ID;
   const visibleCatalog = hideTier0
-    ? data.catalog.filter((f) => f.category !== "tier-0")
+    ? data.catalog.filter((f) => f.category !== "tier-0" && f.category !== "mode")
     : data.catalog;
 
   // Group dynamically so a newly added catalog category can never white-screen

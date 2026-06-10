@@ -144,10 +144,13 @@ PR タイトル例（リポの履歴に合わせる）:
 
 ## 5. 機能フラグ（FEATURE_CATALOG 実数）
 
-`src/lib/feature-flags.ts` の `FEATURE_CATALOG` は **2026-06-02 時点で 53 件 / 11 カテゴリ**（観の期 tier-0 の 10 件を 081f3d9 で追加）。
+`src/lib/feature-flags.ts` の `FEATURE_CATALOG` は **2026-06-10 時点で 52 件 / 12 カテゴリ**（mode カテゴリ + `standalone_mode` を追加。§9 決定で `tier-f.beforeAfter` と `tier-d.heroAssessment` を削除——打合せ文字起こしの「色軸評価」は「4軸評価」の誤変換で、正対象は HERO自己評価と本藤さん確認済み）。
+
+**mode カテゴリ（2026-06-10 追加）**: `standalone_mode` = 商品版の動作モード。ON のテナントは①朝夕3画面入力（体調→意図/結果→気分、`evening_energy` 分離保存）②気分ローソク足③分析機能の段階開示（21日+記入10日）④マネージャー/管理者のログ本文閲覧を API レベルで遮断＋投稿通知メール停止⑤未記入フォローアップ。大幸薬品では `applyTenantFlagGuards` が強制 OFF（tier-0 と同じ防御）。サーバー判定は `src/lib/standalone.ts`（`isStandaloneTenant` / `standaloneGuard` / `computeUnlockState` / `computeSkipFollowup`）、21日レポートは `src/lib/standalone-report.ts` + `standalone_reports` テーブル、スキップ記録は `skip_reasons` テーブル（migration: `20260610_standalone_mode_schema.sql`）。
 
 | カテゴリ | 件数 | 代表 |
 |---|---:|---|
+| `mode` 動作モード | 1 | **standalone_mode**（商品版。大幸は非表示&強制OFF） |
 | `core` | 3 | morningInput / eveningInput / logHistory |
 | `existing` | 11 | energyTracking, mission, streak, badges, animations, reminderMail, managerFeedback, csvExport, otpAuth, managerAnalytics, **dailyQuestions** |
 | `tier-0` 観の期(KAN のキー) | 10 | kanNoKi / weeklyMirror / bodyPrompt / silenceObservation / peerComparison(.tenant/.crossTenant/.industry/.global) / transitionSignal（reflection-lab 限定・大幸薬品は非表示&強制OFF） |
@@ -155,9 +158,9 @@ PR タイトル例（リポの履歴に合わせる）:
 | `tier-a` Manager Safety Net | 5 | oneOnOneBriefing, burnoutScore, consultantSpotlight, psychSafetyMonitor, managerSelfReflection |
 | `tier-b` Cultural Engine | 4 | aar, knowledgeLibrary, cultureScore, peerReflection |
 | `tier-c` Competency Trap Escape | 3 | unlearnChallenge, identityTracking, outsightTask |
-| `tier-d` PsyCap | 3 | heroAssessment, efficacyBooster, hopeDesign |
+| `tier-d` PsyCap | 2 | efficacyBooster, hopeDesign（heroAssessment＝4軸自己評価は 2026-06-10 §9 決定で削除） |
 | `tier-e` UX | 4 | microRitualOptimizer, ruminationTimer, calendarBlock, voiceInput |
-| `tier-f` ROI/Evidence | 3 | growthRoi, beforeAfter, clientReport |
+| `tier-f` ROI/Evidence | 2 | growthRoi, clientReport（beforeAfter は 2026-06-10 §9 決定で削除） |
 | `tier-g` Business Model | 3 | multiTenant, pitchGenerator, consultIntervention |
 
 保存形式: テナント毎に `ai_settings.value` 行（`tenant_id`, `key='feature_flags'`, `value=JSON`）。flat shape（`{flagKey: bool}`）が現行、legacy nested shape（`{default: {...}}`）は読み取り側で互換維持。
@@ -230,6 +233,7 @@ PR タイトル例（リポの履歴に合わせる）:
    - 主正典：`書籍_v3.0_素材/book_v2.7_full.md` 補章 A（用語集）+ `書籍_v2.6/00_ボイス指針.md`
    - 詳細：`~/.claude/skills/human-mature-canonical-vocabulary-guard/SKILL.md` の Step 1（正典パス）と Step 2.5（二層構造）
 10. **観の期（`phase_mode='kan-no-ki'`）のログは「本人と装置だけ」。** 上司・伴走者・コンサル（spotlight）・briefing・burnout など管理者向けに logs を読む全経路で kan-no-ki を除外する。共有関数 `getLogsByParticipant` / `getAllLogsForTenant` は**既定で除外**し、本人向けの読み取りのみ `{ includeKanNoKi: true }` を渡す。logs を直クエリする新規の管理者向けコードは `.neq("phase_mode","kan-no-ki")` を必須とする。道場1 移行後も過去の観の期ログは上司へ開かない（2026-06-02 確認・恒久対策）。
+11. **standalone テナント（`standalone_mode=true`）のログ本文はテナント丸ごと「本人と装置だけ」。** マネージャー/管理者向けにログ本文・日次気分値を返す新規 API・ページは、必ず `standaloneGuard(tenantId, surface)`（403）または本文ストリッピングを入れる。日報投稿通知メール（本文スニペット付き）も standalone では送らない。UI 非表示だけで済ませることは禁止（2026-06-10 仕様書 §7）。energy は「朝の気分」、夕の気分は `evening_energy`（standalone のみ書き込み）。夕の記入判定に energy を使わない。
 
 ---
 
