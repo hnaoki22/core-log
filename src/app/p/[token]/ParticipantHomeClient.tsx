@@ -538,7 +538,6 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
           {/* 成長測定 */}
           {(() => {
             const features = [
-              { key: "tier-d.heroAssessment", label: "HERO自己評価", icon: "📊", path: "hero" },
               { key: "tier-d.efficacyBooster", label: "効力感", icon: "💪", path: "efficacy" },
               { key: "tier-d.hopeDesign", label: "希望設計", icon: "🎯", path: "hope" },
             ];

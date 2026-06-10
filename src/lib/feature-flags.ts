@@ -352,16 +352,10 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   },
 
   // ===== Tier D: PsyCap =====
-  {
-    key: "tier-d.heroAssessment",
-    label: "HERO自己評価(月次)",
-    description: "Hope / Efficacy / Resilience / Optimism の4軸評価。時系列グラフで可視化。",
-    category: "tier-d",
-    defaultEnabled: false,
-    phase1Enabled: false,
-    implemented: true,
-    recommendedPhase: 2,
-  },
+  // tier-d.heroAssessment（HERO自己評価＝Hope/Efficacy/Resilience/Optimism の
+  // 4軸を月次で自己入力）は 2026-06-10 本藤さん決定で削除（仕様書 §9。打合せの
+  // 「色軸評価」は「4軸評価」の誤変換と確認）。全テナント使用0行を確認の上、
+  // UI/ルート/フラグ/プリセット参照を撤去。hero_assessments テーブルは残置。
   {
     key: "tier-d.efficacyBooster",
     label: "自己効力感ブースター",
@@ -641,7 +635,7 @@ export const PRESETS: Preset[] = [
   {
     id: "daiko-phase2",
     label: "大幸薬品 Phase 2",
-    description: "Phase 1 + マネージャーFB + 週次ダブルループ問い + HERO評価。",
+    description: "Phase 1 + マネージャーFB + 週次ダブルループ問い。",
     getFlags: () => {
       const flags: Record<string, boolean> = {};
       for (const f of FEATURE_CATALOG) {
@@ -650,7 +644,6 @@ export const PRESETS: Preset[] = [
       flags["feature.managerFeedback"] = true;
       flags["tier-s.doubleLoopPrompt"] = true;
       flags["tier-s.structuredInput"] = true;
-      flags["tier-d.heroAssessment"] = true;
       flags["tier-a.managerSelfReflection"] = true;
       return flags;
     },
@@ -672,7 +665,6 @@ export const PRESETS: Preset[] = [
       flags["tier-a.oneOnOneBriefing"] = true;
       flags["tier-a.burnoutScore"] = true;
       flags["tier-a.managerSelfReflection"] = true;
-      flags["tier-d.heroAssessment"] = true;
       flags["tier-b.aar"] = true;
       flags["tier-b.knowledgeLibrary"] = true;
       flags["tier-f.growthRoi"] = true;
