@@ -154,3 +154,62 @@ export function invalidateDailyQuestionsCache(tenantId?: string) {
   if (tenantId) cacheByTenant.delete(tenantId);
   else cacheByTenant.clear();
 }
+
+// ---------------------------------------------------------------------------
+// Write (admin) — 管理画面から毎日の問いを保存する。
+// 2026-06-21: 管理UI追加（本藤さん要望）。upsert + 行数検証 + キャッシュ無効化。
+// ---------------------------------------------------------------------------
+
+const MAX_Q_PER_LIST = 30;   // 1曜日・朝/夕あたりの問い上限
+const MAX_Q_CHARS = 400;     // 1問あたりの文字数上限
+
+function sanitizeWeekly(weekly: DailyQuestionsWeekly): DailyQuestionsWeekly {
+  const out = {} as DailyQuestionsWeekly;
+  const cap = (arr: string[]) =>
+    arr.map((s) => (typeof s === "string" ? s.trim() : ""))
+       .filter((s) => s.length > 0)
+       .map((s) => s.slice(0, MAX_Q_CHARS))
+       .slice(0, MAX_Q_PER_LIST);
+  for (const day of DAY_KEYS) {
+    const d = weekly[day] ?? EMPTY_DAY;
+    out[day] = {
+      axis: (d.axis || "").trim().slice(0, 40),
+      morning: cap(d.morning || []),
+      evening: cap(d.evening || []),
+    };
+  }
+  return out;
+}
+
+/**
+ * テナントの毎日の問い（週次）を保存（upsert）する。admin API 専用。
+ * 影響行を .select() で検証する（zero-defect-guard 原則1）。保存後はキャッシュを無効化。
+ */
+export async function saveWeeklyForTenant(
+  tenantId: string,
+  rawWeekly: unknown
+): Promise<boolean> {
+  const parsed = parseWeekly(rawWeekly);
+  if (!parsed) {
+    logger.warn("daily-questions: save rejected (empty or invalid weekly)", { tenantId });
+    return false;
+  }
+  const clean = sanitizeWeekly(parsed);
+  const { error, data } = await getClient()
+    .from("ai_settings")
+    .upsert(
+      { tenant_id: tenantId, key: "daily_questions", value: JSON.stringify(clean) },
+      { onConflict: "tenant_id,key" }
+    )
+    .select("tenant_id");
+  if (error) {
+    logger.error("daily-questions: save failed", { tenantId, error: error.message });
+    return false;
+  }
+  if (!data || data.length === 0) {
+    logger.warn("daily-questions: upsert matched 0 rows", { tenantId });
+    return false;
+  }
+  invalidateDailyQuestionsCache(tenantId);
+  return true;
+}
