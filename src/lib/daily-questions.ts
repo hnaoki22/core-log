@@ -141,13 +141,38 @@ export function getTodayDayKey(now: Date = new Date()): DayKey {
   return "monday";
 }
 
+// ---- 週替わりローテーション（プールが多い時、毎日は数問だけを週ごとに出す）----
+// 2026-06-21: ネタ集の大量プール投入に合わせ、惰性対策として導入。
+// プールが QUESTIONS_PER_SLOT 以下のテナント（既存3問/スロット等）は挙動不変。
+export const QUESTIONS_PER_SLOT = 3;
+
+function jstWeekIndex(now: Date): number {
+  const days = Math.floor((now.getTime() + 9 * 3600 * 1000) / 86400000);
+  return Math.floor(days / 7);
+}
+
+function rotateSelect(pool: string[], n: number, weekIdx: number): string[] {
+  if (!Array.isArray(pool) || pool.length <= n) return pool || [];
+  const start = (((weekIdx * n) % pool.length) + pool.length) % pool.length;
+  const out: string[] = [];
+  for (let i = 0; i < n; i++) out.push(pool[(start + i) % pool.length]);
+  return out;
+}
+
 export async function getTodayQuestionsForTenant(
   tenantId: string,
   now: Date = new Date()
 ): Promise<DailyQuestionsForDay | null> {
   const weekly = await getWeeklyForTenant(tenantId);
   if (!weekly) return null;
-  return weekly[getTodayDayKey(now)] || null;
+  const day = weekly[getTodayDayKey(now)] || null;
+  if (!day) return null;
+  const wk = jstWeekIndex(now);
+  return {
+    axis: day.axis,
+    morning: rotateSelect(day.morning, QUESTIONS_PER_SLOT, wk),
+    evening: rotateSelect(day.evening, QUESTIONS_PER_SLOT, wk),
+  };
 }
 
 export function invalidateDailyQuestionsCache(tenantId?: string) {
