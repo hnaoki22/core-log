@@ -595,6 +595,16 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     phase1Enabled: false,
     implemented: true,
   },
+  // ===== Tier E 追加: 自分の気づきメモ（standalone AI分析）2026-06-21 / 太田さん要望① =====
+  {
+    key: "tier-e.selfInsightNote",
+    label: "自分の気づきメモ",
+    description: "AI分析（21日レポート）を読んで、本人が自分の気づきを書き残し、過去の気づきが蓄積される欄。standaloneモードのAI分析画面に表示。",
+    category: "tier-e",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    implemented: true,
+  },
 ];
 
 // ===== Presets =====
