@@ -6,11 +6,11 @@ import { useFeatures } from "@/lib/use-features";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 
+// GET /api/features/outsight は当週の未完了タスクを data.task（単数・null可）で返す
 type OutsightTask = {
   id: string;
-  task: string;
-  deadline: string;
-  status: "current" | "completed";
+  task_description: string;
+  is_completed: boolean;
 };
 
 export default function OutsightPage() {
@@ -30,7 +30,7 @@ export default function OutsightPage() {
         const res = await fetch(`/api/features/outsight?token=${token}`);
         if (res.ok) {
           const data = await res.json();
-          setTasks(data.tasks || []);
+          setTasks(data.task ? [data.task] : []);
         }
         const badgesRes = await fetch(`/api/logs?token=${token}`);
         if (badgesRes.ok) {
@@ -51,15 +51,15 @@ export default function OutsightPage() {
     setCompletingId(taskId);
     try {
       const res = await fetch("/api/features/outsight", {
-        method: "POST",
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, action: "complete", taskId, reflection }),
+        body: JSON.stringify({ token, taskId, reflection }),
       });
       if (res.ok) {
         const refreshRes = await fetch(`/api/features/outsight?token=${token}`);
         if (refreshRes.ok) {
           const data = await refreshRes.json();
-          setTasks(data.tasks || []);
+          setTasks(data.task ? [data.task] : []);
         }
         setReflection("");
       }
@@ -89,8 +89,8 @@ export default function OutsightPage() {
     );
   }
 
-  const currentTask = tasks.find(t => t.status === "current");
-  const completedTasks = tasks.filter(t => t.status === "completed");
+  const currentTask = tasks.find(t => !t.is_completed);
+  const completedTasks = tasks.filter(t => t.is_completed);
 
   return (
     <div className="min-h-screen bg-[#F5F0EB] pb-24">
@@ -114,11 +114,8 @@ export default function OutsightPage() {
           <div className="card p-5 mb-5 border-l-4 border-l-[#1A1A2E]">
             <h3 className="font-semibold text-sm text-[#1A1A2E] mb-3">現在のタスク</h3>
             <div className="bg-[#F5F0EB] p-3 rounded-xl border border-[#EFE8DD] mb-3">
-              <p className="text-sm text-[#2C2C4A]">{currentTask.task}</p>
+              <p className="text-sm text-[#2C2C4A]">{currentTask.task_description}</p>
             </div>
-            {currentTask.deadline && (
-              <p className="text-xs text-[#8B8489] mb-3">期限: {new Date(currentTask.deadline).toLocaleDateString("ja-JP")}</p>
-            )}
 
             <div>
               <label className="text-sm font-medium text-[#1A1A2E] block mb-2">完了時の振り返り</label>
@@ -158,7 +155,7 @@ export default function OutsightPage() {
             <div className="space-y-2">
               {completedTasks.map((task) => (
                 <div key={task.id} className="card p-4 opacity-75">
-                  <p className="text-sm text-[#2C2C4A]">{task.task}</p>
+                  <p className="text-sm text-[#2C2C4A]">{task.task_description}</p>
                   <p className="text-xs text-[#8B8489] mt-1">✓ 完了</p>
                 </div>
               ))}

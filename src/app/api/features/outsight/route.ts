@@ -201,7 +201,7 @@ export async function PUT(req: NextRequest) {
 
     // Update task with completion
     const client = getClient();
-    const { error } = await client
+    const { data, error } = await client
       .from("outsight_tasks")
       .update({
         is_completed: true,
@@ -210,7 +210,8 @@ export async function PUT(req: NextRequest) {
       })
       .eq("id", taskId)
       .eq("tenant_id", participant.tenantId)
-      .eq("participant_id", participant.id);
+      .eq("participant_id", participant.id)
+      .select("id");
 
     if (error) {
       console.error("Outsight update error:", error);
@@ -218,6 +219,11 @@ export async function PUT(req: NextRequest) {
         { error: "Failed to complete task" },
         { status: 500 }
       );
+    }
+    if (!data || data.length === 0) {
+      // PostgREST は 0 行 UPDATE でも error: null を返すため行数を検証する
+      console.error("Outsight update matched 0 rows:", { taskId });
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
     return NextResponse.json({
