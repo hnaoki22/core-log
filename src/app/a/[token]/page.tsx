@@ -1154,7 +1154,7 @@ export default function AdminDashboard() {
                     </Link>
                   )}
                   {isOn("tier-g.consultIntervention") && (
-                    <Link href={`/a/${token}/features/consult`} className="card p-4 hover:shadow-md transition-shadow">
+                    <Link href={`/a/${token}/features/consult${selectedTenantSlug ? `?tenant=${selectedTenantSlug}` : ""}`} className="card p-4 hover:shadow-md transition-shadow">
                       <div className="w-9 h-9 rounded-lg bg-[#F2F2F7] flex items-center justify-center text-[#1A1A2E] mb-2"><IconUsers size={18} /></div>
                       <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">介入ログ</h3>
                       <p className="text-xs text-[#8B8489]">コーチング記録</p>
