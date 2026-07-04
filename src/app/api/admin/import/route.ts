@@ -4,10 +4,15 @@
 //   role: "参加者" | "マネージャー" | "管理者" | "閲覧者"
 //   dojoPhase: 参加者のみ（省略時はテナント設定の最初のフェーズ、未設定なら空）
 //   managerName: 参加者のみ。上司の名前（先にマネージャー行を書くこと）
+//
+// Tenant resolution: ?tenant=slug（管理者がダッシュボードで選択中のテナント）
+// を最優先で解決する。actor のホームテナント固定だと、大幸薬品を選択して
+// インポートしても行がホームテナント側に無エラーで作成される
+// silent wrong-tenant write になる（core-log-review Trap 3）。
 
 import { NextRequest, NextResponse } from "next/server";
 import { getManagerByToken, isAdminToken } from "@/lib/participant-db";
-import { resolveManagerTenantStrict } from "@/lib/tenant-context";
+import { resolveAdminTargetTenant } from "@/lib/tenant-context";
 import {
   createParticipantInSupabase as createParticipant,
   createManagerInSupabase as createManager,
@@ -163,7 +168,10 @@ export async function POST(request: NextRequest) {
     if (!manager || !manager.isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
-    const tenantResult = resolveManagerTenantStrict(manager);
+    const tenantResult = await resolveAdminTargetTenant(
+      manager,
+      request.nextUrl.searchParams.get("tenant")
+    );
     if (!tenantResult.ok) {
       return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
     }
@@ -456,10 +464,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
-  // テナントのフェーズラベルを取得してテンプレートに反映
+  // 選択中テナント（?tenant=slug）のフェーズラベルを取得してテンプレートに反映。
+  // 解決できない場合はテンプレート自体は返す（例示フェーズが汎用になるだけ）。
   const manager = await getManagerByToken(token);
-  const tenantId = manager?.tenantId || "";
-  const labels = await getPhaseLabels(tenantId);
+  const tenantResult = manager
+    ? await resolveAdminTargetTenant(manager, request.nextUrl.searchParams.get("tenant"))
+    : null;
+  const tenantId = tenantResult?.ok ? tenantResult.tenantId : "";
+  const labels = tenantId ? await getPhaseLabels(tenantId) : [];
   const examplePhase = labels[0] || "フェーズ1";
 
   const template = `name,email,department,role,dojoPhase,managerName

@@ -8,9 +8,29 @@
 //
 // Related memory: bug_admin_tenant_silent_fallback.md
 
-import { describe, it, expect } from "vitest";
-import { resolveManagerTenantStrict } from "./tenant-context";
+import { describe, it, expect, vi } from "vitest";
+import { resolveManagerTenantStrict, resolveAdminTargetTenant } from "./tenant-context";
 import { DEFAULT_TENANT_ID } from "./supabase";
+
+// resolveAdminTargetTenant needs getTenantBySlug; mock only that export and
+// keep the rest of ./supabase (DEFAULT_TENANT_ID etc.) real.
+vi.mock("./supabase", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./supabase")>();
+  return {
+    ...actual,
+    getTenantBySlug: vi.fn(async (slug: string) =>
+      slug === "taiko-yakuhin"
+        ? {
+            id: "tenant-taiko-uuid",
+            name: "大幸薬品",
+            slug,
+            companyName: "大幸薬品株式会社",
+            featureFlags: {},
+          }
+        : null
+    ),
+  };
+});
 
 describe("resolveManagerTenantStrict", () => {
   it("returns manager.tenantId when set (non-admin)", () => {
@@ -111,6 +131,79 @@ describe("resolveManagerTenantStrict", () => {
     if (result.ok) {
       expect(result.tenantId).toBe(DEFAULT_TENANT_ID);
       expect(result.source).toBe("super-admin-default");
+    }
+  });
+});
+
+// Trap 3 (actor's tenant vs target's tenant) — admin WRITE endpoints must
+// honor the dashboard-selected ?tenant=slug instead of silently writing to
+// the admin's home tenant (bug: /api/admin/import 横展開, 2026-07-04).
+describe("resolveAdminTargetTenant", () => {
+  it("admin + known slug → the SELECTED tenant, not the admin's home tenant", async () => {
+    const result = await resolveAdminTargetTenant(
+      { tenantId: "tenant-home-uuid", isAdmin: true },
+      "taiko-yakuhin"
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.tenantId).toBe("tenant-taiko-uuid");
+      expect(result.source).toBe("query-slug");
+    }
+  });
+
+  it("admin + unknown slug → 404, never a silent home-tenant fallback", async () => {
+    const result = await resolveAdminTargetTenant(
+      { tenantId: "tenant-home-uuid", isAdmin: true },
+      "daiko" // CLAUDE.md に残っていた誤 slug — フォールバックさせず必ずエラーに
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(404);
+      expect(result.errorBody.detail).toContain("daiko");
+    }
+  });
+
+  it("admin without slug → home tenant (strict rule)", async () => {
+    const result = await resolveAdminTargetTenant(
+      { tenantId: "tenant-home-uuid", isAdmin: true },
+      null
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.tenantId).toBe("tenant-home-uuid");
+      expect(result.source).toBe("manager.tenantId");
+    }
+  });
+
+  it("tenantless super-admin without slug → DEFAULT_TENANT_ID", async () => {
+    const result = await resolveAdminTargetTenant({ tenantId: null, isAdmin: true }, null);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.tenantId).toBe(DEFAULT_TENANT_ID);
+      expect(result.source).toBe("super-admin-default");
+    }
+  });
+
+  it("non-admin + slug → slug is ignored, locked to own tenant", async () => {
+    const result = await resolveAdminTargetTenant(
+      { tenantId: "tenant-own-uuid", isAdmin: false },
+      "taiko-yakuhin"
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.tenantId).toBe("tenant-own-uuid");
+      expect(result.source).toBe("manager.tenantId");
+    }
+  });
+
+  it("non-admin without tenantId → 403 even when a slug is passed", async () => {
+    const result = await resolveAdminTargetTenant(
+      { tenantId: null, isAdmin: false },
+      "taiko-yakuhin"
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(403);
     }
   });
 });

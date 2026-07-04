@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/supabase";
 import { getParticipantByTokenFromSupabase, getManagerByTokenFromSupabase } from "@/lib/supabase";
-import { isFeatureEnabledForToken } from "@/lib/feature-flags";
+import { isFeatureEnabled, isFeatureEnabledForToken } from "@/lib/feature-flags";
 
 /**
  * Compute the JST ISO-week string for the given instant.
@@ -100,15 +100,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check feature flag
-    const featureEnabled = await isFeatureEnabledForToken("tier-c.outsightTask", token);
-    if (!featureEnabled) {
-      return NextResponse.json(
-        { error: "Outsight task feature is not enabled" },
-        { status: 403 }
-      );
-    }
-
     // Verify admin/manager token
     const manager = await getManagerByTokenFromSupabase(token);
     if (!manager || !manager.isAdmin) {
@@ -118,22 +109,37 @@ export async function POST(req: NextRequest) {
     if (!participantId) {
       return NextResponse.json({ error: "participantId is required" }, { status: 400 });
     }
-    if (!manager.tenantId) {
-      return NextResponse.json({ error: "Tenant unresolved" }, { status: 500 });
-    }
 
-    // Confirm the target participant belongs to the manager's tenant so an
-    // admin in tenant A cannot assign a task to a participant in tenant B
-    // by guessing the participant id.
+    // Trap 3: TARGET 参加者の行を先に引き、その tenant_id で書く。actor の
+    // テナントで WHERE すると admin のクロステナント割当が常に 404 になり、
+    // actor のテナントで INSERT すると orphan task になる。admin は全テナント
+    // 可・テナント所属の非 admin は自テナントのみ（isAdmin ベースの規約）。
     const client = getClient();
-    const { data: targetOk } = await client
+    const { data: target, error: targetError } = await client
       .from("participants")
-      .select("id")
+      .select("id, tenant_id")
       .eq("id", participantId)
-      .eq("tenant_id", manager.tenantId)
       .maybeSingle();
-    if (!targetOk) {
+    if (targetError) {
+      console.error("Outsight target lookup error:", targetError);
+      return NextResponse.json({ error: "Failed to resolve participant" }, { status: 500 });
+    }
+    if (!target) {
       return NextResponse.json({ error: "Target participant not found" }, { status: 404 });
+    }
+    if (!manager.isAdmin && target.tenant_id !== manager.tenantId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const tenantId = target.tenant_id as string;
+
+    // Check feature flag for the TARGET tenant (the assignee's tenant decides
+    // whether the feature is live, not the admin's home tenant).
+    const featureEnabled = await isFeatureEnabled("tier-c.outsightTask", tenantId);
+    if (!featureEnabled) {
+      return NextResponse.json(
+        { error: "Outsight task feature is not enabled" },
+        { status: 403 }
+      );
     }
 
     // Get current week string
@@ -143,7 +149,7 @@ export async function POST(req: NextRequest) {
     const { data, error } = await client
       .from("outsight_tasks")
       .insert({
-        tenant_id: manager.tenantId,
+        tenant_id: tenantId,
         participant_id: participantId,
         week_string: weekString,
         task_description: taskDescription,

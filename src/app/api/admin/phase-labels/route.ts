@@ -6,31 +6,16 @@
 // tenantId) MUST be able to write to a specific tenant via ?tenant=slug,
 // otherwise the save silently goes to DEFAULT_TENANT_ID and the dashboard
 // re-read shows the unchanged labels — user sees "save failed" with no
-// error. Mirrors the pattern in /api/admin/ai-settings.
+// error. Uses the shared resolveAdminTargetTenant (Trap 3); unlike the old
+// local resolver, an unknown slug is now a 404 instead of a silent
+// home-tenant fallback.
 
 import { NextRequest, NextResponse } from "next/server";
 import { getManagerByToken } from "@/lib/participant-db";
-import { getTenantBySlug } from "@/lib/supabase";
-import { resolveManagerTenantStrict } from "@/lib/tenant-context";
+import { resolveAdminTargetTenant } from "@/lib/tenant-context";
 import { getPhaseLabels, savePhaseLabels } from "@/lib/phase-labels";
 
 export const dynamic = "force-dynamic";
-
-async function resolveTargetTenantId(
-  request: NextRequest,
-  manager: { tenantId?: string | null; isAdmin?: boolean },
-): Promise<{ ok: true; tenantId: string } | { ok: false; status: number; body: { error: string; detail?: string } }> {
-  const slug = request.nextUrl.searchParams.get("tenant");
-  if (manager.isAdmin && slug) {
-    const t = await getTenantBySlug(slug);
-    if (t) return { ok: true, tenantId: t.id };
-  }
-  const strict = resolveManagerTenantStrict(manager);
-  if (!strict.ok) {
-    return { ok: false, status: strict.status, body: strict.errorBody };
-  }
-  return { ok: true, tenantId: strict.tenantId };
-}
 
 // ---------- GET: Retrieve phase labels for a tenant ----------
 export async function GET(request: NextRequest) {
@@ -45,9 +30,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    const tenantResult = await resolveTargetTenantId(request, manager);
+    const tenantResult = await resolveAdminTargetTenant(
+      manager,
+      request.nextUrl.searchParams.get("tenant")
+    );
     if (!tenantResult.ok) {
-      return NextResponse.json(tenantResult.body, { status: tenantResult.status });
+      return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
     }
 
     const labels = await getPhaseLabels(tenantResult.tenantId);
@@ -80,9 +68,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    const tenantResult = await resolveTargetTenantId(request, manager);
+    const tenantResult = await resolveAdminTargetTenant(
+      manager,
+      request.nextUrl.searchParams.get("tenant")
+    );
     if (!tenantResult.ok) {
-      return NextResponse.json(tenantResult.body, { status: tenantResult.status });
+      return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
     }
 
     const ok = await savePhaseLabels(tenantResult.tenantId, cleaned);
