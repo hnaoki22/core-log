@@ -74,7 +74,12 @@ async function authorizeWithToken(
   }
   const targetTenantId = existing.tenant_id as string;
 
-  const isSuperAdmin = !manager.tenantId;
+  // Cross-tenant access follows the same convention as the rest of the admin
+  // API (resolveAdminTenantContext): is_admin=true managers operate on any
+  // tenant. The old rule (`!manager.tenantId` = super-admin) matched zero
+  // rows in production — every admin row has a tenant_id — so cross-tenant
+  // edits always 403'd even though the dashboard listed those participants.
+  const isSuperAdmin = !!manager.isAdmin;
   const allowed = isSuperAdmin || manager.tenantId === targetTenantId;
   if (!allowed) {
     return {

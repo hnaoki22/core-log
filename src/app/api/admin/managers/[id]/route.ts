@@ -53,9 +53,11 @@ export async function PUT(
     }
     const targetTenantId = existing.tenant_id as string;
 
-    // Access check: super-admin can edit any manager; tenant-admin can only
-    // edit managers within their own tenant.
-    const isSuperAdmin = !manager.tenantId;
+    // Access check: admins (is_admin=true) can edit managers on any tenant,
+    // matching the resolveAdminTenantContext convention. The old rule
+    // (`!manager.tenantId` = super-admin) matched zero rows in production —
+    // every admin row has a tenant_id — so cross-tenant edits always 403'd.
+    const isSuperAdmin = !!manager.isAdmin;
     const allowed = isSuperAdmin || manager.tenantId === targetTenantId;
     if (!allowed) {
       return NextResponse.json(
