@@ -144,8 +144,11 @@ For any admin operation on `participants` / `managers` / `missions` / `feedback`
 
 1. **SELECT the target row's `tenant_id` first** (no tenant filter).
 2. **Validate** that the actor is allowed to touch that tenant:
-   - super-admin (`!manager.tenantId` AND `manager.isAdmin`) → allowed for any tenant
-   - tenant-admin → allowed only when `manager.tenantId === target.tenant_id`
+   - admin (`manager.isAdmin === true`) → allowed for any tenant (same convention as `resolveAdminTenantContext`)
+   - non-admin manager → allowed only when `manager.tenantId === target.tenant_id`
+   - do NOT use `!manager.tenantId` as the super-admin test — production has no
+     tenant-less manager rows, so that rule rejects every cross-tenant edit while
+     the dashboard (isAdmin-based) still lists the rows (2026-07-04 道場切替 bug)
 3. **UPDATE / DELETE** using the **target's** tenant_id.
 
 Reference implementations:
