@@ -1,6 +1,7 @@
 "use client";
 
 import { BottomNav } from "@/components/BottomNav";
+import { EnergyGlyph } from "@/components/EnergyGlyph";
 import { MoodCandlestick } from "@/components/features/MoodCandlestick";
 import { formatDateTimeJST, formatTimeJST } from "@/lib/date-utils";
 import { useState, useEffect } from "react";
@@ -27,13 +28,6 @@ type LogEntry = {
   managerReaction?: string | null;
   morningTime?: string | null;
   eveningTime?: string | null;
-};
-
-const energyEmoji: Record<string, string> = {
-  excellent: "🔥",
-  good: "😊",
-  okay: "😐",
-  low: "😞",
 };
 
 const energyLabel: Record<string, string> = {
@@ -106,10 +100,10 @@ export default function LogsClient({ token, initialData }: Props) {
   }, [token]);
 
   const statusConfig = {
-    morning_only: { label: "朝のみ", bg: "bg-indigo-50", text: "text-[#1A1A2E]" },
-    complete: { label: "完了", bg: "bg-emerald-50", text: "text-emerald-600" },
-    fb_done: { label: "FB済", bg: "bg-amber-50", text: "text-amber-600" },
-    empty: { label: "未記入", bg: "bg-gray-50", text: "text-gray-400" },
+    morning_only: { label: "朝のみ", bg: "bg-[#F2F2F7]", text: "text-[#2C2C4A]" },
+    complete: { label: "完了", bg: "bg-[#EFF5F1]", text: "text-[#2D6A4F]" },
+    fb_done: { label: "FB済", bg: "bg-[#FAF4E9]", text: "text-[#A66214]" },
+    empty: { label: "未記入", bg: "bg-[#F4F2F3]", text: "text-[#8B8489]" },
   };
 
   // Generate a CSV from the logs already loaded on the page (no server round
@@ -207,8 +201,8 @@ export default function LogsClient({ token, initialData }: Props) {
                     onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
                     className="w-full p-4 flex gap-3 hover:bg-[#FBF8F4] transition-colors text-left"
                   >
-                    <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-semibold ${
-                      log.hasFeedback ? "bg-amber-500" : "bg-[#1A1A2E]"
+                    <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-white text-xs font-semibold ${
+                      log.hasFeedback ? "bg-[#C17817]" : "bg-[#1A1A2E]"
                     }`}>
                       <div className="text-center leading-tight">
                         <div className="font-bold text-sm">{log.dayNum}</div>
@@ -229,7 +223,7 @@ export default function LogsClient({ token, initialData }: Props) {
 
                     <div className="flex-shrink-0 flex items-center gap-2">
                       {log.energy && (
-                        <span className="text-base leading-none">{energyEmoji[log.energy]}</span>
+                        <EnergyGlyph level={log.energy} size={18} />
                       )}
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9BDAE" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
                         className={`transition-transform duration-200 ${expandedId === log.id ? "rotate-90" : ""}`}>
@@ -265,7 +259,7 @@ export default function LogsClient({ token, initialData }: Props) {
 
                       {log.energy && (
                         <div className="flex items-center gap-2">
-                          <span className="text-base leading-none">{energyEmoji[log.energy]}</span>
+                          <EnergyGlyph level={log.energy} size={16} />
                           <span className="text-xs text-[#5B5560]">{energyLabel[log.energy]}</span>
                         </div>
                       )}

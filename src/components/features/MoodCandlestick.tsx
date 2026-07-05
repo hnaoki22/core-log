@@ -15,6 +15,8 @@
 // 実装方式: 既存の「エネルギーの推移」チャート（ParticipantHomeClient）と
 // 同じ自前SVG。外部チャートライブラリは導入しない（§4 プリフライト判断）。
 
+import { EnergyDot } from "@/components/EnergyGlyph";
+
 type CandleLog = {
   date: string; // YYYY-MM-DD
   energy: "excellent" | "good" | "okay" | "low" | null;
@@ -112,13 +114,13 @@ export function MoodCandlestick({ logs, days = 21, title = "気分の推移" }: 
 
       <div className="relative">
         <div
-          className="absolute left-0 top-0 bottom-0 flex flex-col justify-between py-1.5 text-[9px] pointer-events-none"
+          className="absolute left-0 top-0 bottom-0 flex flex-col justify-between py-1.5 items-center pointer-events-none"
           style={{ width: "16px" }}
         >
-          <span>🔥</span>
-          <span>😊</span>
-          <span>😐</span>
-          <span>😞</span>
+          <EnergyDot level="excellent" size={6} />
+          <EnergyDot level="good" size={6} />
+          <EnergyDot level="okay" size={6} />
+          <EnergyDot level="low" size={6} />
         </div>
 
         <svg

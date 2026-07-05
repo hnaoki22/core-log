@@ -4,6 +4,19 @@ import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useFeatures } from "@/lib/use-features";
+import { EnergyGlyph } from "@/components/EnergyGlyph";
+import {
+  IconChartBar,
+  IconTrendingUp,
+  IconRotateCcw,
+  IconFile,
+  IconTarget,
+  IconBuilding,
+  IconUsers,
+  IconSearch,
+  IconBook,
+  IconBulb,
+} from "@/components/icons";
 
 type ParticipantData = {
   id: string;
@@ -66,12 +79,7 @@ type AdminData = {
 type ManagerOption = { id: string; name: string };
 type AddResult = { type: "participant" | "manager"; name: string; token: string; url: string } | null;
 
-const energyEmoji: Record<string, string> = {
-  excellent: "🔥",
-  good: "😊",
-  okay: "😐",
-  low: "😞",
-};
+// energy 状態は EnergyGlyph（線画フェイス）で表示する
 
 export default function AdminDashboard() {
   const params = useParams();
@@ -827,19 +835,19 @@ export default function AdminDashboard() {
                   <h3 className="text-xs font-semibold text-[#5B5560] mb-3">エネルギー分布</h3>
                   <div className="grid grid-cols-4 gap-2">
                     {[
-                      { key: "excellent", emoji: "🔥", label: "絶好調", color: "bg-red-50 border-red-200" },
-                      { key: "good", emoji: "😊", label: "良い", color: "bg-green-50 border-green-200" },
-                      { key: "okay", emoji: "😐", label: "まあまあ", color: "bg-yellow-50 border-yellow-200" },
-                      { key: "low", emoji: "😞", label: "低調", color: "bg-blue-50 border-blue-200" },
+                      { key: "excellent", label: "絶好調" },
+                      { key: "good", label: "良い" },
+                      { key: "okay", label: "まあまあ" },
+                      { key: "low", label: "低調" },
                     ].map(e => {
                       const count = analyticsData.energyDistribution[e.key as keyof typeof analyticsData.energyDistribution];
                       const total = Object.values(analyticsData.energyDistribution).reduce((a, b) => a + b, 0);
                       const pct = total > 0 ? Math.round((count / total) * 100) : 0;
                       return (
-                        <div key={e.key} className={`${e.color} border rounded-xl p-3 text-center`}>
-                          <div className="text-xl mb-1">{e.emoji}</div>
-                          <div className="text-lg font-bold text-[#1A1A2E]">{pct}%</div>
-                          <div className="text-[10px] text-[#8B8489]">{e.label} ({count})</div>
+                        <div key={e.key} className="card p-3 text-center">
+                          <div className="flex justify-center mb-1.5"><EnergyGlyph level={e.key} size={20} /></div>
+                          <div className="stat-number text-[20px] text-[#1A1A2E]">{pct}<span className="text-[13px]">%</span></div>
+                          <div className="text-[10px] text-[#8B8489] mt-0.5">{e.label} ({count})</div>
                         </div>
                       );
                     })}
@@ -900,7 +908,7 @@ export default function AdminDashboard() {
             {!isObserver && (
               <div className="flex items-center gap-2 flex-wrap">
                 <button onClick={() => { setShowImportModal(true); setImportStep("input"); setCsvText(""); setImportPreview(null); setImportResult(null); setImportError(null); }} className="text-xs px-4 py-2 rounded-xl border border-[#C4A882] text-[#8B7355] hover:bg-[#FBF8F4] transition-colors whitespace-nowrap">
-                  📄 CSV一括インポート
+                  CSV一括インポート
                 </button>
                 <button onClick={() => setShowAddParticipant(true)} className="btn-accent text-xs px-4 py-2 whitespace-nowrap">
                   + 参加者を追加
@@ -988,8 +996,8 @@ export default function AdminDashboard() {
                       {p.recentEnergy.length > 0 && (
                         <div className="flex gap-0.5 mt-0.5">
                           {p.recentEnergy.map((energy, i) => (
-                            <span key={i} className="text-xs leading-none">
-                              {energy ? energyEmoji[energy] : "·"}
+                            <span key={i} className="leading-none">
+                              {energy ? <EnergyGlyph level={energy} size={13} /> : <span className="text-xs text-[#C9BDAE]">·</span>}
                             </span>
                           ))}
                         </div>
@@ -1009,7 +1017,7 @@ export default function AdminDashboard() {
             {!isObserver && (
               <div className="flex items-center gap-2 flex-wrap">
                 <button onClick={() => { setShowManagerImport(true); setManagerImportStep("input"); setManagerCsvText(""); setManagerImportPreview(null); setManagerImportResult(null); setManagerImportError(null); }} className="text-xs px-4 py-2 rounded-xl border border-[#C4A882] text-[#8B7355] hover:bg-[#FBF8F4] transition-colors whitespace-nowrap">
-                  📄 CSVインポート
+                  CSVインポート
                 </button>
                 <button onClick={() => setShowAddManager(true)} className="text-xs font-medium px-4 py-2 rounded-xl bg-amber-500 text-white hover:bg-amber-600 transition-colors whitespace-nowrap">
                   + マネージャーを追加
@@ -1087,21 +1095,21 @@ export default function AdminDashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {isOn("tier-b.cultureScore") && (
                     <Link href={`/a/${token}/features/culture`} className="card p-4 hover:shadow-md transition-shadow">
-                      <div className="text-2xl mb-2">📊</div>
+                      <div className="w-9 h-9 rounded-lg bg-[#F2F2F7] flex items-center justify-center text-[#1A1A2E] mb-2"><IconChartBar size={18} /></div>
                       <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">カルチャースコア</h3>
                       <p className="text-xs text-[#8B8489]">組織文化メトリクス</p>
                     </Link>
                   )}
                   {isOn("tier-f.growthRoi") && (
                     <Link href={`/a/${token}/features/growth-roi`} className="card p-4 hover:shadow-md transition-shadow">
-                      <div className="text-2xl mb-2">📈</div>
+                      <div className="w-9 h-9 rounded-lg bg-[#F2F2F7] flex items-center justify-center text-[#1A1A2E] mb-2"><IconTrendingUp size={18} /></div>
                       <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">成長ROI</h3>
                       <p className="text-xs text-[#8B8489]">学習効果を可視化</p>
                     </Link>
                   )}
                   {isOn("tier-e.microRitualOptimizer") && (
                     <Link href={`/a/${token}/features/ritual-metrics`} className="card p-4 hover:shadow-md transition-shadow">
-                      <div className="text-2xl mb-2">🔄</div>
+                      <div className="w-9 h-9 rounded-lg bg-[#F2F2F7] flex items-center justify-center text-[#1A1A2E] mb-2"><IconRotateCcw size={18} /></div>
                       <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">リチュアルメトリクス</h3>
                       <p className="text-xs text-[#8B8489]">実施統計</p>
                     </Link>
@@ -1117,14 +1125,14 @@ export default function AdminDashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {isOn("tier-f.clientReport") && (
                     <Link href={`/a/${token}/features/client-report`} className="card p-4 hover:shadow-md transition-shadow">
-                      <div className="text-2xl mb-2">📄</div>
+                      <div className="w-9 h-9 rounded-lg bg-[#F2F2F7] flex items-center justify-center text-[#1A1A2E] mb-2"><IconFile size={18} /></div>
                       <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">クライアントレポート</h3>
                       <p className="text-xs text-[#8B8489]">成果報告書生成</p>
                     </Link>
                   )}
                   {isOn("tier-g.pitchGenerator") && (
                     <Link href={`/a/${token}/features/pitch`} className="card p-4 hover:shadow-md transition-shadow">
-                      <div className="text-2xl mb-2">🎯</div>
+                      <div className="w-9 h-9 rounded-lg bg-[#F2F2F7] flex items-center justify-center text-[#1A1A2E] mb-2"><IconTarget size={18} /></div>
                       <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">ピッチ生成</h3>
                       <p className="text-xs text-[#8B8489]">営業提案書</p>
                     </Link>
@@ -1140,14 +1148,14 @@ export default function AdminDashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {isOn("tier-g.multiTenant") && (
                     <Link href={`/a/${token}/features/tenants`} className="card p-4 hover:shadow-md transition-shadow">
-                      <div className="text-2xl mb-2">🏢</div>
+                      <div className="w-9 h-9 rounded-lg bg-[#F2F2F7] flex items-center justify-center text-[#1A1A2E] mb-2"><IconBuilding size={18} /></div>
                       <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">マルチテナント</h3>
                       <p className="text-xs text-[#8B8489]">複数組織管理</p>
                     </Link>
                   )}
                   {isOn("tier-g.consultIntervention") && (
                     <Link href={`/a/${token}/features/consult`} className="card p-4 hover:shadow-md transition-shadow">
-                      <div className="text-2xl mb-2">👥</div>
+                      <div className="w-9 h-9 rounded-lg bg-[#F2F2F7] flex items-center justify-center text-[#1A1A2E] mb-2"><IconUsers size={18} /></div>
                       <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">介入ログ</h3>
                       <p className="text-xs text-[#8B8489]">コーチング記録</p>
                     </Link>
@@ -1155,14 +1163,14 @@ export default function AdminDashboard() {
 
                   {isOn("tier-a.consultantSpotlight") && (
                     <Link href={`/a/${token}/features/spotlight`} className="card p-4 hover:shadow-md transition-shadow">
-                      <div className="text-2xl mb-2">🔍</div>
+                      <div className="w-9 h-9 rounded-lg bg-[#F2F2F7] flex items-center justify-center text-[#1A1A2E] mb-2"><IconSearch size={18} /></div>
                       <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">スポットライト</h3>
                       <p className="text-xs text-[#8B8489]">注目参加者AI分析</p>
                     </Link>
                   )}
                   {isOn("tier-b.knowledgeLibrary") && (
                     <Link href={`/a/${token}/features/knowledge`} className="card p-4 hover:shadow-md transition-shadow">
-                      <div className="text-2xl mb-2">📚</div>
+                      <div className="w-9 h-9 rounded-lg bg-[#F2F2F7] flex items-center justify-center text-[#1A1A2E] mb-2"><IconBook size={18} /></div>
                       <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">ナレッジ</h3>
                       <p className="text-xs text-[#8B8489]">組織学習</p>
                     </Link>
@@ -1181,7 +1189,7 @@ export default function AdminDashboard() {
               <h2 className="text-sm font-semibold text-[#5B5560] uppercase tracking-wide px-1 mb-3">参加者向け例示</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <Link href={`/a/${token}/features/placeholder-examples`} className="card p-4 hover:shadow-md transition-shadow">
-                  <div className="text-2xl mb-2">💡</div>
+                  <div className="w-9 h-9 rounded-lg bg-[#F2F2F7] flex items-center justify-center text-[#1A1A2E] mb-2"><IconBulb size={18} /></div>
                   <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">例示管理</h3>
                   <p className="text-xs text-[#8B8489]">各道場の問い・記入欄プレースホルダー (AI 生成可)</p>
                 </Link>
@@ -1324,7 +1332,7 @@ export default function AdminDashboard() {
               </div>
               <p className="text-xs text-amber-600 font-medium mt-1">対象: {fbTargetName}</p>
               {(() => { const p = data?.participants.find((p) => p.name === fbTargetName); return p?.fbPolicy ? (
-                <p className="text-[10px] text-violet-500 mt-1 bg-violet-50 rounded-md px-2 py-1">📋 FB方針: {p.fbPolicy}</p>
+                <p className="text-[10px] text-violet-500 mt-1 bg-violet-50 rounded-md px-2 py-1">FB方針: {p.fbPolicy}</p>
               ) : null; })()}
             </div>
             {fbSuccess ? (
@@ -1353,7 +1361,7 @@ export default function AdminDashboard() {
                         <div key={i} className="bg-white rounded-lg px-3 py-2 text-xs border border-[#EFE8DD]">
                           <div className="flex items-center justify-between mb-1">
                             <span className="font-medium text-[#1A1A2E]">{log.date} ({log.dayOfWeek})</span>
-                            {log.energy && <span className="text-sm leading-none">{energyEmoji[log.energy] || ""}</span>}
+                            {log.energy && <EnergyGlyph level={log.energy} size={15} />}
                           </div>
                           <p className="text-[#1A1A2E]">朝: {log.morningIntent || "—"}</p>
                           {log.eveningInsight && <p className="text-amber-600 mt-0.5">夜: {log.eveningInsight}</p>}
@@ -1378,7 +1386,7 @@ export default function AdminDashboard() {
                     <button
                       onClick={handleAiDraft}
                       disabled={aiDraftLoading || fbLogsLoading || fbRecentLogs.length === 0}
-                      className="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-lg bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:from-violet-600 hover:to-purple-700 disabled:from-gray-300 disabled:to-gray-400 disabled:text-gray-500 transition-all shadow-sm"
+                      className="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-lg bg-[#1A1A2E] text-white hover:bg-[#141423] disabled:bg-[#C9BDAE] disabled:text-white transition-all shadow-sm"
                     >
                       {aiDraftLoading ? (
                         <>
@@ -1456,7 +1464,7 @@ export default function AdminDashboard() {
             <div className="p-5 border-b border-[#EFE8DD]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center">
+                  <div className="w-8 h-8 bg-[#1A1A2E] rounded-lg flex items-center justify-center">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
                     </svg>
@@ -1500,7 +1508,7 @@ export default function AdminDashboard() {
             <div className="p-5 border-t border-[#EFE8DD] flex items-center gap-3">
               <button onClick={() => setShowPromptSettings(false)} className="btn-secondary flex-1 py-2.5 text-sm">閉じる</button>
               <button onClick={handleSavePrompt} disabled={promptSaving || promptLoading}
-                className="flex-1 py-2.5 text-sm font-medium rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:from-violet-600 hover:to-purple-700 disabled:from-gray-300 disabled:to-gray-400 disabled:text-gray-500 transition-all">
+                className="flex-1 py-2.5 text-sm font-medium rounded-xl bg-[#1A1A2E] text-white hover:bg-[#141423] disabled:bg-[#C9BDAE] disabled:text-white transition-all">
                 {promptSaving ? "保存中..." : promptSaved ? "保存しました ✓" : "保存する"}
               </button>
             </div>
@@ -1515,7 +1523,7 @@ export default function AdminDashboard() {
             <div className="p-5 border-b border-[#EFE8DD]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center">
+                  <div className="w-8 h-8 bg-[#C17817] rounded-lg flex items-center justify-center">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>
                     </svg>
@@ -1593,7 +1601,7 @@ export default function AdminDashboard() {
             <div className="p-5 border-t border-[#EFE8DD] flex items-center gap-3">
               <button onClick={() => setShowPhaseSettings(false)} className="btn-secondary flex-1 py-2.5 text-sm">閉じる</button>
               <button onClick={handleSavePhaseLabels} disabled={phaseSaving}
-                className="flex-1 py-2.5 text-sm font-medium rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white hover:from-amber-600 hover:to-orange-700 disabled:from-gray-300 disabled:to-gray-400 disabled:text-gray-500 transition-all">
+                className="flex-1 py-2.5 text-sm font-medium rounded-xl bg-[#C17817] text-white hover:bg-[#A66214] disabled:bg-[#C9BDAE] disabled:text-white transition-all">
                 {phaseSaving ? "保存中..." : phaseSaved ? "保存しました ✓" : "保存する"}
               </button>
             </div>
@@ -1758,9 +1766,9 @@ export default function AdminDashboard() {
                     <p className="font-semibold text-[#2C2C4A]">インポート内容の確認</p>
                     <p>合計: <strong>{importPreview.summary.total}名</strong>（マネージャー {importPreview.summary.managers}名 + 参加者 {importPreview.summary.participants}名）</p>
                     {importPreview.summary.duplicates > 0 && (
-                      <p className="text-amber-600">⚠️ {importPreview.summary.duplicates}名は既に登録済みのためスキップされます</p>
+                      <p className="text-amber-600">{importPreview.summary.duplicates}名は既に登録済みのためスキップされます</p>
                     )}
-                    <p className="text-green-700">✅ 新規登録: <strong>{importPreview.summary.newRegistrations}名</strong></p>
+                    <p className="text-[#2D6A4F]">新規登録: <strong>{importPreview.summary.newRegistrations}名</strong></p>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs">
@@ -1840,7 +1848,7 @@ export default function AdminDashboard() {
                           <tr key={i} className="border-b border-[#EFE8DD]">
                             <td className="py-2 pr-3 font-medium text-[#1A1A2E]">{r.name}</td>
                             <td className="py-2 pr-3"><span className={`px-1.5 py-0.5 rounded text-[10px] ${r.role === "参加者" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>{r.role || "参加者"}</span></td>
-                            <td className="py-2 pr-3">{r.status === "success" ? <span className="text-green-600">✅ 登録</span> : r.status === "skipped" ? <span className="text-amber-600">⏭️ スキップ</span> : <span className="text-red-600">❌ エラー</span>}</td>
+                            <td className="py-2 pr-3">{r.status === "success" ? <span className="text-[#2D6A4F] font-medium">登録</span> : r.status === "skipped" ? <span className="text-amber-600 font-medium">スキップ</span> : <span className="text-red-600 font-medium">エラー</span>}</td>
                             <td className="py-2 font-mono text-[10px] text-[#5B5560] break-all">{r.url || r.message}</td>
                           </tr>
                         ))}
@@ -1857,7 +1865,7 @@ export default function AdminDashboard() {
                       navigator.clipboard.writeText(lines);
                     }}
                     className="text-xs text-[#8B7355] hover:text-[#6B5335] underline"
-                  >📋 全URLをコピー（タブ区切り）</button>
+                  >全URLをコピー（タブ区切り）</button>
                   <div className="flex gap-3 pt-2">
                     <button type="button" onClick={() => setShowImportModal(false)} className="btn-primary flex-1 py-2.5 text-sm">閉じる</button>
                   </div>
@@ -2061,7 +2069,7 @@ export default function AdminDashboard() {
                           <tr key={i} className={r.isDuplicate ? "bg-amber-50" : ""}>
                             <td className="px-3 py-2">{r.name}</td><td className="px-3 py-2">{r.email}</td>
                             <td className="px-3 py-2">{r.department}</td><td className="px-3 py-2">{r.role}</td>
-                            <td className="px-3 py-2">{r.isDuplicate ? "⚠️ 重複" : "✅ 新規"}</td>
+                            <td className="px-3 py-2">{r.isDuplicate ? <span className="text-amber-600 font-medium">重複</span> : <span className="text-[#2D6A4F] font-medium">新規</span>}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -2093,7 +2101,7 @@ export default function AdminDashboard() {
                         {managerImportResult.results.map((r, i) => (
                           <tr key={i}>
                             <td className="px-3 py-2">{r.name}</td><td className="px-3 py-2">{r.email}</td>
-                            <td className="px-3 py-2">{r.status === "success" ? "✅" : r.status === "skipped" ? "⏭️" : "❌"} {r.message}</td>
+                            <td className="px-3 py-2"><span className={r.status === "success" ? "text-[#2D6A4F] font-medium" : r.status === "skipped" ? "text-amber-600 font-medium" : "text-red-600 font-medium"}>{r.status === "success" ? "登録" : r.status === "skipped" ? "スキップ" : "エラー"}</span> {r.message}</td>
                             <td className="px-3 py-2">{r.url ? <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-amber-600 hover:underline">開く</a> : ""}</td>
                           </tr>
                         ))}

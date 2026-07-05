@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { getTodayJST } from "@/lib/date-utils";
 import { getPlaceholderExample } from "@/lib/placeholder-examples";
 import { useState, useRef } from "react";
+import { EnergyGlyph, ENERGY_COLORS, ENERGY_TINTS } from "@/components/EnergyGlyph";
 
 type TodayLog = {
   id: string;
@@ -40,11 +41,11 @@ type ParticipantBasic = {
 // 4段階セレクタ（InputClient と同一の選択肢・配色。standalone では
 // ラベルを「気分」として提示する）
 const moodOptions = [
-  { id: "excellent", label: "絶好調", emoji: "🔥", bg: "bg-amber-50", border: "border-amber-300", ring: "ring-amber-200" },
-  { id: "good", label: "良い", emoji: "😊", bg: "bg-emerald-50", border: "border-emerald-300", ring: "ring-emerald-200" },
-  { id: "okay", label: "まあまあ", emoji: "😐", bg: "bg-gray-50", border: "border-gray-300", ring: "ring-gray-200" },
-  { id: "low", label: "低調", emoji: "😞", bg: "bg-red-50", border: "border-red-300", ring: "ring-red-200" },
-];
+  { id: "excellent", label: "絶好調" },
+  { id: "good", label: "良い" },
+  { id: "okay", label: "まあまあ" },
+  { id: "low", label: "低調" },
+] as const;
 
 export type SkipFollowup = {
   gapWeekdays: number;
@@ -102,8 +103,8 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
     return (
       <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
         <div className="max-w-md mx-auto text-center animate-fade-up">
-          <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <div className="w-16 h-16 bg-[#EFF5F1] border border-[#2D6A4F]/20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
           </div>
@@ -239,8 +240,8 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
     return (
       <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
         <div className="max-w-md mx-auto text-center animate-scale-in w-full">
-          <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <div className="w-16 h-16 bg-[#EFF5F1] border border-[#2D6A4F]/20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
           </div>
@@ -372,7 +373,7 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
                     {morningMood && (
                       <p className="text-sm text-[#5B5560] leading-relaxed">
                         <span className="text-[#8B8489] text-xs mr-2">気分</span>
-                        {morningMood.emoji} {morningMood.label}
+                        <EnergyGlyph level={morningMood.id} size={15} className="inline align-[-3px] mr-1" /> {morningMood.label}
                       </p>
                     )}
                     {todayLog?.morningCondition && (
@@ -419,7 +420,7 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
             {/* 夕は今朝の気分を1行だけ参照表示（朝夕差を意識して選べるように） */}
             {!isMorning && morningMood && (
               <p className="text-xs text-[#8B8489]">
-                今朝の気分: {morningMood.emoji} {morningMood.label}
+                今朝の気分: <EnergyGlyph level={morningMood.id} size={14} className="inline align-[-3px] mx-0.5" /> {morningMood.label}
               </p>
             )}
             <div className="grid grid-cols-2 gap-3">
@@ -427,13 +428,18 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
                 <button
                   key={option.id}
                   onClick={() => setMood(option.id)}
-                  className={`p-4 rounded-2xl border-2 transition-all duration-200 ${
+                  style={
                     mood === option.id
-                      ? `${option.border} ${option.bg} ring-2 ${option.ring}`
+                      ? { borderColor: ENERGY_COLORS[option.id], backgroundColor: ENERGY_TINTS[option.id] }
+                      : undefined
+                  }
+                  className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+                    mood === option.id
+                      ? "shadow-sm"
                       : "border-[#E5DCD0] bg-white hover:border-[#C9BDAE]"
                   }`}
                 >
-                  <div className="text-2xl mx-auto mb-2">{option.emoji}</div>
+                  <div className="flex justify-center mb-2"><EnergyGlyph level={option.id} size={30} /></div>
                   <div className="text-sm font-medium text-[#1A1A2E]">{option.label}</div>
                 </button>
               ))}

@@ -194,8 +194,11 @@ export default function OTPVerificationPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center text-white text-lg">
-              🔐
+            <div className="w-12 h-12 bg-[#1A1A2E] rounded-xl flex items-center justify-center text-white">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
             </div>
           </div>
           <h1 className="text-2xl font-semibold text-[#1A1A2E] mb-2">メール認証</h1>
@@ -217,7 +220,7 @@ export default function OTPVerificationPage() {
               <button
                 onClick={handleSendCode}
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 text-white font-medium py-3 rounded-xl hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full bg-[#1A1A2E] text-white font-medium py-3 rounded-xl hover:bg-[#141423] hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading && (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -255,7 +258,7 @@ export default function OTPVerificationPage() {
                     onChange={(e) => handleCodeChange(index, e.target.value)}
                     onKeyDown={(e) => handleKeyDown(index, e)}
                     disabled={loading}
-                    className="w-12 h-12 text-center text-xl font-bold border-2 border-[#C9BDAE] rounded-lg focus:border-indigo-500 focus:outline-none bg-white disabled:bg-[#F5F0EB] disabled:opacity-50"
+                    className="w-12 h-12 text-center text-xl font-bold border-2 border-[#C9BDAE] rounded-lg focus:border-[#1A1A2E] focus:outline-none bg-white disabled:bg-[#F5F0EB] disabled:opacity-50"
                     placeholder="0"
                   />
                 ))}
@@ -265,7 +268,7 @@ export default function OTPVerificationPage() {
               <button
                 onClick={handleVerifyCode}
                 disabled={loading || code.join("").length !== 6}
-                className="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 text-white font-medium py-3 rounded-xl hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full bg-[#1A1A2E] text-white font-medium py-3 rounded-xl hover:bg-[#141423] hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading && (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>

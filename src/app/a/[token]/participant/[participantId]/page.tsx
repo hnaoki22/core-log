@@ -7,6 +7,7 @@ import { getManagerByToken } from "@/lib/participant-db";
 import { isStandaloneTenant } from "@/lib/standalone";
 import { formatTimeJST, formatFullDateTimeJST } from "@/lib/date-utils";
 import { hasMorning, hasEvening, getDayStatus, computeParticipantStats } from "@/lib/stats";
+import { EnergyGlyph } from "@/components/EnergyGlyph";
 
 type Params = {
   params: {
@@ -15,12 +16,7 @@ type Params = {
   };
 };
 
-const energyEmoji: Record<string, string> = {
-  excellent: "🔥",
-  good: "😊",
-  okay: "😐",
-  low: "😞",
-};
+// energy 状態は EnergyGlyph（線画フェイス）で表示する
 
 const energyLabel: Record<string, string> = {
   excellent: "絶好調",
@@ -237,9 +233,7 @@ export default async function AdminParticipantPage({ params }: Params) {
                     </span>
                     {entry.energy && (
                       <div className="flex items-center gap-1.5">
-                        <span className="text-base leading-none">
-                          {energyEmoji[entry.energy] || ""}
-                        </span>
+                        <EnergyGlyph level={entry.energy} size={16} />
                         <span className="text-[11px] text-[#8B8489]">
                           {energyLabel[entry.energy] || ""}
                         </span>

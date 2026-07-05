@@ -5,6 +5,7 @@ import { getTodayJST, getCurrentHourJST, isGracePeriod } from "@/lib/date-utils"
 import { getPlaceholderExample, type CustomExampleSet } from "@/lib/placeholder-examples";
 import { useState, useEffect, useRef } from "react";
 import { useFeatures } from "@/lib/use-features";
+import { EnergyGlyph, ENERGY_COLORS, ENERGY_TINTS } from "@/components/EnergyGlyph";
 import { StructuredInput } from "@/components/features/StructuredInput";
 import { DoubleLoopPrompt } from "@/components/features/DoubleLoopPrompt";
 import { useRuminationDetector, BreathingPrompt } from "@/components/features/RuminationTimerIntegration";
@@ -30,11 +31,11 @@ type StructuredInputState = {
 };
 
 const energyOptions = [
-  { id: "excellent", label: "絶好調", emoji: "🔥", color: "#C17817", bg: "bg-amber-50", border: "border-amber-300", ring: "ring-amber-200" },
-  { id: "good", label: "良い", emoji: "😊", color: "#2D6A4F", bg: "bg-emerald-50", border: "border-emerald-300", ring: "ring-emerald-200" },
-  { id: "okay", label: "まあまあ", emoji: "😐", color: "#5B5560", bg: "bg-gray-50", border: "border-gray-300", ring: "ring-gray-200" },
-  { id: "low", label: "低調", emoji: "😞", color: "#8B1A2B", bg: "bg-red-50", border: "border-red-300", ring: "ring-red-200" },
-];
+  { id: "excellent", label: "絶好調" },
+  { id: "good", label: "良い" },
+  { id: "okay", label: "まあまあ" },
+  { id: "low", label: "低調" },
+] as const;
 
 export type InputPageInitialData = {
   participant: ParticipantBasic;
@@ -238,8 +239,8 @@ export default function InputPage({ token, initialData }: Props) {
     return (
       <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
         <div className="max-w-md mx-auto text-center animate-fade-up">
-          <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <div className="w-16 h-16 bg-[#EFF5F1] border border-[#2D6A4F]/20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
           </div>
@@ -381,8 +382,8 @@ export default function InputPage({ token, initialData }: Props) {
     return (
       <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
         <div className="max-w-md mx-auto text-center animate-scale-in">
-          <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <div className="w-16 h-16 bg-[#EFF5F1] border border-[#2D6A4F]/20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
           </div>
@@ -582,13 +583,18 @@ export default function InputPage({ token, initialData }: Props) {
                 <button
                   key={option.id}
                   onClick={() => setEnergy(option.id)}
-                  className={`p-4 rounded-2xl border-2 transition-all duration-200 ${
+                  style={
                     energy === option.id
-                      ? `${option.border} ${option.bg} ring-2 ${option.ring}`
+                      ? { borderColor: ENERGY_COLORS[option.id], backgroundColor: ENERGY_TINTS[option.id] }
+                      : undefined
+                  }
+                  className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+                    energy === option.id
+                      ? "shadow-sm"
                       : "border-[#E5DCD0] bg-white hover:border-[#C9BDAE]"
                   }`}
                 >
-                  <div className="text-2xl mx-auto mb-2">{option.emoji}</div>
+                  <div className="flex justify-center mb-2"><EnergyGlyph level={option.id} size={30} /></div>
                   <div className="text-sm font-medium text-[#1A1A2E]">{option.label}</div>
                 </button>
               ))}

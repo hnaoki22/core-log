@@ -72,7 +72,9 @@ export default function CommentForm({ token, entryId, existingComment }: Props) 
           onClick={() => setIsOpen(true)}
           className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
         >
-          <span>💬</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
           {savedComment ? "コメントを編集" : "コメントする"}
         </button>
       ) : (
