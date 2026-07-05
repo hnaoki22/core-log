@@ -4,6 +4,22 @@ import { getTodayJST, getCurrentHourJST, formatDateTimeJST } from "@/lib/date-ut
 import { BottomNav } from "@/components/BottomNav";
 import { useFeatures } from "@/lib/use-features";
 import { MoodCandlestick } from "@/components/features/MoodCandlestick";
+import { EnergyGlyph, EnergyDot, ENERGY_COLORS } from "@/components/EnergyGlyph";
+import {
+  IconRepeat,
+  IconRotateCcw,
+  IconBulb,
+  IconTrendingUp,
+  IconGauge,
+  IconCompass,
+  IconUsers,
+  IconClipboard,
+  IconSearch,
+  IconWindow,
+  IconChartLine,
+  IconFlame,
+  IconPen,
+} from "@/components/icons";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 
@@ -33,19 +49,7 @@ type ParticipantData = {
   weekNum: number;
 };
 
-const energyColor: Record<string, string> = {
-  excellent: "#C17817",
-  good: "#2D6A4F",
-  okay: "#8B8489",
-  low: "#8B1A2B",
-};
-
-const energyEmoji: Record<string, string> = {
-  excellent: "🔥",
-  good: "😊",
-  okay: "😐",
-  low: "😞",
-};
+const energyColor = ENERGY_COLORS;
 
 export type ParticipantHomeInitialData = {
   participant: ParticipantData;
@@ -232,8 +236,8 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
         {/* フィードバック機能がOFFでも未読があれば表示（HM送信分は常に表示） */}
         {unreadFeedback > 0 && (
           <Link href={`/p/${token}/feedback`}>
-            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-4 rounded-2xl flex items-center gap-3 cursor-pointer hover:shadow-md transition-all">
-              <div className="bg-amber-500 text-white rounded-xl w-10 h-10 flex items-center justify-center flex-shrink-0 font-semibold text-sm">
+            <div className="card-rule border-l-[#C17817] p-4 flex items-center gap-3 cursor-pointer hover:shadow-md transition-all">
+              <div className="bg-[#C17817] text-white rounded-lg w-10 h-10 flex items-center justify-center flex-shrink-0 font-semibold text-sm">
                 {unreadFeedback}
               </div>
               <div className="flex-1">
@@ -269,10 +273,10 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
             </div>
           </Link>
         ) : (
-          <div className="bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200 p-5 rounded-2xl">
+          <div className="card-rule border-l-[#2D6A4F] p-5">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <div className="w-10 h-10 bg-[#EFF5F1] rounded-full flex items-center justify-center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12"/>
                 </svg>
               </div>
@@ -287,21 +291,21 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
         {/* Stats Row */}
         <div className="grid grid-cols-3 gap-3">
           <div className="card p-4 text-center">
-            <div className="text-2xl font-bold text-[#1A1A2E] tracking-tight">{entryDays}</div>
-            <div className="text-[10px] text-[#8B8489] font-medium tracking-wide uppercase mt-1">記入日数</div>
-          </div>
-          <div className="bg-[#F2F2F7] border border-indigo-200 p-4 rounded-2xl text-center">
-            <div className="text-2xl font-bold text-[#1A1A2E] tracking-tight">{entryRate}%</div>
-            <div className="text-[10px] text-[#4D4D6D] font-medium tracking-wide uppercase mt-1">記入率</div>
+            <div className="stat-number text-[30px] text-[#1A1A2E]">{entryDays}</div>
+            <div className="text-[10px] text-[#8B8489] font-medium tracking-wide uppercase mt-1.5">記入日数</div>
           </div>
           <div className="card p-4 text-center">
-            <div className="text-2xl font-bold text-[#1A1A2E] tracking-tight">
+            <div className="stat-number text-[30px] text-[#1A1A2E]">{entryRate}<span className="text-[18px]">%</span></div>
+            <div className="text-[10px] text-[#8B8489] font-medium tracking-wide uppercase mt-1.5">記入率</div>
+          </div>
+          <div className="card p-4 text-center">
+            <div className="stat-number text-[30px] text-[#1A1A2E]">
               {streak > 0 ? streak : "0"}
             </div>
-            <div className="text-[10px] text-[#8B8489] font-medium tracking-wide uppercase mt-1">
+            <div className="text-[10px] text-[#8B8489] font-medium tracking-wide uppercase mt-1.5">
               {streak > 0 ? "連続" : "連続"}
             </div>
-            {streak >= 3 && <div className="w-1 h-1 bg-amber-400 rounded-full mx-auto mt-1.5"></div>}
+            {streak >= 3 && <div className="w-1 h-1 bg-[#C17817] rounded-full mx-auto mt-1.5"></div>}
           </div>
         </div>
 
@@ -309,8 +313,8 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
             解禁ゲートは AI分析 のみ（2026-06-10夜 本藤さん決定）— タップで AI分析へ */}
         {sa?.unlocked && !unlockSeen && (
           <Link href={`/p/${token}/standalone-report`} onClick={markUnlockSeen}>
-            <div className="w-full text-left bg-gradient-to-br from-indigo-50 to-stone-50 border border-indigo-200 p-5 rounded-2xl animate-fade-up hover:shadow-md transition-all cursor-pointer">
-              <p className="text-[10px] text-[#4D4D6D] font-medium tracking-wide uppercase mb-1.5">3週間の節目</p>
+            <div className="w-full text-left card-rule border-l-[#C17817] p-5 animate-fade-up hover:shadow-md transition-all cursor-pointer">
+              <p className="text-[10px] text-[#C17817] font-medium tracking-wide uppercase mb-1.5">3週間の節目</p>
               <p className="text-base font-semibold text-[#1A1A2E] leading-relaxed mb-1">
                 3週間分のログが貯まりました。
               </p>
@@ -325,7 +329,9 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
           <Link href={`/p/${token}/standalone-report`}>
             <div className="card p-4 hover:bg-[#FBF8F4] transition-colors cursor-pointer animate-fade-up">
               <div className="flex items-center gap-3">
-                <div className="text-xl">🔍</div>
+                <div className="w-9 h-9 rounded-lg bg-[#F2F2F7] flex items-center justify-center text-[#1A1A2E]">
+                  <IconChartLine size={18} />
+                </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-[#1A1A2E]">AI分析</p>
                   <p className="text-[10px] text-[#8B8489] mt-0.5">あなたの3週間 ── CORE Logが観た事</p>
@@ -358,8 +364,8 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
           const energyTrend = olderEnergies.length >= 2 ? (recentAvg - olderAvg) : 0;
           const energyTrendLabel = energyTrend > 0.3 ? "上昇傾向" : energyTrend < -0.3 ? "低下傾向" : "安定";
           const energyTrendIcon = energyTrend > 0.3 ? "↑" : energyTrend < -0.3 ? "↓" : "→";
-          const energyTrendColor = energyTrend > 0.3 ? "text-emerald-600" : energyTrend < -0.3 ? "text-red-500" : "text-blue-500";
-          const energyTrendBg = energyTrend > 0.3 ? "from-emerald-50 to-green-50 border-emerald-200" : energyTrend < -0.3 ? "from-red-50 to-orange-50 border-red-200" : "from-blue-50 to-indigo-50 border-blue-200";
+          const energyTrendColor = energyTrend > 0.3 ? "text-[#2D6A4F]" : energyTrend < -0.3 ? "text-[#8B1A2B]" : "text-[#5B5560]";
+          const energyTrendRule = energyTrend > 0.3 ? "border-l-[#2D6A4F]" : energyTrend < -0.3 ? "border-l-[#8B1A2B]" : "border-l-[#C9BDAE]";
 
           // Completion rate for this week
           const todayStr = getTodayJST();
@@ -378,29 +384,31 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
           return (
             <div className="grid grid-cols-2 gap-3">
               {/* Streak Card */}
-              <div className={`p-4 rounded-2xl border ${streak >= 7 ? "bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200" : streak >= 3 ? "bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-200" : "card"}`}>
+              <div className={`card-rule ${streak >= 7 ? "border-l-[#C17817]" : streak >= 3 ? "border-l-[#1A1A2E]" : "border-l-[#C9BDAE]"} p-4`}>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-lg">{streak >= 7 ? "🔥" : streak >= 3 ? "✨" : "📝"}</span>
+                  <span className={streak >= 7 ? "text-[#C17817]" : streak >= 3 ? "text-[#1A1A2E]" : "text-[#8B8489]"}>
+                    {streak >= 3 ? <IconFlame size={16} /> : <IconPen size={16} />}
+                  </span>
                   <span className="text-[10px] font-semibold text-[#5B5560] uppercase tracking-wide">連続記入</span>
                 </div>
-                <div className={`text-2xl font-bold tracking-tight ${streak >= 7 ? "text-amber-600" : streak >= 3 ? "text-[#1A1A2E]" : "text-[#1A1A2E]"}`}>
-                  {streak}日
+                <div className={`stat-number text-[26px] ${streak >= 7 ? "text-[#C17817]" : "text-[#1A1A2E]"}`}>
+                  {streak}<span className="text-[15px] ml-0.5">日</span>
                 </div>
-                <p className="text-[10px] text-[#8B8489] mt-1">
+                <p className="text-[10px] text-[#8B8489] mt-1.5">
                   {streak >= 7 ? "素晴らしい継続力!" : streak >= 3 ? "いい調子です!" : streak > 0 ? "続けていきましょう" : "今日から始めましょう"}
                 </p>
               </div>
 
               {/* Energy Trend Card */}
-              <div className={`p-4 rounded-2xl border bg-gradient-to-br ${energyTrendBg}`}>
+              <div className={`card-rule ${energyTrendRule} p-4`}>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className={`text-lg font-bold ${energyTrendColor}`}>{energyTrendIcon}</span>
+                  <span className={`text-lg font-bold leading-none ${energyTrendColor}`}>{energyTrendIcon}</span>
                   <span className="text-[10px] font-semibold text-[#5B5560] uppercase tracking-wide">エネルギー</span>
                 </div>
-                <div className={`text-lg font-bold tracking-tight ${energyTrendColor}`}>
+                <div className={`text-lg font-semibold tracking-tight ${energyTrendColor}`}>
                   {energyTrendLabel}
                 </div>
-                <p className="text-[10px] text-[#8B8489] mt-1">
+                <p className="text-[10px] text-[#8B8489] mt-1.5">
                   今週の記入率 {weekCompletionRate}%
                 </p>
               </div>
@@ -417,11 +425,11 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
             </div>
 
             <div className="relative">
-              <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-between py-2 text-[9px] text-[#C9BDAE] pointer-events-none" style={{ width: "16px" }}>
-                <span>🔥</span>
-                <span>😊</span>
-                <span>😐</span>
-                <span>😞</span>
+              <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-between py-2 pointer-events-none items-center" style={{ width: "16px" }}>
+                <EnergyDot level="excellent" size={6} />
+                <EnergyDot level="good" size={6} />
+                <EnergyDot level="okay" size={6} />
+                <EnergyDot level="low" size={6} />
               </div>
 
               <svg
@@ -461,10 +469,10 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
               </svg>
             </div>
 
-            <div className="flex justify-between mt-1 px-5">
+            <div className="flex justify-between mt-1.5 px-5">
               {chartLogs.map((log, i) => (
-                <span key={i} className="text-xs leading-none text-center" style={{ width: `${100 / chartLogs.length}%` }}>
-                  {log.energy ? energyEmoji[log.energy] : ""}
+                <span key={i} className="flex justify-center leading-none" style={{ width: `${100 / chartLogs.length}%` }}>
+                  {log.energy ? <EnergyGlyph level={log.energy} size={13} /> : null}
                 </span>
               ))}
             </div>
@@ -495,7 +503,9 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
               <Link href={`/p/${token}/features/kan-no-ki`}>
                 <div className="card p-4 hover:bg-[#FBF8F4] transition-colors cursor-pointer">
                   <div className="flex items-center gap-3">
-                    <div className="text-xl">🪟</div>
+                    <div className="w-9 h-9 rounded-lg bg-[#F2F2F7] flex items-center justify-center text-[#1A1A2E]">
+                      <IconWindow size={18} />
+                    </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium text-[#1A1A2E]">週次の観た事</p>
                       <p className="text-[11px] text-[#8B8489] mt-0.5">装置が観た事をお返しします</p>
@@ -509,10 +519,10 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
           {/* 内省深化 */}
           {(() => {
             const features = [
-              { key: "tier-s.ruminationDetection", label: "反芻分析", icon: "🧠", path: "rumination" },
-              { key: "tier-s.weeklyConceptualization", label: "週次コンセプト", icon: "💡", path: "conceptualize" },
-              { key: "tier-c.unlearnChallenge", label: "アンラーン", icon: "🔄", path: "unlearn" },
-              { key: "tier-c.identityTracking", label: "自分の変化", icon: "🌱", path: "identity" },
+              { key: "tier-s.ruminationDetection", label: "反芻分析", Icon: IconRepeat, path: "rumination" },
+              { key: "tier-s.weeklyConceptualization", label: "週次コンセプト", Icon: IconBulb, path: "conceptualize" },
+              { key: "tier-c.unlearnChallenge", label: "アンラーン", Icon: IconRotateCcw, path: "unlearn" },
+              { key: "tier-c.identityTracking", label: "自分の変化", Icon: IconTrendingUp, path: "identity" },
             ];
             const enabledFeatures = features.filter(f => isOn(f.key));
             return enabledFeatures.length > 0 && (
@@ -525,7 +535,7 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
                   {enabledFeatures.map(f => (
                     <Link key={f.key} href={`/p/${token}/features/${f.path}`}>
                       <div className="card p-3 text-center hover:bg-[#FBF8F4] transition-colors cursor-pointer">
-                        <div className="text-xl mb-1">{f.icon}</div>
+                        <div className="flex justify-center text-[#1A1A2E] mb-1.5"><f.Icon size={18} /></div>
                         <p className="text-xs font-medium text-[#1A1A2E]">{f.label}</p>
                       </div>
                     </Link>
@@ -538,8 +548,8 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
           {/* 成長測定 */}
           {(() => {
             const features = [
-              { key: "tier-d.efficacyBooster", label: "効力感", icon: "💪", path: "efficacy" },
-              { key: "tier-d.hopeDesign", label: "希望設計", icon: "🎯", path: "hope" },
+              { key: "tier-d.efficacyBooster", label: "効力感", Icon: IconGauge, path: "efficacy" },
+              { key: "tier-d.hopeDesign", label: "希望設計", Icon: IconCompass, path: "hope" },
             ];
             const enabledFeatures = features.filter(f => isOn(f.key));
             return enabledFeatures.length > 0 && (
@@ -552,7 +562,7 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
                   {enabledFeatures.map(f => (
                     <Link key={f.key} href={`/p/${token}/features/${f.path}`}>
                       <div className="card p-3 text-center hover:bg-[#FBF8F4] transition-colors cursor-pointer">
-                        <div className="text-xl mb-1">{f.icon}</div>
+                        <div className="flex justify-center text-[#1A1A2E] mb-1.5"><f.Icon size={18} /></div>
                         <p className="text-xs font-medium text-[#1A1A2E]">{f.label}</p>
                       </div>
                     </Link>
@@ -565,9 +575,9 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
           {/* 組織学習 */}
           {(() => {
             const features = [
-              { key: "tier-b.peerReflection", label: "ピア振り返り", icon: "👥", path: "peer" },
-              { key: "tier-b.aar", label: "AAR", icon: "📋", path: "aar" },
-              { key: "tier-c.outsightTask", label: "アウトサイト", icon: "🔍", path: "outsight" },
+              { key: "tier-b.peerReflection", label: "ピア振り返り", Icon: IconUsers, path: "peer" },
+              { key: "tier-b.aar", label: "AAR", Icon: IconClipboard, path: "aar" },
+              { key: "tier-c.outsightTask", label: "アウトサイト", Icon: IconSearch, path: "outsight" },
             ];
             const enabledFeatures = features.filter(f => isOn(f.key));
             return enabledFeatures.length > 0 && (
@@ -580,7 +590,7 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
                   {enabledFeatures.map(f => (
                     <Link key={f.key} href={`/p/${token}/features/${f.path}`}>
                       <div className="card p-3 text-center hover:bg-[#FBF8F4] transition-colors cursor-pointer">
-                        <div className="text-xl mb-1">{f.icon}</div>
+                        <div className="flex justify-center text-[#1A1A2E] mb-1.5"><f.Icon size={18} /></div>
                         <p className="text-xs font-medium text-[#1A1A2E]">{f.label}</p>
                       </div>
                     </Link>
@@ -609,8 +619,8 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
                   <div className={`flex gap-3 px-5 py-3.5 hover:bg-[#F5F0EB] transition-colors cursor-pointer ${
                     idx < recentLogs.length - 1 ? "border-b border-[#EFE8DD]" : ""
                   }`}>
-                    <div className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-semibold ${
-                      log.hasFeedback ? "bg-amber-500" : "bg-[#1A1A2E]"
+                    <div className={`flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-white text-xs font-semibold ${
+                      log.hasFeedback ? "bg-[#C17817]" : "bg-[#1A1A2E]"
                     }`}>
                       {log.dayNum}
                     </div>
@@ -622,10 +632,10 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
                     </div>
                     <div className="flex-shrink-0 flex items-center gap-2">
                       {log.energy && (
-                        <span className="text-base leading-none">{energyEmoji[log.energy]}</span>
+                        <EnergyGlyph level={log.energy} size={18} />
                       )}
                       {log.hasFeedback && (
-                        <div className="w-1.5 h-1.5 bg-amber-400 rounded-full"></div>
+                        <div className="w-1.5 h-1.5 bg-[#C17817] rounded-full"></div>
                       )}
                     </div>
                   </div>

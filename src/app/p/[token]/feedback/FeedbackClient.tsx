@@ -81,7 +81,7 @@ export default function FeedbackClient({ token, initialData }: Props) {
     return (
       <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6 pb-24">
         <div className="text-center max-w-sm">
-          <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+          <div className="w-14 h-14 rounded-full bg-[#EFE8DD] flex items-center justify-center mx-auto mb-4">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8B8489" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
             </svg>
@@ -112,7 +112,7 @@ export default function FeedbackClient({ token, initialData }: Props) {
       <div className="max-w-md mx-auto px-5 pt-5 space-y-3 animate-fade-up relative z-10">
         {feedbacks.length === 0 ? (
           <div className="text-center py-16">
-            <div className="w-12 h-12 bg-[#EFE8DD] rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <div className="w-12 h-12 bg-[#EFE8DD] rounded-full flex items-center justify-center mx-auto mb-4">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8B8489" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
               </svg>

@@ -86,6 +86,7 @@
   .gradient-header {
     background: linear-gradient(135deg, #141423 0%, #1A1A2E 50%, #2C2C4A 100%);
     position: relative;
+    border-bottom: 1px solid rgba(193, 120, 23, 0.35);
   }
   .gradient-header::after {
     content: '';
@@ -100,6 +101,7 @@
   .gradient-header-manager {
     background: linear-gradient(135deg, #080810 0%, #141423 50%, #1A1A2E 100%);
     position: relative;
+    border-bottom: 1px solid rgba(193, 120, 23, 0.35);
   }
   .gradient-header-manager::after {
     content: '';
@@ -114,6 +116,7 @@
   .gradient-header-admin {
     background: linear-gradient(135deg, #040408 0%, #080810 50%, #141423 100%);
     position: relative;
+    border-bottom: 1px solid rgba(193, 120, 23, 0.25);
   }
   .gradient-header-admin::after {
     content: '';
@@ -228,6 +231,28 @@
     font-family: 'Cormorant Garamond', 'Noto Sans JP', serif;
     font-weight: 600;
     letter-spacing: -0.01em;
+  }
+
+  /* Stat numerals — editorial serif figures (consulting-report signature) */
+  .stat-number {
+    font-family: 'Cormorant Garamond', 'Noto Sans JP', serif;
+    font-weight: 600;
+    letter-spacing: 0;
+    line-height: 1;
+    font-variant-numeric: lining-nums;
+  }
+
+  /* Chip — small squared label (replaces pastel pill soup) */
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-medium;
+  }
+
+  /* Card with a colored left rule — quiet semantic emphasis */
+  .card-rule {
+    @apply bg-white rounded-2xl;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--color-border-light);
+    border-left-width: 3px;
   }
 }
 

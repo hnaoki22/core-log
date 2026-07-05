@@ -11,7 +11,8 @@ export default function Home() {
               <line x1="16" y1="17" x2="8" y2="17"/>
             </svg>
           </div>
-          <h1 className="text-3xl font-semibold text-white tracking-tight mb-3">CORE Log</h1>
+          <h1 className="font-display text-4xl text-white tracking-tight mb-3">CORE Log</h1>
+          <div className="w-8 h-px bg-[#C17817]/60 mx-auto mb-3"></div>
           <p className="text-gray-400 text-base font-light">リーダーシップ開発プログラム</p>
         </div>
 

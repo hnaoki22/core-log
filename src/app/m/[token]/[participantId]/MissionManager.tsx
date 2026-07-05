@@ -269,7 +269,10 @@ export default function MissionManager({ token, participantName, initialMissions
       {/* Header */}
       <div className="p-4 border-b border-gray-100 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-500 flex items-center gap-2">
-          🎯 ミッション管理
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" />
+          </svg>
+          ミッション管理
         </h2>
         <button
           onClick={() => setShowCreateForm(!showCreateForm)}

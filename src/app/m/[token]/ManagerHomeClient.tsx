@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useFeatures } from "@/lib/use-features";
+import { EnergyGlyph } from "@/components/EnergyGlyph";
 
 type ParticipantData = {
   name: string;
@@ -35,12 +36,7 @@ type BurnoutScore = {
   riskLevel: "low" | "medium" | "high";
 };
 
-const energyEmoji: Record<string, string> = {
-  excellent: "🔥",
-  good: "😊",
-  okay: "😐",
-  low: "😞",
-};
+// energy 状態は EnergyGlyph（線画フェイス）で表示する
 
 export type ManagerHomeInitialData = ManagerData;
 
@@ -117,10 +113,10 @@ export default function ManagerHomeClient({ token, initialData }: Props) {
   }).length;
 
   const getStatusIndicator = (participant: ParticipantData) => {
-    if (participant.streak > 0) return { color: "bg-emerald-500", label: "活動中" };
-    if (participant.entryRate > 50) return { color: "bg-amber-500", label: "スローダウン" };
-    if (participant.entryDays > 0) return { color: "bg-red-500", label: "気になる変化" };
-    return { color: "bg-gray-300", label: "未開始" };
+    if (participant.streak > 0) return { color: "bg-[#2D6A4F]", label: "活動中" };
+    if (participant.entryRate > 50) return { color: "bg-[#C17817]", label: "スローダウン" };
+    if (participant.entryDays > 0) return { color: "bg-[#8B1A2B]", label: "気になる変化" };
+    return { color: "bg-[#C9BDAE]", label: "未開始" };
   };
 
   return (
@@ -157,14 +153,17 @@ export default function ManagerHomeClient({ token, initialData }: Props) {
         {/* High Risk Burnout Alert */}
         {highRiskParticipants.length > 0 && isOn("tier-a.burnoutScore") && (
           <Link href={`/m/${token}/features/burnout`}>
-            <div className="card p-3 border-2 border-red-300 bg-red-50 hover:bg-red-100 transition-colors cursor-pointer">
-              <div className="flex items-start gap-2">
-                <span className="text-lg flex-shrink-0">⚠️</span>
+            <div className="card-rule border-l-[#8B1A2B] p-3.5 hover:shadow-md transition-all cursor-pointer">
+              <div className="flex items-start gap-2.5">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8B1A2B" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
                 <div className="flex-1">
-                  <p className="text-xs font-semibold text-red-700">
+                  <p className="text-xs font-semibold text-[#6F1221]">
                     気になる変化: {highRiskParticipants.map((h) => h.participantName).join("・")}さんのコンディションに変化のサインがあります
                   </p>
-                  <p className="text-[10px] text-red-600 mt-0.5">詳細を確認する →</p>
+                  <p className="text-[10px] text-[#8B1A2B] mt-0.5">詳細を確認する →</p>
                 </div>
               </div>
             </div>
@@ -174,16 +173,16 @@ export default function ManagerHomeClient({ token, initialData }: Props) {
         {/* Summary Stats */}
         <div className="grid grid-cols-3 gap-2.5">
           <div className="card p-3.5 text-center">
-            <div className="text-2xl font-bold text-[#1A1A2E] tracking-tight">{totalParticipants}</div>
-            <div className="text-[10px] text-[#8B8489] font-medium tracking-wide mt-0.5">参加者</div>
-          </div>
-          <div className="bg-[#F2F2F7] border border-indigo-200 p-3.5 rounded-2xl text-center">
-            <div className="text-2xl font-bold text-[#1A1A2E] tracking-tight">{avgEntryRate}%</div>
-            <div className="text-[10px] text-[#4D4D6D] font-medium tracking-wide mt-0.5">平均記入率</div>
+            <div className="stat-number text-[26px] text-[#1A1A2E]">{totalParticipants}</div>
+            <div className="text-[10px] text-[#8B8489] font-medium tracking-wide mt-1">参加者</div>
           </div>
           <div className="card p-3.5 text-center">
-            <div className="text-2xl font-bold text-[#1A1A2E] tracking-tight">{lowEnergyParticipants}</div>
-            <div className="text-[10px] text-[#8B8489] font-medium tracking-wide mt-0.5">低エネルギー</div>
+            <div className="stat-number text-[26px] text-[#1A1A2E]">{avgEntryRate}<span className="text-[16px]">%</span></div>
+            <div className="text-[10px] text-[#8B8489] font-medium tracking-wide mt-1">平均記入率</div>
+          </div>
+          <div className="card p-3.5 text-center">
+            <div className="stat-number text-[26px] text-[#1A1A2E]">{lowEnergyParticipants}</div>
+            <div className="text-[10px] text-[#8B8489] font-medium tracking-wide mt-1">低エネルギー</div>
           </div>
         </div>
 
@@ -243,8 +242,8 @@ export default function ManagerHomeClient({ token, initialData }: Props) {
                 {isOn("tier-a.psychSafetyMonitor") && (
                   <Link href={`/m/${token}/features/psych-safety`}>
                     <div className="card p-4 w-44 hover:shadow-md transition-shadow cursor-pointer flex-shrink-0">
-                      <div className="flex items-center justify-center h-10 mb-2 rounded-lg bg-green-100/50">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-600">
+                      <div className="flex items-center justify-center h-10 mb-2 rounded-lg bg-[#EFF5F1]">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#2D6A4F]">
                           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                         </svg>
                       </div>
@@ -324,8 +323,8 @@ export default function ManagerHomeClient({ token, initialData }: Props) {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
                           {(participant.recentEnergy || []).map((energy, idx) => (
-                            <span key={idx} className="text-sm leading-none">
-                              {energy ? energyEmoji[energy] : "·"}
+                            <span key={idx} className="leading-none">
+                              {energy ? <EnergyGlyph level={energy} size={15} /> : <span className="text-sm text-[#C9BDAE]">·</span>}
                             </span>
                           ))}
                         </div>
