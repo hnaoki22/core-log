@@ -740,6 +740,62 @@ export async function getSkipReasonsByParticipant(
   /* eslint-enable @typescript-eslint/no-explicit-any */
 }
 
+// ---------------------------------------------------------------------------
+// logform v2 F5: 惰性検知の発火履歴（週1制限用）。deny-all RLS・service_role 経由。
+// ---------------------------------------------------------------------------
+
+function shiftDateStr(dateStr: string, deltaDays: number): string {
+  const t = Date.parse(`${dateStr}T00:00:00Z`);
+  const d = new Date(t + deltaDays * 86400000);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
+// 当日を除く直近 days 日以内に発火履歴があるか（週1制限。失敗時は抑制側=true に倒す）。
+export async function hasRecentInertiaNudge(
+  participantId: string,
+  tenantId: string,
+  today: string,
+  days = 7
+): Promise<boolean> {
+  const since = shiftDateStr(today, -days);
+  const { data, error } = await getClient()
+    .from("inertia_nudges")
+    .select("id")
+    .eq("participant_id", participantId)
+    .eq("tenant_id", tenantId)
+    .gte("shown_date", since)
+    .lt("shown_date", today)
+    .limit(1);
+  if (error) {
+    logger.error("hasRecentInertiaNudge failed", { error: error.message, participantId });
+    return true; // 連発を防ぐため、判定不能時は表示しない側へ
+  }
+  return (data?.length ?? 0) > 0;
+}
+
+// 発火事実を記録（同日多重は UNIQUE(participant_id,shown_date) で冪等に無視）。
+export async function insertInertiaNudge(args: {
+  tenantId: string;
+  participantId: string;
+  shownDate: string;
+  windowEnd: string;
+}): Promise<void> {
+  const { error } = await getClient()
+    .from("inertia_nudges")
+    .upsert(
+      {
+        tenant_id: args.tenantId,
+        participant_id: args.participantId,
+        shown_date: args.shownDate,
+        window_end: args.windowEnd,
+      },
+      { onConflict: "participant_id,shown_date", ignoreDuplicates: true }
+    );
+  if (error) {
+    logger.error("insertInertiaNudge failed", { error: error.message, participantId: args.participantId });
+  }
+}
+
 export async function addManagerComment(
   pageId: string,
   comment: string,

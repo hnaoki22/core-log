@@ -74,6 +74,7 @@ export type StandaloneInputInitialData = {
   // logform v2 レイヤー（standalone_mode の上に重ねる）。OFF のときは従来 standalone 挙動。
   logformV2: boolean;
   prevDay: PrevDayRecord | null;
+  inertiaNudge: string | null;  // F5 惰性検知の翌朝メッセージ（表示する時だけ非null）
 };
 
 interface Props {
@@ -108,6 +109,7 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
   const morningClosed = initialData.initialMorningClosed;
   const logformV2 = initialData.logformV2;   // logform v2 レイヤー
   const prevDay = initialData.prevDay;
+  const inertiaNudge = initialData.inertiaNudge; // F5 惰性検知メッセージ
 
   const [step, setStep] = useState(1);
   const [condition, setCondition] = useState("");   // ①体調・自由記述（v1）。v2 ではゲージに置換
@@ -395,6 +397,12 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
         {/* ①体調（v1=自由記述 / v2=3ゲージ。いずれも空のまま次へ進める） */}
         {step === 1 && (
           <div className="space-y-4">
+            {/* F5: 惰性検知の翌朝メッセージ（静かに問いかける。評価語なし・咎めない）。 */}
+            {inertiaNudge && (
+              <div className="bg-[#FBF8F4] border border-[#EFE8DD] rounded-2xl p-4">
+                <p className="text-sm text-[#1A1A2E] leading-relaxed">{inertiaNudge}</p>
+              </div>
+            )}
             {/* F4: 前日ログはデフォルト非表示。ボタンで開示し、項目単位で引き継ぐ。 */}
             {logformV2 && prevDay && (
               <div>

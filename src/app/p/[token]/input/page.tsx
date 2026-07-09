@@ -6,7 +6,8 @@
 // we can SEE where the time goes per request.
 
 import { notFound } from "next/navigation";
-import { getParticipantWithLogsByToken } from "@/lib/supabase";
+import { getParticipantWithLogsByToken, hasRecentInertiaNudge, insertInertiaNudge } from "@/lib/supabase";
+import { computeInertiaNudge } from "@/lib/inertia-nudge";
 import { getTodayJST, getCurrentHourJST, isGracePeriod, calculateWeekNum } from "@/lib/date-utils";
 import { getFlagsForTenant } from "@/lib/feature-flags";
 import { getKanNoKiPhase } from "@/lib/kan-no-ki";
@@ -145,6 +146,26 @@ export default async function InputPageServer({
         };
       }
     }
+    // F5 惰性検知: 朝の記入時のみ。週1制限を確認 → 判定 → 表示するなら履歴を await 記録
+    // （fire-and-forget 禁止）。検知失敗はログ表示を妨げない（が黙って握らずログする）。
+    let inertiaNudge: string | null = null;
+    if (logformV2 && initialIsMorning && !saAlreadyCompleted && participant.tenantId) {
+      try {
+        const recentlyNudged = await hasRecentInertiaNudge(participant.id, participant.tenantId, today);
+        const nudge = computeInertiaNudge(logs, today, recentlyNudged);
+        if (nudge.show) {
+          inertiaNudge = nudge.message;
+          await insertInertiaNudge({
+            tenantId: participant.tenantId,
+            participantId: participant.id,
+            shownDate: today,
+            windowEnd: today,
+          });
+        }
+      } catch (e) {
+        console.warn(`[inertia] detection skipped (non-fatal): ${String(e)}`);
+      }
+    }
     return (
       <StandaloneInputClient
         token={token}
@@ -160,6 +181,7 @@ export default async function InputPageServer({
           initialAlreadyCompleted: saAlreadyCompleted,
           logformV2,
           prevDay,
+          inertiaNudge,
         }}
       />
     );
