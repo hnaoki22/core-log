@@ -21,6 +21,8 @@ import { getTodayJST } from "@/lib/date-utils";
 import { getPlaceholderExample } from "@/lib/placeholder-examples";
 import { useState, useRef } from "react";
 import { EnergyGlyph, ENERGY_COLORS, ENERGY_TINTS } from "@/components/EnergyGlyph";
+import { ConditionGauges } from "@/components/features/ConditionGauges";
+import { type GaugeRaws } from "@/lib/condition-gauges";
 
 type TodayLog = {
   id: string;
@@ -53,17 +55,49 @@ export type SkipFollowup = {
   returnLogId: string;
 };
 
+// logform v2（F4）: 前日ログの引き継ぎ元。ボタン開示 → 項目単位で「引き継ぐ」。
+export type PrevDayRecord = {
+  date: string;
+  morningIntent: string | null;
+  morningAction: string | null;
+  eveningInsight: string | null;
+  eveningState: string | null;
+  gauges: GaugeRaws | null;
+};
+
 export type StandaloneInputInitialData = {
   participant: ParticipantBasic;
   todayLog: TodayLog | null;
   initialIsMorning: boolean;
   initialMorningClosed: boolean;
   initialAlreadyCompleted: boolean;
+  // logform v2 レイヤー（standalone_mode の上に重ねる）。OFF のときは従来 standalone 挙動。
+  logformV2: boolean;
+  prevDay: PrevDayRecord | null;
 };
 
 interface Props {
   token: string;
   initialData: StandaloneInputInitialData;
+}
+
+// F4: 前日ログの1項目 + 「引き継ぐ」ボタン（項目単位のコピー。一括ボタンは作らない）
+function PrevItem({ label, text, onCarry }: { label: string; text: string; onCarry: () => void }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <p className="text-sm text-[#5B5560] leading-relaxed whitespace-pre-wrap flex-1">
+        <span className="text-[#8B8489] text-xs mr-2">{label}</span>
+        {text}
+      </p>
+      <button
+        type="button"
+        onClick={onCarry}
+        className="text-xs text-[#2D6A4F] border border-[#2D6A4F]/30 rounded-full px-3 py-1 hover:bg-[#EFF5F1] transition-colors shrink-0"
+      >
+        引き継ぐ
+      </button>
+    </div>
+  );
 }
 
 export default function StandaloneInputClient({ token, initialData }: Props) {
@@ -72,11 +106,29 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
   const todayLog = initialData.todayLog;
   const isMorning = initialData.initialIsMorning;
   const morningClosed = initialData.initialMorningClosed;
+  const logformV2 = initialData.logformV2;   // logform v2 レイヤー
+  const prevDay = initialData.prevDay;
 
   const [step, setStep] = useState(1);
-  const [condition, setCondition] = useState("");   // ①体調（朝/夕共通の state。保存先はサーバーで分岐）
-  const [mainText, setMainText] = useState("");      // ②意図（朝）/ 結果（夕）
+  const [condition, setCondition] = useState("");   // ①体調・自由記述（v1）。v2 ではゲージに置換
+  const [gauges, setGauges] = useState<GaugeRaws>({}); // ①体調3ゲージ（v2 F1/F3）
+  const [mainText, setMainText] = useState("");      // ②Q1（意図/結果）
+  const [secondText, setSecondText] = useState("");  // ②Q2（v2: 行動/状態一言）
+  const [carriedOver, setCarriedOver] = useState<string[]>([]); // F4 引き継ぎメタ
+  const [showPrevDay, setShowPrevDay] = useState(false);        // F4 前日ログ開示
   const [mood, setMood] = useState<string | null>(null); // ③気分
+
+  // F4: 前日の項目を今日の入力へ引き継ぐ（引き継いだ項目名を記録する）
+  const carryText = (key: string, text: string, target: "main" | "second") => {
+    if (target === "main") setMainText(text);
+    else setSecondText(text);
+    setCarriedOver((prev) => (prev.includes(key) ? prev : [...prev, key]));
+  };
+  const carryGauges = () => {
+    if (!prevDay?.gauges) return;
+    setGauges(prevDay.gauges);
+    setCarriedOver((prev) => Array.from(new Set([...prev, ...Object.keys(prevDay.gauges!)])));
+  };
   const [completed, setCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -175,6 +227,19 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
         };
         if (condition.trim().length > 0) {
           body.eveningCondition = condition.trim();
+        }
+      }
+
+      // logform v2 追加フィールド（standalone の body に上乗せ）。
+      // v2 では体調は自由記述ではなく3ゲージ。Q2（朝=行動 / 夕=状態一言）と
+      // 引き継ぎメタ（F4）も送る。すべて任意・空なら送らない（咎めない原則）。
+      if (logformV2) {
+        body.conditionGauges = gauges;
+        if (secondText.trim().length > 0) {
+          body[isMorning ? "morningAction" : "eveningState"] = secondText.trim();
+        }
+        if (carriedOver.length > 0) {
+          body.carriedOver = carriedOver;
         }
       }
 
@@ -327,19 +392,92 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
           ))}
         </div>
 
-        {/* ①体調（自由記述・空のまま次へ進める） */}
+        {/* ①体調（v1=自由記述 / v2=3ゲージ。いずれも空のまま次へ進める） */}
         {step === 1 && (
           <div className="space-y-4">
+            {/* F4: 前日ログはデフォルト非表示。ボタンで開示し、項目単位で引き継ぐ。 */}
+            {logformV2 && prevDay && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowPrevDay((v) => !v)}
+                  className="text-sm text-[#5B5560] underline underline-offset-2 hover:text-[#1A1A2E] transition-colors"
+                >
+                  {showPrevDay ? "昨日の記録を閉じる" : "昨日の記録を見る"}
+                </button>
+                {showPrevDay && (
+                  <div className="mt-3 bg-[#FBF8F4] border border-[#EFE8DD] p-4 rounded-2xl space-y-3">
+                    <p className="text-[10px] text-[#8B8489] font-medium tracking-wide uppercase">
+                      昨日の記録（{prevDay.date}）
+                    </p>
+                    {isMorning ? (
+                      <>
+                        {prevDay.morningIntent && (
+                          <PrevItem
+                            label="意図"
+                            text={prevDay.morningIntent}
+                            onCarry={() => carryText("morningIntent", prevDay.morningIntent!, "main")}
+                          />
+                        )}
+                        {prevDay.morningAction && (
+                          <PrevItem
+                            label="場面・行動"
+                            text={prevDay.morningAction}
+                            onCarry={() => carryText("morningAction", prevDay.morningAction!, "second")}
+                          />
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {prevDay.eveningInsight && (
+                          <PrevItem
+                            label="やってみたこと"
+                            text={prevDay.eveningInsight}
+                            onCarry={() => carryText("eveningInsight", prevDay.eveningInsight!, "main")}
+                          />
+                        )}
+                        {prevDay.eveningState && (
+                          <PrevItem
+                            label="状態"
+                            text={prevDay.eveningState}
+                            onCarry={() => carryText("eveningState", prevDay.eveningState!, "second")}
+                          />
+                        )}
+                      </>
+                    )}
+                    {prevDay.gauges && (
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-[#5B5560]">
+                          <span className="text-[#8B8489] text-xs mr-2">体調</span>
+                          昨日のゲージ
+                        </span>
+                        <button
+                          type="button"
+                          onClick={carryGauges}
+                          className="text-xs text-[#2D6A4F] border border-[#2D6A4F]/30 rounded-full px-3 py-1 hover:bg-[#EFF5F1] transition-colors shrink-0"
+                        >
+                          引き継ぐ
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             <p className="text-[#1A1A2E] font-medium text-base leading-relaxed">
               {isMorning ? "今朝、体はどんな感じですか？" : "今、体はどんな感じですか？"}
             </p>
-            <textarea
-              value={condition}
-              onChange={(e) => setCondition(e.target.value)}
-              onFocus={handleFocus}
-              placeholder="例：少しだるい／よく眠れた（空欄のままでも進めます）"
-              className="input-field min-h-[88px] resize-none leading-relaxed"
-            />
+            {logformV2 ? (
+              <ConditionGauges value={gauges} onChange={setGauges} onFirstInteract={handleFocus} />
+            ) : (
+              <textarea
+                value={condition}
+                onChange={(e) => setCondition(e.target.value)}
+                onFocus={handleFocus}
+                placeholder="例：少しだるい／よく眠れた（空欄のままでも進めます）"
+                className="input-field min-h-[88px] resize-none leading-relaxed"
+              />
+            )}
           </div>
         )}
 
@@ -347,22 +485,49 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
         {step === 2 && (
           <div className="space-y-4">
             {isMorning ? (
-              <>
-                <p className="text-[#1A1A2E] font-medium text-base leading-relaxed">今日の意図</p>
-                <textarea
-                  value={mainText}
-                  onChange={(e) => setMainText(e.target.value)}
-                  onFocus={handleFocus}
-                  placeholder={getPlaceholderExample({
-                    token,
-                    dojoPhase: participant.dojoPhase,
-                    date: today,
-                    type: "morning",
-                    customExamples: null,
-                  })}
-                  className="input-field min-h-[180px] resize-none leading-relaxed"
-                />
-              </>
+              logformV2 ? (
+                <>
+                  {/* F2 Q1: アウトカム型の意図 */}
+                  <p className="text-[#1A1A2E] font-medium text-base leading-relaxed">
+                    今日の終わりに、どんな状態の自分でいられたらいいですか
+                  </p>
+                  <textarea
+                    value={mainText}
+                    onChange={(e) => setMainText(e.target.value)}
+                    onFocus={handleFocus}
+                    placeholder="（例文は科学検証仕様書 v1.0 の文言に差し替え予定）"
+                    className="input-field min-h-[120px] resize-none leading-relaxed"
+                  />
+                  {/* F2 Q2: Q1 と同時に必ず表示（畳まない）。任意・咎めない（送信ブロックしない）。 */}
+                  <p className="text-[#1A1A2E] font-medium text-base leading-relaxed pt-2">
+                    そのために、今日どんな場面で、何をしますか（一つで十分です）
+                  </p>
+                  <textarea
+                    value={secondText}
+                    onChange={(e) => setSecondText(e.target.value)}
+                    onFocus={handleFocus}
+                    placeholder="（例文は科学検証仕様書 v1.0 の文言に差し替え予定）"
+                    className="input-field min-h-[100px] resize-none leading-relaxed"
+                  />
+                </>
+              ) : (
+                <>
+                  <p className="text-[#1A1A2E] font-medium text-base leading-relaxed">今日の意図</p>
+                  <textarea
+                    value={mainText}
+                    onChange={(e) => setMainText(e.target.value)}
+                    onFocus={handleFocus}
+                    placeholder={getPlaceholderExample({
+                      token,
+                      dojoPhase: participant.dojoPhase,
+                      date: today,
+                      type: "morning",
+                      customExamples: null,
+                    })}
+                    className="input-field min-h-[180px] resize-none leading-relaxed"
+                  />
+                </>
+              )
             ) : (
               <>
                 {/* 今朝の記録カード — 気分→体調→意図の順で、あるものだけを再掲。
@@ -394,18 +559,43 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
                     今朝の記録はありません。夕方だけの記入でも大丈夫です。
                   </p>
                 )}
-                <p className="text-[#1A1A2E] font-medium text-base leading-relaxed">
-                  {todayLog && todayLog.morningIntent
-                    ? "今朝の意図、やってみてどうでしたか？"
-                    : "今日、やってみてどうでしたか？"}
-                </p>
-                <textarea
-                  value={mainText}
-                  onChange={(e) => setMainText(e.target.value)}
-                  onFocus={handleFocus}
-                  placeholder="うまくいったこと、いかなかったこと、気づいたこと"
-                  className="input-field min-h-[180px] resize-none leading-relaxed"
-                />
+                {logformV2 ? (
+                  <>
+                    {/* F3 Q1: 行動（採点語を使わない） */}
+                    <p className="text-[#1A1A2E] font-medium text-base leading-relaxed">今日、実際にやってみたことは？</p>
+                    <textarea
+                      value={mainText}
+                      onChange={(e) => setMainText(e.target.value)}
+                      onFocus={handleFocus}
+                      placeholder="やってみたことを、そのまま"
+                      className="input-field min-h-[120px] resize-none leading-relaxed"
+                    />
+                    {/* F3 Q2: 意識・状態 */}
+                    <p className="text-[#1A1A2E] font-medium text-base leading-relaxed pt-2">いまの自分の状態を一言でいうと？</p>
+                    <textarea
+                      value={secondText}
+                      onChange={(e) => setSecondText(e.target.value)}
+                      onFocus={handleFocus}
+                      placeholder="ひとことで"
+                      className="input-field min-h-[80px] resize-none leading-relaxed"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[#1A1A2E] font-medium text-base leading-relaxed">
+                      {todayLog && todayLog.morningIntent
+                        ? "今朝の意図、やってみてどうでしたか？"
+                        : "今日、やってみてどうでしたか？"}
+                    </p>
+                    <textarea
+                      value={mainText}
+                      onChange={(e) => setMainText(e.target.value)}
+                      onFocus={handleFocus}
+                      placeholder="うまくいったこと、いかなかったこと、気づいたこと"
+                      className="input-field min-h-[180px] resize-none leading-relaxed"
+                    />
+                  </>
+                )}
               </>
             )}
           </div>

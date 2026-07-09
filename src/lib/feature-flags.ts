@@ -595,6 +595,20 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     phase1Enabled: false,
     implemented: true,
   },
+  // logform v2（朝夕ログ刷新 2026-07-09）: standalone商品モードの入力フォーム刷新版。
+  // standalone_mode の上に重ねるレイヤー。ON のテナント（reflection-lab / デモ）でのみ
+  // v2 フォーム（体調3ゲージ・アウトカム型意図・行動/意識の振り返り・前日ログ開示）を出す。
+  // category="mode" のため大幸は applyTenantFlagGuards で強制 OFF ＋ 管理UIで非表示。
+  {
+    key: "logform_v2",
+    label: "ログ入力フォーム v2",
+    description: "standalone商品モードの入力フォーム刷新版。体調を3項目の選択式ゲージ（睡眠の質・体の疲労感・頭のさえ）に、朝の意図をアウトカム型2問に、夕方を行動・意識の2問にする。前日ログはボタンで開示。standalone_mode ON のテナントでのみ有効。テナント単位でON/OFF。",
+    category: "mode",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    dependencies: ["standalone_mode"],
+    implemented: true,
+  },
   // ===== Tier E 追加: 自分の気づきメモ（standalone AI分析）2026-06-21 / 太田さん要望① =====
   {
     key: "tier-e.selfInsightNote",

@@ -11,6 +11,7 @@ import "server-only";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "./logger";
 import { getDayOfWeekJPShort } from "./date-utils";
+import type { ConditionGauges } from "./condition-gauges";
 
 // ---------------------------------------------------------------------------
 // Default tenant ID configuration
@@ -67,6 +68,14 @@ export type NotionLogEntry = {
   eveningEnergy: "excellent" | "good" | "okay" | "low" | null;
   morningCondition: string | null;  // 朝の体調・自由記述（standalone §3、空可）
   eveningCondition: string | null;  // 夕の体調・自由記述（standalone §3、空可）
+  // logform v2（朝夕ログ刷新）: standalone_mode の上に重ねるレイヤーでのみ書かれる。
+  // OFF のテナントでは常に null。
+  morningConditionGauges: ConditionGauges | null;  // F1 朝の体調3ゲージ
+  eveningConditionGauges: ConditionGauges | null;  // F3 夕の体調3ゲージ
+  morningAction: string | null;   // F2 Q2「今日どんな場面で何をするか」
+  eveningState: string | null;    // F3 Q2「いまの自分の状態を一言」
+  carriedOver: string[] | null;   // F4 前日から引き継いだ項目名
+  logformVersion: number | null;  // 記入フォーム版数（v2=2, NULL=旧）
   status: "complete" | "morning_only" | "empty" | "fb_done";
   hasFeedback: boolean;
   hmFeedback: string | null;
@@ -177,6 +186,12 @@ function rowToLog(r: any): NotionLogEntry {
     eveningEnergy: r.evening_energy || null,
     morningCondition: r.morning_condition || null,
     eveningCondition: r.evening_condition || null,
+    morningConditionGauges: r.morning_condition_gauges ?? null,
+    eveningConditionGauges: r.evening_condition_gauges ?? null,
+    morningAction: r.morning_action || null,
+    eveningState: r.evening_state || null,
+    carriedOver: Array.isArray(r.carried_over) ? r.carried_over : null,
+    logformVersion: r.logform_version ?? null,
     status: r.status || "empty",
     hasFeedback: r.has_feedback || false,
     hmFeedback: r.hm_feedback || null,
@@ -442,7 +457,15 @@ export async function createMorningEntry(
   morningDurationSec: number | null = null,
   phaseMode: "kan-no-ki" | "dojo-1" = "dojo-1",
   bodyIntent: string | null = null,
-  morningCondition: string | null = null
+  morningCondition: string | null = null,
+  // logform v2（朝夕ログ刷新）: 値がある時だけ列に書く。migration 未適用環境でも
+  // 従来フローが壊れないようにする（standalone §3 の morningCondition と同方針）。
+  v2?: {
+    conditionGauges?: ConditionGauges | null;
+    action?: string | null;        // F2 Q2「今日どんな場面で何をするか」
+    carriedOver?: string[] | null; // F4 引き継ぎメタ
+    logformVersion?: number | null;
+  }
 ): Promise<string | null> {
   const now = new Date();
   const d = new Date(date);
@@ -469,6 +492,11 @@ export async function createMorningEntry(
   if (morningCondition !== null && morningCondition.length > 0) {
     insertData.morning_condition = morningCondition;
   }
+  // logform v2 の朝フィールド（値がある時だけ書く）
+  if (v2?.conditionGauges) insertData.morning_condition_gauges = v2.conditionGauges;
+  if (v2?.action && v2.action.length > 0) insertData.morning_action = v2.action;
+  if (v2?.carriedOver && v2.carriedOver.length > 0) insertData.carried_over = v2.carriedOver;
+  if (v2?.logformVersion != null) insertData.logform_version = v2.logformVersion;
   const { data, error } = await getClient()
     .from("logs")
     .insert(insertData)
@@ -497,6 +525,11 @@ export async function updateEveningEntry(
     // （energy: null → undefined → PostgREST はカラムを更新しない）。
     eveningEnergy?: string | null;
     eveningCondition?: string | null;
+    // logform v2（朝夕ログ刷新）: 値がある時だけ列に書く
+    conditionGauges?: ConditionGauges | null;  // F3 夕の体調3ゲージ
+    eveningState?: string | null;              // F3 Q2「いまの自分の状態を一言」
+    carriedOver?: string[] | null;             // F4 引き継ぎメタ
+    logformVersion?: number | null;
   }
 ): Promise<boolean> {
   const now = new Date();
@@ -523,6 +556,11 @@ export async function updateEveningEntry(
   if (extras?.eveningCondition && extras.eveningCondition.length > 0) {
     updateData.evening_condition = extras.eveningCondition;
   }
+  // logform v2 の夕フィールド（値がある時だけ書く）
+  if (extras?.conditionGauges) updateData.evening_condition_gauges = extras.conditionGauges;
+  if (extras?.eveningState && extras.eveningState.length > 0) updateData.evening_state = extras.eveningState;
+  if (extras?.carriedOver && extras.carriedOver.length > 0) updateData.carried_over = extras.carriedOver;
+  if (extras?.logformVersion != null) updateData.logform_version = extras.logformVersion;
   const { error, data: updated } = await getClient()
     .from("logs")
     .update(updateData)
@@ -556,6 +594,11 @@ export async function createEveningOnlyEntry(
     // 夕のみ記入の場合 null のまま残す（呼び出し側が energy=null を渡す）。
     eveningEnergy?: string | null;
     eveningCondition?: string | null;
+    // logform v2（朝夕ログ刷新）: 値がある時だけ列に書く
+    conditionGauges?: ConditionGauges | null;  // F3 夕の体調3ゲージ
+    eveningState?: string | null;              // F3 Q2「いまの自分の状態を一言」
+    carriedOver?: string[] | null;             // F4 引き継ぎメタ
+    logformVersion?: number | null;
   }
 ): Promise<string | null> {
   const now = new Date();
@@ -584,6 +627,11 @@ export async function createEveningOnlyEntry(
   if (extras?.eveningCondition && extras.eveningCondition.length > 0) {
     insertData.evening_condition = extras.eveningCondition;
   }
+  // logform v2 の夕フィールド（値がある時だけ書く）
+  if (extras?.conditionGauges) insertData.evening_condition_gauges = extras.conditionGauges;
+  if (extras?.eveningState && extras.eveningState.length > 0) insertData.evening_state = extras.eveningState;
+  if (extras?.carriedOver && extras.carriedOver.length > 0) insertData.carried_over = extras.carriedOver;
+  if (extras?.logformVersion != null) insertData.logform_version = extras.logformVersion;
   const { data, error } = await getClient()
     .from("logs")
     .insert(insertData)

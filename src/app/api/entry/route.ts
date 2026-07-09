@@ -12,6 +12,7 @@ import { sanitizeInput } from "@/lib/sanitize";
 import { logger } from "@/lib/logger";
 import { resolvePhaseMode, triggerBodyPromptIfNeeded } from "@/lib/kan-no-ki";
 import { isFeatureEnabled } from "@/lib/feature-flags";
+import { sanitizeConditionGauges, sanitizeCarriedOver } from "@/lib/condition-gauges";
 
 // standalone §5: 復帰日の未記入フォローアップ。
 // その日最初のエントリ作成（morning / evening_only）後にのみ判定する。
@@ -66,6 +67,9 @@ export async function POST(request: NextRequest) {
     const participantId = participant.id;
     // standalone商品モード（§1/§3）: 朝夕の気分を分離保存し、体調自由記述を受け付ける
     const standalone = await isFeatureEnabled("standalone_mode", tenantId);
+    // logform v2（朝夕ログ刷新）: standalone の上に重ねるレイヤー。ON のテナントでのみ
+    // 体調3ゲージ・アウトカム型設問・行動/意識設問・引き継ぎメタを受け付ける。
+    const logformV2 = standalone && (await isFeatureEnabled("logform_v2", tenantId));
     if (participant.endDate && isProgramEnded(participant.endDate)) {
       return NextResponse.json({
         error: "プログラムは終了しています。日報の入力はできません。",
@@ -111,6 +115,18 @@ export async function POST(request: NextRequest) {
       const sanitizedMorningCondition = standalone && body.morningCondition
         ? sanitizeInput(String(body.morningCondition))
         : null;
+      // logform v2 朝フィールド（F1 体調3ゲージ / F2 Q2 行動 / F4 引き継ぎメタ）
+      const sanitizedMorningAction = logformV2 && body.morningAction
+        ? sanitizeInput(String(body.morningAction))
+        : null;
+      const v2Morning = logformV2
+        ? {
+            conditionGauges: sanitizeConditionGauges(body.conditionGauges),
+            action: sanitizedMorningAction && sanitizedMorningAction.length > 0 ? sanitizedMorningAction : null,
+            carriedOver: sanitizeCarriedOver(body.carriedOver),
+            logformVersion: 2,
+          }
+        : undefined;
       const pageId = await createMorningEntry(
         participantName, date, sanitizedMorningIntent, energy,
         dojoPhase, weekNum, tenantId, participantId,
@@ -118,6 +134,7 @@ export async function POST(request: NextRequest) {
         phaseMode,
         sanitizedBodyIntent && sanitizedBodyIntent.length > 0 ? sanitizedBodyIntent : null,
         sanitizedMorningCondition && sanitizedMorningCondition.length > 0 ? sanitizedMorningCondition : null,
+        v2Morning,
       );
       if (!pageId) {
         return NextResponse.json({ error: "Failed to create entry" }, { status: 500 });
@@ -178,6 +195,10 @@ export async function POST(request: NextRequest) {
       const sanitizedEveningCondition = standalone && body.eveningCondition
         ? sanitizeInput(String(body.eveningCondition))
         : null;
+      // logform v2 夕フィールド（F3 Q2 状態一言）
+      const sanitizedEveningState = logformV2 && body.eveningState
+        ? sanitizeInput(String(body.eveningState))
+        : null;
       const success = await updateEveningEntry(
         pageId, sanitizedEveningInsight, standalone ? null : energy,
         typeof eveningDurationSec === "number" ? eveningDurationSec : null,
@@ -186,6 +207,14 @@ export async function POST(request: NextRequest) {
           ? {
               eveningEnergy: energy || null,
               eveningCondition: sanitizedEveningCondition && sanitizedEveningCondition.length > 0 ? sanitizedEveningCondition : null,
+              ...(logformV2
+                ? {
+                    conditionGauges: sanitizeConditionGauges(body.conditionGauges),
+                    eveningState: sanitizedEveningState && sanitizedEveningState.length > 0 ? sanitizedEveningState : null,
+                    carriedOver: sanitizeCarriedOver(body.carriedOver),
+                    logformVersion: 2,
+                  }
+                : {}),
             }
           : undefined
       );
@@ -252,6 +281,10 @@ export async function POST(request: NextRequest) {
       const sanitizedEveningConditionEO = standalone && body.eveningCondition
         ? sanitizeInput(String(body.eveningCondition))
         : null;
+      // logform v2 夕フィールド（F3 Q2 状態一言）
+      const sanitizedEveningStateEO = logformV2 && body.eveningState
+        ? sanitizeInput(String(body.eveningState))
+        : null;
       const pageId = await createEveningOnlyEntry(
         participantName, date, sanitizedEveningInsight, standalone ? null : energy,
         dojoPhase, weekNum, tenantId, participantId,
@@ -262,6 +295,14 @@ export async function POST(request: NextRequest) {
           ? {
               eveningEnergy: energy || null,
               eveningCondition: sanitizedEveningConditionEO && sanitizedEveningConditionEO.length > 0 ? sanitizedEveningConditionEO : null,
+              ...(logformV2
+                ? {
+                    conditionGauges: sanitizeConditionGauges(body.conditionGauges),
+                    eveningState: sanitizedEveningStateEO && sanitizedEveningStateEO.length > 0 ? sanitizedEveningStateEO : null,
+                    carriedOver: sanitizeCarriedOver(body.carriedOver),
+                    logformVersion: 2,
+                  }
+                : {}),
             }
           : undefined
       );

@@ -12,7 +12,8 @@ import { getFlagsForTenant } from "@/lib/feature-flags";
 import { getKanNoKiPhase } from "@/lib/kan-no-ki";
 import { getTodayQuestionsForTenant, getTodayDayKey } from "@/lib/daily-questions";
 import InputClient, { type InputPageInitialData } from "./InputClient";
-import StandaloneInputClient from "./StandaloneInputClient";
+import StandaloneInputClient, { type PrevDayRecord } from "./StandaloneInputClient";
+import { gaugesToRaws } from "@/lib/condition-gauges";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -122,6 +123,28 @@ export default async function InputPageServer({
         saAlreadyCompleted = true;
       }
     }
+    // logform v2（朝夕ログ刷新）: standalone の上に重ねるレイヤー。
+    const logformV2 = flagMap["logform_v2"] === true;
+    // F4 前日ログ: デフォルト非表示のためデータだけ渡す（開示・引き継ぎはクライアント側）。
+    // 「昨日」は getTodayJST()（グレースピリオド調整済み）から1日引く。
+    let prevDay: PrevDayRecord | null = null;
+    if (logformV2) {
+      const [py, pm, pd] = today.split("-").map(Number);
+      const pdt = new Date(Date.UTC(py, pm - 1, pd));
+      pdt.setUTCDate(pdt.getUTCDate() - 1);
+      const prevDate = `${pdt.getUTCFullYear()}-${String(pdt.getUTCMonth() + 1).padStart(2, "0")}-${String(pdt.getUTCDate()).padStart(2, "0")}`;
+      const prevEntry = logs.find((l) => l.date === prevDate);
+      if (prevEntry) {
+        prevDay = {
+          date: prevDate,
+          morningIntent: prevEntry.morningIntent || null,
+          morningAction: prevEntry.morningAction ?? null,
+          eveningInsight: prevEntry.eveningInsight ?? null,
+          eveningState: prevEntry.eveningState ?? null,
+          gauges: gaugesToRaws(prevEntry.morningConditionGauges ?? prevEntry.eveningConditionGauges),
+        };
+      }
+    }
     return (
       <StandaloneInputClient
         token={token}
@@ -135,6 +158,8 @@ export default async function InputPageServer({
           initialIsMorning,
           initialMorningClosed,
           initialAlreadyCompleted: saAlreadyCompleted,
+          logformV2,
+          prevDay,
         }}
       />
     );
