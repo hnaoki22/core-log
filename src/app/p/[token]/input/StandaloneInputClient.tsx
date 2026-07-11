@@ -22,7 +22,7 @@ import { getPlaceholderExample } from "@/lib/placeholder-examples";
 import { useState, useRef } from "react";
 import { EnergyGlyph, ENERGY_COLORS, ENERGY_TINTS } from "@/components/EnergyGlyph";
 import { ConditionGauges } from "@/components/features/ConditionGauges";
-import { type GaugeRaws } from "@/lib/condition-gauges";
+import { type GaugeRaws, type GaugeKey, gaugeDefsFor } from "@/lib/condition-gauges";
 
 type TodayLog = {
   id: string;
@@ -128,8 +128,15 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
   };
   const carryGauges = () => {
     if (!prevDay?.gauges) return;
-    setGauges(prevDay.gauges);
-    setCarriedOver((prev) => Array.from(new Set([...prev, ...Object.keys(prevDay.gauges!)])));
+    // 夕は睡眠を持たない（C3）。引き継ぎ経由でも睡眠キーが夕ログに紛れ込まないよう有効キーで絞る。
+    const allowed = new Set(gaugeDefsFor(isMorning).map((g) => g.key));
+    const next: GaugeRaws = {};
+    for (const [k, v] of Object.entries(prevDay.gauges)) {
+      if (v == null || !allowed.has(k as GaugeKey)) continue;
+      next[k as GaugeKey] = v;
+    }
+    setGauges(next);
+    setCarriedOver((prev) => Array.from(new Set([...prev, ...Object.keys(next)])));
   };
   const [completed, setCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -476,7 +483,7 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
               {isMorning ? "今朝、体はどんな感じですか？" : "今、体はどんな感じですか？"}
             </p>
             {logformV2 ? (
-              <ConditionGauges value={gauges} onChange={setGauges} onFirstInteract={handleFocus} />
+              <ConditionGauges value={gauges} onChange={setGauges} onFirstInteract={handleFocus} defs={gaugeDefsFor(isMorning)} />
             ) : (
               <textarea
                 value={condition}
@@ -506,15 +513,16 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
                     placeholder="（例文は科学検証仕様書 v1.0 の文言に差し替え予定）"
                     className="input-field min-h-[120px] resize-none leading-relaxed"
                   />
-                  {/* F2 Q2: Q1 と同時に必ず表示（畳まない）。任意・咎めない（送信ブロックしない）。 */}
+                  {/* F2 Q2: Q1 と同時に必ず表示（畳まない）。任意・咎めない（送信ブロックしない）。
+                      問いは軽く、if-then の具体性は placeholder で例示（太田さん 7/11 C1）。 */}
                   <p className="text-[#1A1A2E] font-medium text-base leading-relaxed pt-2">
-                    そのために、今日どんな場面で、何をしますか（一つで十分です）
+                    そのために、どうしますか？（一つで十分です）
                   </p>
                   <textarea
                     value={secondText}
                     onChange={(e) => setSecondText(e.target.value)}
                     onFocus={handleFocus}
-                    placeholder="（例文は科学検証仕様書 v1.0 の文言に差し替え予定）"
+                    placeholder="例：14時の打合せで、結論から先に話してみる"
                     className="input-field min-h-[100px] resize-none leading-relaxed"
                   />
                 </>
@@ -569,23 +577,25 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
                 )}
                 {logformV2 ? (
                   <>
-                    {/* F3 Q1: 行動（採点語を使わない） */}
-                    <p className="text-[#1A1A2E] font-medium text-base leading-relaxed">今日、実際にやってみたことは？</p>
-                    <textarea
-                      value={mainText}
-                      onChange={(e) => setMainText(e.target.value)}
-                      onFocus={handleFocus}
-                      placeholder="やってみたことを、そのまま"
-                      className="input-field min-h-[120px] resize-none leading-relaxed"
-                    />
-                    {/* F3 Q2: 意識・状態 */}
-                    <p className="text-[#1A1A2E] font-medium text-base leading-relaxed pt-2">いまの自分の状態を一言でいうと？</p>
+                    {/* 太田さん 7/11 C2: 朝（状態→行動）と対称に、夕も 状態 を上・行動 を下へ。
+                        表示順のみ入替。secondText→eveningState / mainText→eveningInsight の束縛は不変。 */}
+                    {/* F3: 状態（What）— 意識・状態 */}
+                    <p className="text-[#1A1A2E] font-medium text-base leading-relaxed">いまの自分の状態を一言でいうと？</p>
                     <textarea
                       value={secondText}
                       onChange={(e) => setSecondText(e.target.value)}
                       onFocus={handleFocus}
                       placeholder="ひとことで"
                       className="input-field min-h-[80px] resize-none leading-relaxed"
+                    />
+                    {/* F3: 行動（How）— 採点語を使わない */}
+                    <p className="text-[#1A1A2E] font-medium text-base leading-relaxed pt-2">今日、実際にやってみたことは？</p>
+                    <textarea
+                      value={mainText}
+                      onChange={(e) => setMainText(e.target.value)}
+                      onFocus={handleFocus}
+                      placeholder="やってみたことを、そのまま"
+                      className="input-field min-h-[120px] resize-none leading-relaxed"
                     />
                   </>
                 ) : (
