@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getLogsByParticipant } from "@/lib/supabase";
 import { getParticipantByToken } from "@/lib/participant-db";
 import { isStandaloneTenant, computeUnlockState } from "@/lib/standalone";
-import { getLatestStandaloneReport, generateStandaloneReport } from "@/lib/standalone-report";
+import { getLatestStandaloneReport, generateStandaloneReport, latestSubmittedLogDate } from "@/lib/standalone-report";
 import { getTodayJST } from "@/lib/date-utils";
 import { logger } from "@/lib/logger";
 
@@ -54,10 +54,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 24時間キャッシュ
-    const cached = await getLatestStandaloneReport(participant.id, tenantId);
-    if (cached) {
-      return NextResponse.json({ success: true, cached: true, ...cached });
+    // logform v2 Item 1（レポート固定化）: 新しい提出ログが無ければ、24hを超えても
+    // 生成済みレポートをそのまま返す。同じ入力を毎日再生成して文面がドリフトするのを
+    // 止め、新ログが入ったときだけ再生成する（商談デモの再生成リスクも同時に解消）。
+    const latest = await getLatestStandaloneReport(participant.id, tenantId, Infinity);
+    const latestLogDate = latestSubmittedLogDate(logs);
+    if (latest && latestLogDate && latest.periodEnd >= latestLogDate) {
+      return NextResponse.json({ success: true, cached: true, ...latest });
     }
 
     const generated = await generateStandaloneReport(

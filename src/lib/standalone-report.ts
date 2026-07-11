@@ -58,13 +58,17 @@ export async function getLatestStandaloneReport(
   tenantId: string,
   maxAgeHours = 24
 ): Promise<StoredStandaloneReport | null> {
-  const since = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000).toISOString();
-  const { data, error } = await getClient()
+  let query = getClient()
     .from("standalone_reports")
     .select("id, report, period_start, period_end, entry_days, created_at")
     .eq("participant_id", participantId)
-    .eq("tenant_id", tenantId)
-    .gte("created_at", since)
+    .eq("tenant_id", tenantId);
+  // maxAgeHours=Infinity のときは年齢制限なし（logform v2 Item 1: 新ログが無ければ既存を返す）
+  if (Number.isFinite(maxAgeHours)) {
+    const since = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000).toISOString();
+    query = query.gte("created_at", since);
+  }
+  const { data, error } = await query
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -81,6 +85,16 @@ export async function getLatestStandaloneReport(
     entryDays: data.entry_days,
     createdAt: data.created_at,
   };
+}
+
+/**
+ * 提出済みログの最新日付を返す（logform v2 Item 1: レポート固定化）。
+ * これが生成済みレポートの period_end 以下なら「新ログなし」＝再生成不要。
+ */
+export function latestSubmittedLogDate(logs: NotionLogEntry[]): string | null {
+  const dates = logs.filter(isLogSubmitted).map((l) => l.date).filter(Boolean);
+  if (dates.length === 0) return null;
+  return dates.reduce((max, d) => (d > max ? d : max));
 }
 
 /**
