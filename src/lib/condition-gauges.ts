@@ -40,6 +40,14 @@ export const GAUGE_DEFS: GaugeDef[] = [
   { key: "clarity", label: "頭のさえ", leftLabel: "クリア", rightLabel: "ぼんやり" },
 ];
 
+// 夕は睡眠を問わない（睡眠質は起床時想起の尺度＝朝専用。夕の再質問は測定学的に無効）。
+// 朝=3項目（GAUGE_DEFS）/ 夕=2項目。描画・引き継ぎ・保存で使う有効キー集合の単一の真実源。
+export const EVENING_GAUGE_KEYS: GaugeKey[] = ["fatigue", "clarity"];
+
+export function gaugeDefsFor(isMorning: boolean): GaugeDef[] {
+  return isMorning ? GAUGE_DEFS : GAUGE_DEFS.filter((g) => EVENING_GAUGE_KEYS.includes(g.key));
+}
+
 export const GAUGE_STEPS = 4; // 4段階・中間なし
 
 export function normalizeGauge(raw: number, steps: number = GAUGE_STEPS): number {

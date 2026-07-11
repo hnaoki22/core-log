@@ -5,7 +5,7 @@
 // - 既存 energy 4択と同じ操作感（p-*/rounded/border-2 のタップボタン）に揃える。
 // - 各項目は任意（未選択でも先へ進める）。オルソソムニア回避＝強制しない。
 
-import { GAUGE_DEFS, GAUGE_STEPS, type GaugeRaws } from "@/lib/condition-gauges";
+import { GAUGE_DEFS, GAUGE_STEPS, type GaugeDef, type GaugeRaws } from "@/lib/condition-gauges";
 
 export type { GaugeRaws };
 
@@ -13,14 +13,16 @@ export function ConditionGauges({
   value,
   onChange,
   onFirstInteract,
+  defs = GAUGE_DEFS,
 }: {
   value: GaugeRaws;
   onChange: (next: GaugeRaws) => void;
   onFirstInteract?: () => void;
+  defs?: GaugeDef[];
 }) {
   return (
     <div className="space-y-6">
-      {GAUGE_DEFS.map((g) => {
+      {defs.map((g) => {
         const cur = value[g.key];
         return (
           <div key={g.key} className="space-y-2">
