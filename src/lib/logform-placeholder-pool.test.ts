@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { PLACEHOLDER_POOL, getPlaceholderFromPool, type PlaceholderSlot } from "./logform-placeholder-pool";
 
-const SLOTS: PlaceholderSlot[] = ["morning_q1", "morning_q2", "evening_action", "evening_state"];
+const SLOTS: PlaceholderSlot[] = ["morning_q1", "morning_q2", "evening_result", "evening_effort"];
 
 describe("logform placeholder pool", () => {
   it("各スロット16案・重複なし・空文字なし", () => {

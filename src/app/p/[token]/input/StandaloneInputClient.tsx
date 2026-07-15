@@ -23,6 +23,7 @@ import { useState, useRef } from "react";
 import { EnergyGlyph, ENERGY_COLORS, ENERGY_TINTS } from "@/components/EnergyGlyph";
 import { ConditionGauges } from "@/components/features/ConditionGauges";
 import { type GaugeRaws, type GaugeKey, gaugeDefsFor } from "@/lib/condition-gauges";
+import { getPlaceholderFromPool } from "@/lib/logform-placeholder-pool";
 
 type TodayLog = {
   id: string;
@@ -429,14 +430,14 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
                       <>
                         {prevDay.morningIntent && (
                           <PrevItem
-                            label="意図"
+                            label="どうなりたいか"
                             text={prevDay.morningIntent}
                             onCarry={() => carryText("morningIntent", prevDay.morningIntent!, "main")}
                           />
                         )}
                         {prevDay.morningAction && (
                           <PrevItem
-                            label="場面・行動"
+                            label="どうしたいか"
                             text={prevDay.morningAction}
                             onCarry={() => carryText("morningAction", prevDay.morningAction!, "second")}
                           />
@@ -446,14 +447,14 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
                       <>
                         {prevDay.eveningInsight && (
                           <PrevItem
-                            label="やってみたこと"
+                            label="どうなったか"
                             text={prevDay.eveningInsight}
                             onCarry={() => carryText("eveningInsight", prevDay.eveningInsight!, "main")}
                           />
                         )}
                         {prevDay.eveningState && (
                           <PrevItem
-                            label="状態"
+                            label="頑張ったこと"
                             text={prevDay.eveningState}
                             onCarry={() => carryText("eveningState", prevDay.eveningState!, "second")}
                           />
@@ -502,28 +503,30 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
             {isMorning ? (
               logformV2 ? (
                 <>
-                  {/* F2 Q1: アウトカム型の意図 */}
+                  {/* 太田さん7/15 §1: 朝画面2は「どうしたいですか（上）→ その結果どうなりたいですか（下）」。
+                      固定順（意志を先・アウトカムを後）。順序ユーザー選択（§1-4）は第2弾。
+                      データ束縛は不変: 上=secondText/morning_action（任意）, 下=mainText/morning_intent（必須・分析対象）。 */}
+                  {/* 上: どうしたいですか（意志・行動。任意・咎めない＝送信ブロックしない） */}
                   <p className="text-[#1A1A2E] font-medium text-base leading-relaxed">
-                    今日の終わりに、どんな状態の自分でいられたらいいですか
-                  </p>
-                  <textarea
-                    value={mainText}
-                    onChange={(e) => setMainText(e.target.value)}
-                    onFocus={handleFocus}
-                    placeholder="（例文は科学検証仕様書 v1.0 の文言に差し替え予定）"
-                    className="input-field min-h-[120px] resize-none leading-relaxed"
-                  />
-                  {/* F2 Q2: Q1 と同時に必ず表示（畳まない）。任意・咎めない（送信ブロックしない）。
-                      問いは軽く、if-then の具体性は placeholder で例示（太田さん 7/11 C1）。 */}
-                  <p className="text-[#1A1A2E] font-medium text-base leading-relaxed pt-2">
-                    そのために、どうしますか？（一つで十分です）
+                    どうしたいですか
                   </p>
                   <textarea
                     value={secondText}
                     onChange={(e) => setSecondText(e.target.value)}
                     onFocus={handleFocus}
-                    placeholder="例：14時の打合せで、結論から先に話してみる"
+                    placeholder={getPlaceholderFromPool("morning_q2", token, today)}
                     className="input-field min-h-[100px] resize-none leading-relaxed"
+                  />
+                  {/* 下: その結果どうなりたいか（アウトカム。必須・分析対象＝morning_intent 意味不変） */}
+                  <p className="text-[#1A1A2E] font-medium text-base leading-relaxed pt-2">
+                    その結果、どうなりたいですか
+                  </p>
+                  <textarea
+                    value={mainText}
+                    onChange={(e) => setMainText(e.target.value)}
+                    onFocus={handleFocus}
+                    placeholder={getPlaceholderFromPool("morning_q1", token, today)}
+                    className="input-field min-h-[120px] resize-none leading-relaxed"
                   />
                 </>
               ) : (
@@ -577,25 +580,26 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
                 )}
                 {logformV2 ? (
                   <>
-                    {/* 太田さん 7/11 C2: 朝（状態→行動）と対称に、夕も 状態 を上・行動 を下へ。
-                        表示順のみ入替。secondText→eveningState / mainText→eveningInsight の束縛は不変。 */}
-                    {/* F3: 状態（What）— 意識・状態 */}
-                    <p className="text-[#1A1A2E] font-medium text-base leading-relaxed">いまの自分の状態を一言でいうと？</p>
-                    <textarea
-                      value={secondText}
-                      onChange={(e) => setSecondText(e.target.value)}
-                      onFocus={handleFocus}
-                      placeholder="ひとことで"
-                      className="input-field min-h-[80px] resize-none leading-relaxed"
-                    />
-                    {/* F3: 行動（How）— 採点語を使わない */}
-                    <p className="text-[#1A1A2E] font-medium text-base leading-relaxed pt-2">今日、実際にやってみたことは？</p>
+                    {/* 太田さん7/15 §2: 夕画面2は「どうなりましたか（上）→ 一番頑張ったことは（下）」。
+                        朝「どうしたいですか」と対（意図→結果のミラー）。
+                        データ束縛は不変: 上=mainText/evening_insight（必須・分析対象）, 下=secondText/evening_state（任意）。 */}
+                    {/* 上: どうなりましたか（一日の結果。必須・分析対象＝evening_insight 意味不変） */}
+                    <p className="text-[#1A1A2E] font-medium text-base leading-relaxed">どうなりましたか</p>
                     <textarea
                       value={mainText}
                       onChange={(e) => setMainText(e.target.value)}
                       onFocus={handleFocus}
-                      placeholder="やってみたことを、そのまま"
+                      placeholder={getPlaceholderFromPool("evening_result", token, today)}
                       className="input-field min-h-[120px] resize-none leading-relaxed"
+                    />
+                    {/* 下: 一番頑張ったことは（任意・「特に無し」でも咎めない＝太田さん §2-3） */}
+                    <p className="text-[#1A1A2E] font-medium text-base leading-relaxed pt-2">一番頑張ったことは</p>
+                    <textarea
+                      value={secondText}
+                      onChange={(e) => setSecondText(e.target.value)}
+                      onFocus={handleFocus}
+                      placeholder={getPlaceholderFromPool("evening_effort", token, today)}
+                      className="input-field min-h-[80px] resize-none leading-relaxed"
                     />
                   </>
                 ) : (

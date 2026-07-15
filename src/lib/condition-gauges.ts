@@ -1,11 +1,11 @@
-// logform v2 体調3ゲージ（睡眠の質 / 体の疲労感 / 頭のさえ）の共有定義。
+// logform v2 体調ゲージの共有定義。朝=睡眠の質/体の疲労感/頭のさえ、夕=今日の充実度/体の疲労感/頭のさえ（太田さん7/15 §2）。
 // UI・API・DB マッピングの単一の真実源（energy ラベルが7ファイルに散在した反省）。
 //
 // §7 禁止事項に従い「良い/悪い」の評価色・評価語は持たせない。端点ラベルは記述的
 // （ぐっすり↔浅い 等）。中間ラベルは持たず「4段階・中間なし」の位置のみ（指示書 F1）。
 // 端点の向きは既存 energy UI（ポジティブ先頭）に合わせ、左端＝ポジティブに統一。
 
-export type GaugeKey = "sleep" | "fatigue" | "clarity";
+export type GaugeKey = "sleep" | "fulfillment" | "fatigue" | "clarity";
 
 // raw = 端点間の位置(1=左端..4=右端)。normalized = (raw-1)/(steps-1)*100。
 // 段階数を将来変えても比較・移動平均が効くよう normalized を併記保存する（指示書§4）。
@@ -33,19 +33,28 @@ export type GaugeDef = {
   rightLabel: string; // 位置4
 };
 
-// 表示順・ラベルは指示書 F1 の文言をそのまま使う。
+// GAUGE_DEFS は全ゲージ定義の集合（朝夕どちらで使うかは下の KEYS で決める）。
+// 表示順・ラベルは指示書 F1 / 太田さん7/15（§2 夕ゲージ3項目化）に従う。
 export const GAUGE_DEFS: GaugeDef[] = [
   { key: "sleep", label: "昨夜の睡眠の質", leftLabel: "ぐっすり", rightLabel: "浅い" },
+  // 充実度（夕のみ）＝日中の活動の質。朝の「昨夜の睡眠の質」に対応（太田さん7/15 §2）。
+  // 端点ラベルは暫定ドラフト（要・本藤さん確認）。§7 に従い評価語を避けた felt-sense 記述。
+  { key: "fulfillment", label: "今日の充実度", leftLabel: "満ちていた", rightLabel: "淡々としていた" },
   { key: "fatigue", label: "体の疲労感", leftLabel: "軽い", rightLabel: "重い" },
   { key: "clarity", label: "頭のさえ", leftLabel: "クリア", rightLabel: "ぼんやり" },
 ];
 
-// 夕は睡眠を問わない（睡眠質は起床時想起の尺度＝朝専用。夕の再質問は測定学的に無効）。
-// 朝=3項目（GAUGE_DEFS）/ 夕=2項目。描画・引き継ぎ・保存で使う有効キー集合の単一の真実源。
-export const EVENING_GAUGE_KEYS: GaugeKey[] = ["fatigue", "clarity"];
+// 朝=睡眠/疲労/冴え（睡眠質は起床時想起の尺度＝朝専用。夕の再質問は測定学的に無効）。
+// 夕=充実度/疲労/冴え（睡眠は夕に出さない。充実度を1項目目に置く＝太田さん7/15 §2）。
+// 描画・引き継ぎ・保存で使う「有効キー集合＋表示順」の単一の真実源。
+export const MORNING_GAUGE_KEYS: GaugeKey[] = ["sleep", "fatigue", "clarity"];
+export const EVENING_GAUGE_KEYS: GaugeKey[] = ["fulfillment", "fatigue", "clarity"];
 
 export function gaugeDefsFor(isMorning: boolean): GaugeDef[] {
-  return isMorning ? GAUGE_DEFS : GAUGE_DEFS.filter((g) => EVENING_GAUGE_KEYS.includes(g.key));
+  const keys = isMorning ? MORNING_GAUGE_KEYS : EVENING_GAUGE_KEYS;
+  return keys
+    .map((k) => GAUGE_DEFS.find((g) => g.key === k))
+    .filter((g): g is GaugeDef => g !== undefined);
 }
 
 export const GAUGE_STEPS = 4; // 4段階・中間なし
@@ -82,6 +91,7 @@ export const CARRYABLE_KEYS: readonly string[] = [
   "eveningInsight",
   "eveningState",
   "sleep",
+  "fulfillment",
   "fatigue",
   "clarity",
 ];
