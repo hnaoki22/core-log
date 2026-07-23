@@ -11,6 +11,13 @@
 // トーン: 正典 v1.1 準拠 — 診断しない・断定しない・仮説として返す・本人の言葉を引用。
 // 用語規律: 「育てる/育成/育む/整える」不使用（「調える」「育つ」は可）。
 //
+// 対象期間（2026-07-23 追加）: 直近 REPORT_WINDOW_DAYS 日のローリング窓。
+// 従来は開始以来の全提出ログを素材にしていたため、プロンプトの「約3週間分」
+// という前提と実データが食い違い、49日分（6月含む）のレポートになって
+// 「変化が実感できない」という指摘を受けた（2026-07-23 太田さん Slack FB）。
+// あわせて、保存済みの前回レポート要旨を比較素材として渡し、「前回からの
+// 変化・継続」に各レンズが1文触れる＝「3週間の塊の推移」の最小形。
+//
 // LLM 呼び出しは llm.ts の llmJson / truncateForLLM 経由。
 // 出力は standalone_reports に永続化（kan_no_ki_observations は観の期の
 // 週次ドメイン専用のため再利用しない＝プリフライト判断）。
@@ -38,6 +45,20 @@ export type StoredStandaloneReport = {
   entryDays: number;
   createdAt: string;
 };
+
+// 直近のローリング窓（日数）。窓の終端は today ではなく「最新の提出日」に置く。
+// today 基準にすると、しばらく書いていない人が久々に開いた時に窓が空になるため。
+export const REPORT_WINDOW_DAYS = 21;
+
+/**
+ * 窓の開始日（YYYY-MM-DD）を返す。latestDate を含めて days 日分。
+ * JST安全のため stats.ts と同じ T12:00:00+09:00 方式で日付演算する。
+ */
+export function reportWindowStart(latestDate: string, days = REPORT_WINDOW_DAYS): string {
+  const d = new Date(latestDate + "T12:00:00+09:00");
+  d.setUTCDate(d.getUTCDate() - (days - 1));
+  return d.toISOString().slice(0, 10);
+}
 
 const MOOD_LABEL: Record<string, string> = {
   excellent: "絶好調",
@@ -113,12 +134,24 @@ export async function generateStandaloneReport(
     .sort((a, b) => (a.date < b.date ? -1 : 1));
   if (submitted.length === 0) return null;
 
-  const periodStart = submitted[0].date;
-  const periodEnd = submitted[submitted.length - 1].date;
-  const entryDays = new Set(submitted.map((l) => l.date)).size;
+  // 直近3週間のローリング窓に絞る（プロンプトの「約3週間分」という前提と素材を一致させる）
+  const latestDate = submitted[submitted.length - 1].date;
+  const windowStart = reportWindowStart(latestDate);
+  const windowed = submitted.filter((l) => l.date >= windowStart);
+
+  const periodStart = windowed[0].date;
+  const periodEnd = windowed[windowed.length - 1].date;
+  const entryDays = new Set(windowed.map((l) => l.date)).size;
+
+  // 前回レポート（保存済み）を比較素材に。「3週間の塊の推移」の最小形。
+  // 初回はなし＝比較セクションを渡さない。
+  const prior = await getLatestStandaloneReport(participant.id, tenantId, Infinity);
+  const priorSection = prior
+    ? `\n### 前回のレポート要旨（対象期間 ${prior.periodStart} 〜 ${prior.periodEnd}）\n相関レンズ: ${truncateForLLM(prior.report.correlationLens || "", 400)}\nテーマ反復レンズ: ${truncateForLLM(prior.report.themeLens || "", 400)}`
+    : "";
 
   // 日次データの整形（フィールドごとに切り詰めて総量を抑える）
-  const dailyLines = submitted.map((l) => {
+  const dailyLines = windowed.map((l) => {
     const parts = [
       `${l.date}: 朝の気分=${moodLabel(l.energy)} / 夕の気分=${moodLabel(l.eveningEnergy)}`,
     ];
@@ -129,8 +162,9 @@ export async function generateStandaloneReport(
     return parts.join("\n");
   });
 
-  // スキップ記録（沈黙も情報として・咎めない素材に）
-  const skips = await getSkipReasonsByParticipant(participant.id, tenantId);
+  // スキップ記録（沈黙も情報として・咎めない素材に）。窓内のギャップのみ渡す。
+  const skips = (await getSkipReasonsByParticipant(participant.id, tenantId))
+    .filter((s) => !s.gapEnd || s.gapEnd >= windowStart);
   const skipLines = skips.map((s) => {
     const r = s.reason ? `本人の言葉「${truncateForLLM(s.reason, 120)}」` : "（理由は無回答）";
     return `${s.gapStart}〜${s.gapEnd}（平日${s.gapWeekdays}日） ${r}`;
@@ -138,7 +172,7 @@ export async function generateStandaloneReport(
 
   // プロンプト v1（2026-06-10夜 本藤さん承認済みの確定版。本藤さん実ログでの
   // サンプル生成を承認済み。雰囲気=「静かな観察＋原文引用＋最後に問いがひとつ」）
-  const systemPrompt = `あなたはCORE Logの「装置」です。参加者の約3週間分のログを観て、観た事を本人にだけ映し返します。
+  const systemPrompt = `あなたはCORE Logの「装置」です。参加者の直近約3週間分のログを観て、観た事を本人にだけ映し返します。素材は直近の窓に絞られています。それより前の期間を推測で持ち出さないでください。
 
 絶対の規律:
 - 診断しない。断定しない。観た事はすべて仮説として「〜かもしれません」「〜ように見えます」の形で返す
@@ -154,6 +188,8 @@ export async function generateStandaloneReport(
 1. 相関レンズ: 朝の気分と夕の気分の動き（朝より上がった日・下がった日のパターン）。気分の高い日と低めの日とで、朝の意図のテーマがどう変わるか、そして意図がどこまで果たされたか（達成の勾配）。体調の記述と気分の関係。
 2. テーマ反復レンズ: 朝の意図に繰り返し現れるテーマや言葉。期間の最初と最近とで、同じテーマの言葉の使い方・扱いがどう変わったか（反復と習熟の輪郭）。気分があまり動かない人ではこちらを主役に。
 
+前回のレポート要旨が素材として渡された場合は、各レンズの終わりに「前回の観察から続いているもの・変わって見えるもの」へ1文だけ触れます（比較のための比較はしない。無理に差を作らない）。渡されていない初回は触れません。
+
 最後に「次の問い」をひとつだけ置きます。観た事から自然に立ち上がる問いを1文で。助言や提案の形にしない。可能なら本人の言葉をひとつ含める。
 
 JSON形式のみで返答:
@@ -165,11 +201,11 @@ JSON形式のみで返答:
 }`;
 
   const userContent = `## 参加者: ${participant.name}
-## 期間: ${periodStart} 〜 ${periodEnd}（本日: ${todayJST} / 記入${entryDays}日）
+## 期間: ${periodStart} 〜 ${periodEnd}（直近${REPORT_WINDOW_DAYS}日の窓 / 本日: ${todayJST} / 記入${entryDays}日）
 
 ### 日次ログ
 ${dailyLines.join("\n")}
-${skipLines.length > 0 ? `\n### 書かなかった期間（本人の任意回答つき）\n${skipLines.join("\n")}` : ""}`;
+${skipLines.length > 0 ? `\n### 書かなかった期間（本人の任意回答つき）\n${skipLines.join("\n")}` : ""}${priorSection}`;
 
   const fallback: StandaloneReport = {
     correlationLens: "（レポートの生成に失敗しました。少し時間をおいてから、もう一度お試しください。）",

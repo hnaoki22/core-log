@@ -5,6 +5,7 @@
 import { getParticipantByEmail } from "./participant-db";
 import { logger } from "./logger";
 import { escapeHtml } from "./sanitize";
+import { MORNING_CLOSE_HOUR_JST } from "./date-utils";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const FROM_EMAIL = process.env.REMIND_FROM_EMAIL || "CORE Log <noreply@resend.dev>";
@@ -179,7 +180,7 @@ function buildEveningNoMorningEmail(name: string, token: string) {
         <p>${safeName}さん、お疲れさまでした。</p>
         <p>今日1日を振り返って、<br>
         <strong>気づいたこと・学んだこと</strong>を3分で記録しましょう。</p>
-        <p style="color: #888; font-size: 12px;">※ 朝の意図設定は12:00で締め切られました。<br>本日の振り返りだけでも記録を残しましょう。</p>
+        <p style="color: #888; font-size: 12px;">※ 朝の意図設定は${MORNING_CLOSE_HOUR_JST}:00で締め切られました。<br>本日の振り返りだけでも記録を残しましょう。</p>
         <div style="text-align: center; margin: 24px 0;">
           <a href="${url}" style="display: inline-block; background: #C17817; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: bold; font-size: 16px;">
             今日の振り返りを記入する →

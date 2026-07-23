@@ -8,7 +8,7 @@
 import { notFound } from "next/navigation";
 import { getParticipantWithLogsByToken, hasRecentInertiaNudge, insertInertiaNudge } from "@/lib/supabase";
 import { computeInertiaNudge } from "@/lib/inertia-nudge";
-import { getTodayJST, getCurrentHourJST, isGracePeriod, calculateWeekNum } from "@/lib/date-utils";
+import { getTodayJST, getCurrentHourJST, isGracePeriod, calculateWeekNum, MORNING_CLOSE_HOUR_JST } from "@/lib/date-utils";
 import { getFlagsForTenant } from "@/lib/feature-flags";
 import { getKanNoKiPhase } from "@/lib/kan-no-ki";
 import { getTodayQuestionsForTenant, getTodayDayKey } from "@/lib/daily-questions";
@@ -58,7 +58,7 @@ export default async function InputPageServer({
     } else {
       initialIsMorning = false;
     }
-  } else if (hour >= 12 || inGracePeriod) {
+  } else if (hour >= MORNING_CLOSE_HOUR_JST || inGracePeriod) {
     initialIsMorning = false;
     initialMorningClosed = true;
   }

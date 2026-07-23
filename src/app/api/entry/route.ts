@@ -7,7 +7,7 @@ import { createMorningEntry, createEveningOnlyEntry, updateEveningEntry, hasLogg
 import { computeSkipFollowup } from "@/lib/standalone";
 import { getParticipantByToken, getManagerById } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
-import { isProgramEnded, isProgramNotStarted, getCurrentHourJST, isGracePeriod } from "@/lib/date-utils";
+import { isProgramEnded, isProgramNotStarted, getCurrentHourJST, isGracePeriod, MORNING_CLOSE_HOUR_JST } from "@/lib/date-utils";
 import { sanitizeInput } from "@/lib/sanitize";
 import { logger } from "@/lib/logger";
 import { resolvePhaseMode, triggerBodyPromptIfNeeded } from "@/lib/kan-no-ki";
@@ -87,12 +87,12 @@ export async function POST(request: NextRequest) {
     if (type === "morning") {
       const { participantName, date, morningIntent, energy, dojoPhase, weekNum, morningDurationSec } = body;
 
-      // 朝の記入は12:00（正午）まで
-      // 深夜0:00〜3:59はグレースピリオド（前日扱い）なので朝の記入は不可
+      // 朝の記入は14:00まで（2026-07-22 戦略会議決定。旧: 正午12:00）
+      // 深夜0:00〜1:59はグレースピリオド（前日扱い）なので朝の記入は不可
       const hour = getCurrentHourJST();
-      if (hour >= 12 || isGracePeriod()) {
+      if (hour >= MORNING_CLOSE_HOUR_JST || isGracePeriod()) {
         return NextResponse.json(
-          { error: "朝の意図設定は12:00までです。本日の振り返りをご記入ください。", morningClosed: true },
+          { error: `朝の意図設定は${MORNING_CLOSE_HOUR_JST}:00までです。本日の振り返りをご記入ください。`, morningClosed: true },
           { status: 403 }
         );
       }
@@ -258,7 +258,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, durationSec: respDurationE });
     }
 
-    // 朝未記入で12:00を過ぎた場合の夕方のみエントリー
+    // 朝未記入で14:00（MORNING_CLOSE_HOUR_JST）を過ぎた場合の夕方のみエントリー
     if (type === "evening_only") {
       const { participantName, date, eveningInsight, energy, dojoPhase, weekNum, eveningDurationSec } = body;
 

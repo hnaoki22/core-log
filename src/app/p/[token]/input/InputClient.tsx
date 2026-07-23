@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { getTodayJST, getCurrentHourJST, isGracePeriod } from "@/lib/date-utils";
+import { getTodayJST, getCurrentHourJST, isGracePeriod, MORNING_CLOSE_HOUR_JST } from "@/lib/date-utils";
 import { getPlaceholderExample, type CustomExampleSet } from "@/lib/placeholder-examples";
 import { useState, useEffect, useRef } from "react";
 import { useFeatures } from "@/lib/use-features";
@@ -201,7 +201,7 @@ export default function InputPage({ token, initialData }: Props) {
           } else {
             setIsMorning(false);
           }
-        } else if (hour >= 12 || inGracePeriod) {
+        } else if (hour >= MORNING_CLOSE_HOUR_JST || inGracePeriod) {
           setIsMorning(false);
           setMorningClosed(true);
         }

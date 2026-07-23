@@ -2,31 +2,44 @@
 // All date calculations should use JST since users are in Japan
 
 /**
- * Business day boundary: 4:00 AM JST.
+ * Business day boundary: 2:00 AM JST.
  *
- * Submissions between 0:00–3:59 AM JST are treated as the PREVIOUS calendar day.
+ * Submissions between 0:00–1:59 AM JST are treated as the PREVIOUS calendar day.
  * This prevents late-night evening reflections from being misclassified as the
  * next day's morning entry.
  *
- * Design rationale (2026-04-16):
+ * Design rationale (2026-04-16, updated 2026-07-23):
  *   A user who finishes overtime at 0:30 AM and writes their evening reflection
  *   should have it recorded on the day they actually worked, not on the next
- *   calendar day.  The 4:00 AM cutoff is safe because virtually no CORE Log
- *   user begins their workday before 4:00 AM.
+ *   calendar day.  Originally 4:00 AM; moved to 2:00 AM by the 2026-07-22
+ *   strategy meeting decision（夜の締切は翌2:00）. The business day now runs
+ *   2:00 → next 2:00 AM, paired with the morning window closing at 14:00
+ *   (MORNING_CLOSE_HOUR_JST below).
  */
-export const BUSINESS_DAY_START_HOUR = 4;
+export const BUSINESS_DAY_START_HOUR = 2;
+
+/**
+ * Morning entry window closes at 14:00 JST.
+ *
+ * 2026-07-22 strategy meeting decision（朝の締切は14:00。旧: 正午12:00）—
+ * lunch-break and afternoon-shift users kept missing the noon cutoff.
+ * From this hour the input UI switches to the evening reflection, morning
+ * POSTs are rejected server-side (api/entry), and stats.ts treats the evening
+ * slot as "open" for completion-rate weighting.
+ */
+export const MORNING_CLOSE_HOUR_JST = 14;
 
 /**
  * Get today's "business date" in YYYY-MM-DD format in JST.
  *
- * During the grace period (0:00–3:59 AM JST) the returned date is the
- * previous calendar day.  From 4:00 AM onward, it is the current calendar day.
+ * During the grace period (0:00–1:59 AM JST) the returned date is the
+ * previous calendar day.  From 2:00 AM onward, it is the current calendar day.
  */
 export function getTodayJST(): string {
   const now = new Date();
   // Subtract BUSINESS_DAY_START_HOUR to shift the day boundary.
-  // At 3:59 AM → shifted to 23:59 previous day → previous date.
-  // At 4:00 AM → shifted to 00:00 same day → current date.
+  // At 1:59 AM → shifted to 23:59 previous day → previous date.
+  // At 2:00 AM → shifted to 00:00 same day → current date.
   const shifted = new Date(now.getTime() - BUSINESS_DAY_START_HOUR * 60 * 60 * 1000);
   return shifted.toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" });
 }
@@ -47,10 +60,10 @@ export function getCurrentHourJST(): number {
 }
 
 /**
- * Returns true when current JST time is in the grace period (0:00–3:59 AM).
+ * Returns true when current JST time is in the grace period (0:00–1:59 AM).
  * During this window, the business date is the previous calendar day, so
  * morning submissions should be blocked (the morning window for that business
- * day closed at noon the previous day).
+ * day closed at MORNING_CLOSE_HOUR_JST the previous day).
  */
 export function isGracePeriod(): boolean {
   return getCurrentHourJST() < BUSINESS_DAY_START_HOUR;
