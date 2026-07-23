@@ -3,6 +3,7 @@
 // Design: "1 day = morning + evening". Both must be completed for 100%.
 
 import { NotionLogEntry } from "./supabase";
+import { MORNING_CLOSE_HOUR_JST } from "./date-utils";
 
 export type ParticipantStats = {
   /** Days with ANY submission (morning or evening or both) */
@@ -26,11 +27,12 @@ export type ParticipantStats = {
 };
 
 // ===== Time-of-day boundary for completion rate =====
-// Before 13:00 JST: today's evening slot hasn't "opened" yet, so the denominator for today
-// starts at 0.5 (morning only). At/after 13:00 JST, denominator becomes 1.0 (both slots).
-// To avoid completion rate exceeding 100% when a user writes evening before 13:00, we use
-// max(time-based minimum, actual submitted weight) as the per-day denominator.
-const EVENING_OPEN_HOUR_JST = 13;
+// Before MORNING_CLOSE_HOUR_JST (14:00 JST): today's evening slot hasn't "opened" yet, so the
+// denominator for today starts at 0.5 (morning only). At/after 14:00 JST, denominator becomes
+// 1.0 (both slots). To avoid completion rate exceeding 100% when a user writes evening before
+// the open hour, we use max(time-based minimum, actual submitted weight) as the denominator.
+// 2026-07-23: 朝の締切 12:00→14:00 に合わせて 13 固定値から共有定数へ（0722戦略会議決定）。
+const EVENING_OPEN_HOUR_JST = MORNING_CLOSE_HOUR_JST;
 
 function getCurrentJSTHour(): number {
   const jstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
