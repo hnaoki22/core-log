@@ -9,8 +9,10 @@ import {
   updateMissionFields,
   getMissionsByParticipant,
   getMissionById,
+  getParticipantByNameCrossTenant,
 } from "@/lib/supabase";
 import { getManagerByToken, getParticipantByToken, getParticipantByName } from "@/lib/participant-db";
+import type { ManagerInfo, ParticipantInfo } from "@/lib/participant-db";
 import { getTodayJST } from "@/lib/date-utils";
 import { sendNotificationEmail } from "@/lib/email";
 import { sanitizeInput } from "@/lib/sanitize";
@@ -24,6 +26,63 @@ const ALLOWED_MISSION_STATUS = new Set([
   "保留",
   "中止",
 ]);
+
+type MissionTarget = {
+  id: string;
+  name: string;
+  email?: string;
+  token?: string;
+  tenantId: string;
+};
+
+// Trap 3（actor's tenant vs target's tenant）: ミッションが属する参加者を解決する。
+// actor のテナント固定だと、admin が他テナント参加者の /m ページ（クロステナント
+// 表示可）からミッションを作成した時に、admin のホームテナント側へ
+// participant_id="" で無エラー作成される silent wrong-tenant write になる
+// （2026-07-04 認可監査）。自テナント一致を優先し、admin のみ一意な
+// クロステナント一致へフォールバックする（同名複数テナントは null = 404）。
+async function resolveMissionTarget(
+  manager: ManagerInfo | null,
+  participant: ParticipantInfo | null,
+  participantName: string
+): Promise<MissionTarget | null> {
+  if (participant) {
+    if (!participant.tenantId) return null;
+    return {
+      id: participant.id,
+      name: participant.name,
+      email: participant.email,
+      token: participant.token,
+      tenantId: participant.tenantId,
+    };
+  }
+  if (!manager) return null;
+  if (manager.tenantId) {
+    const own = await getParticipantByName(participantName, manager.tenantId);
+    if (own?.id && own.tenantId) {
+      return {
+        id: own.id,
+        name: own.name,
+        email: own.email,
+        token: own.token,
+        tenantId: own.tenantId,
+      };
+    }
+  }
+  if (manager.isAdmin) {
+    const cross = await getParticipantByNameCrossTenant(participantName);
+    if (cross) {
+      return {
+        id: cross.id,
+        name: cross.name,
+        email: cross.email,
+        token: cross.token,
+        tenantId: cross.tenantId,
+      };
+    }
+  }
+  return null;
+}
 
 export async function GET(request: NextRequest) {
   const participantName = request.nextUrl.searchParams.get("participantName");
@@ -39,8 +98,7 @@ export async function GET(request: NextRequest) {
   try {
     const manager = await getManagerByToken(token);
     const participant = !manager ? await getParticipantByToken(token) : null;
-    const tenantId = manager?.tenantId || participant?.tenantId;
-    if (!tenantId) {
+    if (!manager && !participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -49,6 +107,15 @@ export async function GET(request: NextRequest) {
     // their direct reports, but that breaks today's admin overview).
     if (participant && participant.name !== participantName) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // Trap 3: TARGET 参加者のテナントで読む。actor のテナント固定だと、admin が
+    // 他テナント参加者を表示中の再取得が常に空リストになる（POST 修正と対）。
+    // 対象が見つからない場合は従来どおり actor のテナントで読む（＝空リスト）。
+    const target = await resolveMissionTarget(manager, participant, participantName);
+    const tenantId = target?.tenantId || manager?.tenantId || participant?.tenantId;
+    if (!tenantId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const missions = await getMissionsByParticipant(participantName, tenantId);
@@ -88,12 +155,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "participantName required" }, { status: 400 });
     }
 
-    const tenantId = participant?.tenantId || manager?.tenantId;
-    if (!tenantId) {
-      return NextResponse.json({ error: "Tenant unresolved" }, { status: 500 });
+    // Trap 3: TARGET 参加者のテナントに書く（actor のテナントではなく）。
+    // 従来は対象が見つからなくても participant_id="" で actor テナントに
+    // 作成されていた（silent wrong-tenant write / orphan mission）。
+    const target = await resolveMissionTarget(manager, participant, effectiveName);
+    if (!target) {
+      return NextResponse.json({ error: "Participant not found" }, { status: 404 });
     }
-    const targetParticipantObj = participant || await getParticipantByName(effectiveName, tenantId);
-    const participantId = targetParticipantObj?.id || "";
+    const tenantId = target.tenantId;
+    const participantId = target.id;
 
     const setDate = getTodayJST();
     const createdBy = manager ? "上司設定" : "自己設定";
@@ -115,14 +185,13 @@ export async function POST(request: NextRequest) {
     // Notify about new mission (non-blocking)
     try {
       if (manager) {
-        // Manager created → notify participant
-        const targetParticipant = await getParticipantByName(effectiveName, tenantId);
-        if (targetParticipant?.email && !targetParticipant.email.includes("example.com")) {
+        // Manager created → notify participant (target row already resolved above)
+        if (target.email && target.token && !target.email.includes("example.com")) {
           await sendNotificationEmail({
-            to: targetParticipant.email,
-            recipientName: targetParticipant.name.split(" ")[0],
+            to: target.email,
+            recipientName: target.name.split(" ")[0],
             senderName: manager.name,
-            token: targetParticipant.token,
+            token: target.token,
             type: "mission_created",
             detail: sanitizedTitle,
           });
@@ -158,24 +227,26 @@ export async function PATCH(request: NextRequest) {
     if (!manager && !participant) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
-    const tenantId = manager?.tenantId || participant?.tenantId;
-    if (!tenantId) {
-      return NextResponse.json({ error: "Tenant unresolved" }, { status: 500 });
-    }
 
-    // Confirm the mission belongs to the caller's tenant AND that a participant
-    // caller owns the mission. Previously these checks were missing, letting
+    // Confirm the caller may touch this mission: tenant-scoped callers must
+    // match the mission's tenant (admins may edit cross-tenant — same
+    // isAdmin-based rule as the admin CRUD routes), and a participant caller
+    // must own the mission. Previously these checks were missing, letting
     // anyone with any valid token rewrite any mission row by guessing its id.
     const mission = await getMissionById(missionId);
     if (!mission) {
       return NextResponse.json({ error: "Mission not found" }, { status: 404 });
     }
-    if (mission.tenantId !== tenantId) {
+    const actorTenantId = manager?.tenantId || participant?.tenantId;
+    if (!manager?.isAdmin && mission.tenantId !== actorTenantId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     if (participant && mission.participantName !== participant.name) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+    // Trap 3: 以降の UPDATE は mission の tenant_id（target）で行う。actor の
+    // テナントを使うと、admin のクロステナント編集が 0 行更新で silently 失敗する。
+    const tenantId = mission.tenantId;
 
     // Field edit (title/purpose/deadline)
     if (title !== undefined) {

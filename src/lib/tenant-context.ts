@@ -116,3 +116,50 @@ export function resolveManagerTenantStrict(manager: ManagerLike): StrictTenantRe
     },
   };
 }
+
+// ===== Target-tenant resolution for admin WRITE endpoints (Trap 3) =====
+//
+// Admin write endpoints (import, phase-labels, consult-intervention, ...)
+// must write to the tenant the admin has SELECTED on the dashboard
+// (?tenant=slug), not to the admin's home tenant. Resolving to the actor's
+// tenant produced silent wrong-tenant writes: the dashboard shows 大幸薬品
+// but the rows land in the admin's home tenant with no error
+// (bug_corelog_dojo_switch_403.md 横展開, 2026-07-04).
+//
+// Unlike resolveAdminTenantContext (read path), an UNKNOWN slug here is a
+// hard 404 — never a silent home-tenant fallback, because falling back on a
+// write is exactly the wrong-tenant write this helper exists to prevent.
+
+export type AdminTargetTenantResult =
+  | {
+      ok: true;
+      tenantId: string;
+      source: "query-slug" | "manager.tenantId" | "super-admin-default";
+    }
+  | {
+      ok: false;
+      status: 403 | 404;
+      errorBody: { error: string; detail: string };
+    };
+
+export async function resolveAdminTargetTenant(
+  manager: ManagerLike,
+  requestedSlug: string | null
+): Promise<AdminTargetTenantResult> {
+  if (manager.isAdmin && requestedSlug) {
+    const tenant = await getTenantBySlug(requestedSlug);
+    if (tenant) {
+      return { ok: true, tenantId: tenant.id, source: "query-slug" };
+    }
+    return {
+      ok: false,
+      status: 404,
+      errorBody: {
+        error: "Unknown tenant",
+        detail: `tenant slug not found: ${requestedSlug}`,
+      },
+    };
+  }
+  // No slug (or non-admin caller): fall back to the strict actor-tenant rule.
+  return resolveManagerTenantStrict(manager);
+}

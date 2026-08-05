@@ -300,7 +300,7 @@ export default function AdminDashboard() {
     setManagerImportLoading(true);
     setManagerImportError(null);
     try {
-      const res = await fetch("/api/admin/import", {
+      const res = await fetch(`/api/admin/import${selectedTenantSlug ? `?tenant=${selectedTenantSlug}` : ""}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, csv: managerCsvText, dryRun: true }),
@@ -315,7 +315,7 @@ export default function AdminDashboard() {
   const handleManagerImportExecute = async () => {
     setManagerImportLoading(true);
     try {
-      const res = await fetch("/api/admin/import", {
+      const res = await fetch(`/api/admin/import${selectedTenantSlug ? `?tenant=${selectedTenantSlug}` : ""}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, csv: managerCsvText, dryRun: false }),
@@ -1154,7 +1154,7 @@ export default function AdminDashboard() {
                     </Link>
                   )}
                   {isOn("tier-g.consultIntervention") && (
-                    <Link href={`/a/${token}/features/consult`} className="card p-4 hover:shadow-md transition-shadow">
+                    <Link href={`/a/${token}/features/consult${selectedTenantSlug ? `?tenant=${selectedTenantSlug}` : ""}`} className="card p-4 hover:shadow-md transition-shadow">
                       <div className="w-9 h-9 rounded-lg bg-[#F2F2F7] flex items-center justify-center text-[#1A1A2E] mb-2"><IconUsers size={18} /></div>
                       <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">介入ログ</h3>
                       <p className="text-xs text-[#8B8489]">コーチング記録</p>
@@ -1701,7 +1701,7 @@ export default function AdminDashboard() {
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <label className="block text-xs font-medium text-[#2C2C4A]">CSVデータ</label>
-                      <a href={`/api/admin/import?token=${token}`} download className="text-xs text-[#8B7355] hover:text-[#6B5335] underline">テンプレートをダウンロード</a>
+                      <a href={`/api/admin/import?token=${token}${selectedTenantSlug ? `&tenant=${selectedTenantSlug}` : ""}`} download className="text-xs text-[#8B7355] hover:text-[#6B5335] underline">テンプレートをダウンロード</a>
                     </div>
                     <textarea
                       value={csvText}
@@ -1742,7 +1742,7 @@ export default function AdminDashboard() {
                       onClick={async () => {
                         setImportLoading(true); setImportError(null);
                         try {
-                          const res = await fetch("/api/admin/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, csv: csvText, dryRun: true }) });
+                          const res = await fetch(`/api/admin/import${selectedTenantSlug ? `?tenant=${selectedTenantSlug}` : ""}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, csv: csvText, dryRun: true }) });
                           const json = await res.json();
                           if (!res.ok) {
                             setImportError({ error: json.error, details: [...(json.details || []), ...(json.duplicates || [])] });
@@ -1805,7 +1805,7 @@ export default function AdminDashboard() {
                       onClick={async () => {
                         setImportLoading(true);
                         try {
-                          const res = await fetch("/api/admin/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, csv: csvText, dryRun: false }) });
+                          const res = await fetch(`/api/admin/import${selectedTenantSlug ? `?tenant=${selectedTenantSlug}` : ""}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, csv: csvText, dryRun: false }) });
                           const json = await res.json();
                           if (res.ok) {
                             setImportResult(json);
