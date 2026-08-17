@@ -5,12 +5,20 @@
 // - standalone テナント限定 + §6 のアンロック条件（21日経過+記入10日）を
 //   サーバー側でも検証する（UI ゲートだけに頼らない）。
 // - 24時間以内の生成済みレポートがあればそれを返す（LLMコスト抑制）。
+// - 応答には history（表示中を除く過去レポート・新しい順・上限 REPORT_HISTORY_LIMIT）を
+//   同梱する（2026-07-23 太田さん FB「3週間分の塊の推移」→ 過去レポートを並べて見る）。
+//   同じ本人・standalone・解禁済みのゲートを通った後にのみ返るので、別エンドポイントにしない。
 
 import { NextRequest, NextResponse } from "next/server";
 import { getLogsByParticipant } from "@/lib/supabase";
 import { getParticipantByToken } from "@/lib/participant-db";
 import { isStandaloneTenant, computeUnlockState } from "@/lib/standalone";
-import { getLatestStandaloneReport, generateStandaloneReport, latestSubmittedLogDate } from "@/lib/standalone-report";
+import {
+  getLatestStandaloneReport,
+  generateStandaloneReport,
+  latestSubmittedLogDate,
+  listStandaloneReports,
+} from "@/lib/standalone-report";
 import { getTodayJST } from "@/lib/date-utils";
 import { logger } from "@/lib/logger";
 
@@ -60,7 +68,15 @@ export async function GET(request: NextRequest) {
     const latest = await getLatestStandaloneReport(participant.id, tenantId, Infinity);
     const latestLogDate = latestSubmittedLogDate(logs);
     if (latest && latestLogDate && latest.periodEnd >= latestLogDate) {
-      return NextResponse.json({ success: true, cached: true, ...latest });
+      const history = await listStandaloneReports(participant.id, tenantId, { excludeId: latest.id });
+      // history 取得失敗はレポート本体を止めない（logger 済み）。UI で「取得できなかった」と出せるよう明示する。
+      return NextResponse.json({
+        success: true,
+        cached: true,
+        ...latest,
+        history: history ?? [],
+        historyUnavailable: history === null,
+      });
     }
 
     const generated = await generateStandaloneReport(
@@ -76,7 +92,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ success: true, cached: false, ...generated });
+    // 生成直後は今作った1件を除いた過去分（永続化に失敗した場合 id="" なので除外指定なし）
+    const history = await listStandaloneReports(participant.id, tenantId, {
+      excludeId: generated.id || null,
+    });
+    return NextResponse.json({
+      success: true,
+      cached: false,
+      ...generated,
+      history: history ?? [],
+      historyUnavailable: history === null,
+    });
   } catch (error) {
     logger.error("standalone report API error", { error: String(error) });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

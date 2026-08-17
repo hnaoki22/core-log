@@ -71,6 +71,59 @@ function moodLabel(v: string | null | undefined): string {
   return v ? MOOD_LABEL[v] ?? v : "未記入";
 }
 
+// standalone_reports の1行 → StoredStandaloneReport（getLatest / list 共通の変換。純関数）
+export type StandaloneReportRow = {
+  id: string;
+  report: unknown;
+  period_start: string;
+  period_end: string;
+  entry_days: number;
+  created_at: string;
+};
+
+export function mapStandaloneReportRow(row: StandaloneReportRow): StoredStandaloneReport {
+  return {
+    id: row.id,
+    report: row.report as StandaloneReport,
+    periodStart: row.period_start,
+    periodEnd: row.period_end,
+    entryDays: row.entry_days,
+    createdAt: row.created_at,
+  };
+}
+
+// 過去レポート一覧の上限（本人のレポート画面「これまでのレポート」用）
+export const REPORT_HISTORY_LIMIT = 30;
+
+/**
+ * 本人の生成済みレポートを新しい順に返す（過去のレポートを並べて見る用。
+ * 2026-07-23 太田さん Slack FB「3週間分の塊の推移として見れるように」→
+ * 7/24 本藤さん「過去のレポートを並べて見られる画面」の最小形。8/12 再提起）。
+ * excludeId を渡すと、その1件（＝画面上部に表示中の最新）を除いて返す。
+ * 失敗時は空配列を返さず null（呼び出し側が「取得できなかった」と区別できるように）。
+ */
+export async function listStandaloneReports(
+  participantId: string,
+  tenantId: string,
+  opts: { limit?: number; excludeId?: string | null } = {}
+): Promise<StoredStandaloneReport[] | null> {
+  const limit = opts.limit ?? REPORT_HISTORY_LIMIT;
+  let query = getClient()
+    .from("standalone_reports")
+    .select("id, report, period_start, period_end, entry_days, created_at")
+    .eq("participant_id", participantId)
+    .eq("tenant_id", tenantId);
+  if (opts.excludeId) query = query.neq("id", opts.excludeId);
+  const { data, error } = await query
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) {
+    logger.error("listStandaloneReports failed", { error: error.message, participantId });
+    return null;
+  }
+  return (data ?? []).map((row) => mapStandaloneReportRow(row as StandaloneReportRow));
+}
+
 /**
  * 直近の生成済みレポートを取得（24時間以内のものをキャッシュとして扱う）。
  */
@@ -98,14 +151,7 @@ export async function getLatestStandaloneReport(
     return null;
   }
   if (!data) return null;
-  return {
-    id: data.id,
-    report: data.report as StandaloneReport,
-    periodStart: data.period_start,
-    periodEnd: data.period_end,
-    entryDays: data.entry_days,
-    createdAt: data.created_at,
-  };
+  return mapStandaloneReportRow(data as StandaloneReportRow);
 }
 
 /**
