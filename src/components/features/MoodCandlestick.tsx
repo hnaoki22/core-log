@@ -5,6 +5,8 @@
 // - 1日＝1本。始値=朝気分（energy）、終値=夕気分（evening_energy）。
 //   4段階を 1〜4 に数値化。
 // - 朝<夕（上昇）/ 朝>夕（下降）を色分け。同値はフラット表現。
+//   色弱の方にも一目で分かるよう、上昇=塗りつぶし / 下降=白抜き（枠線のみ）の
+//   形の違いも併用する（2026-08-04 太田さん Slack FB。色に依存しない冗長符号化）。
 // - 夕未入力の日は朝のみのマーカー（丸印）。
 // - 欠測日は「ありません」と突きつけない（§4 / 文字起こし01:21）:
 //   日付軸は実カレンダー間隔のまま詰めず、記入日同士が離れている場合は
@@ -165,6 +167,8 @@ export function MoodCandlestick({ logs, days = 21, title = "気分の推移" }: 
               const yTop = yFor(Math.max(d.open, d.close));
               const yBottom = yFor(Math.min(d.open, d.close));
               const bodyH = Math.max(2.5, yBottom - yTop); // 同値はフラット（細い横棒）
+              // 下降は白抜き（枠線のみ）。色だけでなく形でも上下が判別できるようにする。
+              const hollow = down;
               return (
                 <g key={i}>
                   <rect
@@ -173,7 +177,9 @@ export function MoodCandlestick({ logs, days = 21, title = "気分の推移" }: 
                     width={candleW}
                     height={d.open === d.close ? 2.5 : bodyH}
                     rx={1.5}
-                    fill={color}
+                    fill={hollow ? "white" : color}
+                    stroke={hollow ? color : undefined}
+                    strokeWidth={hollow ? 1.5 : undefined}
                   />
                 </g>
               );
@@ -203,17 +209,20 @@ export function MoodCandlestick({ logs, days = 21, title = "気分の推移" }: 
 
       <div className="flex items-center gap-3 mt-2.5">
         <LegendSwatch color={COLOR_UP} label="朝より上向き" />
-        <LegendSwatch color={COLOR_DOWN} label="朝より下向き" />
+        <LegendSwatch color={COLOR_DOWN} label="朝より下向き" hollow />
         <LegendSwatch color={COLOR_FLAT} label="フラット / 片方のみ" />
       </div>
     </div>
   );
 }
 
-function LegendSwatch({ color, label }: { color: string; label: string }) {
+function LegendSwatch({ color, label, hollow = false }: { color: string; label: string; hollow?: boolean }) {
   return (
     <span className="inline-flex items-center gap-1 text-[9px] text-[#8B8489]">
-      <span className="inline-block w-2 h-2 rounded-sm" style={{ backgroundColor: color }}></span>
+      <span
+        className="inline-block w-2 h-2 rounded-sm"
+        style={hollow ? { border: `1.5px solid ${color}`, backgroundColor: "white" } : { backgroundColor: color }}
+      ></span>
       {label}
     </span>
   );

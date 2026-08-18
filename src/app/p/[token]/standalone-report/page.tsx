@@ -21,7 +21,23 @@ type ReportPayload = {
   entryDays: number;
   createdAt: string;
   cached?: boolean;
+  // 過去レポート（表示中を除く・新しい順）。2026-07-23 太田さん FB「3週間分の塊の推移」の最小形。
+  history?: HistoryItem[];
+  historyUnavailable?: boolean;
 };
+
+type HistoryItem = {
+  id: string;
+  report: ReportPayload["report"];
+  periodStart: string;
+  periodEnd: string;
+  entryDays: number;
+  createdAt: string;
+};
+
+function fmtDate(d: string): string {
+  return (d || "").slice(0, 10).replace(/-/g, "/");
+}
 
 export default function StandaloneReportPage() {
   const params = useParams();
@@ -39,6 +55,8 @@ export default function StandaloneReportPage() {
   const [noteText, setNoteText] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [noteError, setNoteError] = useState("");
+  // 過去レポートの開閉状態（id → 開いているか）
+  const [openHistory, setOpenHistory] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -233,6 +251,70 @@ export default function StandaloneReportPage() {
                       </div>
                     ))}
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* これまでのレポート（過去分を並べて見る。3週間の塊の推移） */}
+            {(data.historyUnavailable || (data.history && data.history.length > 0)) && (
+              <div className="card p-5">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-lg">🗂️</span>
+                  <h2 className="font-semibold text-sm text-[#1A1A2E]">これまでのレポート</h2>
+                </div>
+                <p className="text-[10px] text-[#8B8489] mb-3">
+                  過去に観た事を新しい順に並べています。開いて読み比べると、続いているもの・変わって見えるものに気づくかもしれません。
+                </p>
+                {data.historyUnavailable ? (
+                  <p className="text-xs text-[#8B8489]">過去のレポートを取得できませんでした。少し時間をおいて開き直してください。</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {(data.history ?? []).map((h) => {
+                      const open = !!openHistory[h.id];
+                      return (
+                        <li key={h.id} className="bg-[#FAF7F3] rounded-xl">
+                          <button
+                            type="button"
+                            onClick={() => setOpenHistory((prev) => ({ ...prev, [h.id]: !prev[h.id] }))}
+                            aria-expanded={open}
+                            className="w-full flex items-center justify-between text-left px-3 py-2.5"
+                          >
+                            <span className="text-xs text-[#1A1A2E]">
+                              {fmtDate(h.periodStart)} 〜 {fmtDate(h.periodEnd)}
+                              <span className="text-[#8B8489]">（記入{h.entryDays}日）</span>
+                            </span>
+                            <span className="text-[10px] text-[#8B8489] ml-2 whitespace-nowrap">
+                              {fmtDate(h.createdAt)} {open ? "▲" : "▼"}
+                            </span>
+                          </button>
+                          {open && (
+                            <div className="px-3 pb-3 space-y-3">
+                              <div>
+                                <p className="text-[10px] text-[#8B8489] font-medium mb-1">気分と意図の動き</p>
+                                <p className="text-xs text-[#1A1A2E] leading-relaxed whitespace-pre-wrap">{h.report.correlationLens}</p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] text-[#8B8489] font-medium mb-1">繰り返し現れるテーマ</p>
+                                <p className="text-xs text-[#1A1A2E] leading-relaxed whitespace-pre-wrap">{h.report.themeLens}</p>
+                              </div>
+                              {h.report.skipNote && (
+                                <div>
+                                  <p className="text-[10px] text-[#8B8489] font-medium mb-1">書かなかった日について</p>
+                                  <p className="text-xs text-[#5B5560] leading-relaxed">{h.report.skipNote}</p>
+                                </div>
+                              )}
+                              {h.report.nextQuestion && (
+                                <div className="border-l-2 border-l-[#1A1A2E] pl-2">
+                                  <p className="text-[10px] text-[#8B8489] font-medium mb-1">次の問い</p>
+                                  <p className="text-xs text-[#1A1A2E] leading-relaxed">{h.report.nextQuestion}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
                 )}
               </div>
             )}
