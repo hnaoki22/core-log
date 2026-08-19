@@ -2,9 +2,12 @@
 
 import { BottomNav } from "@/components/BottomNav";
 import { EnergyGlyph } from "@/components/EnergyGlyph";
-import { MoodCandlestick } from "@/components/features/MoodCandlestick";
+import { MoodTrendLong } from "@/components/features/MoodTrendLong";
+import { ReportHistoryList, type ReportHistoryItem, type ReportNote } from "@/components/features/ReportHistoryList";
 import { formatDateTimeJST, formatTimeJST } from "@/lib/date-utils";
+import { useFeatures } from "@/lib/use-features";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 
 /** Format datetime string to "2026/6/10 08:30" in JST */
 const formatDateTime = formatDateTimeJST;
@@ -66,9 +69,15 @@ const formatTime = formatTimeJST;
 export type LogsInitialData = {
   logs: LogEntry[];
   badges: { feedback: number; feedbackTotal: number; mission: number };
-  // standalone §6: 解禁後のみ true。ローソク足の長期表示をログ一覧の上に出す
+  // standalone: 長期トレンド（約3ヶ月）をログ一覧の上に出す（初日から常時）
   standaloneCandle?: boolean;
+  // standalone §6: 解禁後のみ true。「AI分析（これまで）」の閲覧セクションを出す
+  standaloneUnlocked?: boolean;
 };
+
+// standalone のログ一覧は最新N件だけ見せ、残りは折りたたむ
+// （2026-08-18 太田さん FB: 66日分がずらっと並ぶページは要らない。CSV と長期トレンドを主役に）
+const RECENT_LOG_COUNT = 7;
 
 interface Props {
   token: string;
@@ -80,6 +89,75 @@ export default function LogsClient({ token, initialData }: Props) {
   const [logs, setLogs] = useState<LogEntry[]>(initialData.logs);
   const [badges, setBadges] = useState<{ feedback: number; feedbackTotal: number; mission: number }>(initialData.badges);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showAllLogs, setShowAllLogs] = useState(false);
+
+  // AI分析（これまで）: 生成せずに保存済みの分析を閲覧（standalone・解禁後のみ）
+  const sa = !!initialData.standaloneCandle;
+  const unlocked = !!initialData.standaloneUnlocked;
+  const { isOn } = useFeatures();
+  const notesEnabled = isOn("tier-e.selfInsightNote");
+  const [reports, setReports] = useState<ReportHistoryItem[] | null>(null); // null=未取得
+  const [reportsError, setReportsError] = useState("");
+  const [notesByReport, setNotesByReport] = useState<Record<string, ReportNote[]>>({});
+
+  useEffect(() => {
+    if (!unlocked) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/standalone/report?token=${encodeURIComponent(token)}&view=1`);
+        const body = await res.json();
+        if (cancelled) return;
+        if (!res.ok) {
+          setReportsError(body?.error || "分析を取得できませんでした");
+          setReports([]);
+          return;
+        }
+        if (body?.empty) {
+          setReports([]);
+          return;
+        }
+        const latest: ReportHistoryItem = {
+          id: body.id,
+          report: body.report,
+          periodStart: body.periodStart,
+          periodEnd: body.periodEnd,
+          entryDays: body.entryDays,
+          createdAt: body.createdAt,
+        };
+        setReports([latest, ...((body.history as ReportHistoryItem[]) ?? [])]);
+        if (body.historyUnavailable) setReportsError("過去の分析の一部を取得できませんでした");
+      } catch {
+        if (!cancelled) {
+          setReportsError("通信エラーが発生しました");
+          setReports([]);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [token, unlocked]);
+
+  // 自分の気づき（フラグON時のみ）を reportId で束ねて履歴に添える
+  useEffect(() => {
+    if (!unlocked || !notesEnabled) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/standalone/report/note?token=${encodeURIComponent(token)}`);
+        const body = await res.json();
+        if (cancelled || !res.ok || !Array.isArray(body.notes)) return;
+        const grouped: Record<string, ReportNote[]> = {};
+        for (const n of body.notes as ReportNote[]) {
+          if (!n.reportId) continue;
+          (grouped[n.reportId] ??= []).push(n);
+        }
+        setNotesByReport(grouped);
+      } catch {
+        /* 気づきの取得失敗は致命的ではない（本文の閲覧を優先） */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [token, unlocked, notesEnabled]);
 
   // Background revalidate so logs stay fresh in long-running tabs and the
   // mission badge (which needs a join into mission_comments) populates.
@@ -167,20 +245,55 @@ export default function LogsClient({ token, initialData }: Props) {
       </div>
 
       <div className="max-w-md mx-auto px-5 pt-5 animate-fade-up relative z-10">
-        {/* standalone §6: 振り返り＝ログ一覧＋ローソク足の長期表示（解禁後のみ） */}
-        {initialData.standaloneCandle && logs.length > 0 && (
+        {/* standalone: 長期トレンド（約3ヶ月・週足＋日々の線）。2026-08-18 太田さん FB で 42日→約3ヶ月に */}
+        {sa && logs.length > 0 && (
           <div className="mb-4">
-            <MoodCandlestick
+            <MoodTrendLong
               logs={logs.map((l) => ({
                 date: l.date,
                 energy: l.energy,
                 eveningEnergy: l.eveningEnergy ?? null,
               }))}
-              days={42}
-              title="気分の推移（長期）"
+              days={91}
             />
           </div>
         )}
+
+        {/* standalone §6: AI分析（これまで）— 生成せずに保存済みの分析と自分の気づきを見返す（解禁後のみ） */}
+        {sa && unlocked && (
+          <div className="card p-5 mb-4">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🕯️</span>
+                <h3 className="font-semibold text-sm text-[#1A1A2E]">AI分析（これまで）</h3>
+              </div>
+              <Link
+                href={`/p/${token}/standalone-report`}
+                className="text-[11px] font-medium text-white bg-[#1A1A2E] rounded-full px-3 py-1.5"
+              >
+                新しく観てもらう
+              </Link>
+            </div>
+            <p className="text-[10px] text-[#8B8489] mb-3">
+              保存済みの分析を新しい順に並べています。開くと当時の見立てと、自分の気づきを読み返せます。
+            </p>
+            {reports === null && !reportsError && (
+              <p className="text-xs text-[#8B8489]">読み込んでいます…</p>
+            )}
+            {reportsError && <p className="text-xs text-[#8B8489] mb-2">{reportsError}</p>}
+            {reports !== null && reports.length === 0 && !reportsError && (
+              <p className="text-xs text-[#8B8489]">まだ分析はありません。「新しく観てもらう」から最初の3週間の見立てを作れます。</p>
+            )}
+            {reports !== null && reports.length > 0 && (
+              <ReportHistoryList
+                items={reports}
+                notesByReport={notesEnabled ? notesByReport : undefined}
+                initiallyOpenId={reports[0]?.id ?? null}
+              />
+            )}
+          </div>
+        )}
+
         {logs.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-12 h-12 bg-[#EFE8DD] rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -193,7 +306,23 @@ export default function LogsClient({ token, initialData }: Props) {
           </div>
         ) : (
           <div className="space-y-2">
-            {logs.map((log) => {
+            {sa && (
+              <div className="flex items-center justify-between px-1 pt-1">
+                <p className="text-[11px] font-medium text-[#5B5560]">
+                  {showAllLogs ? `すべてのログ（${logs.length}件）` : `最近のログ（${Math.min(RECENT_LOG_COUNT, logs.length)}件）`}
+                </p>
+                {logs.length > RECENT_LOG_COUNT && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllLogs((v) => !v)}
+                    className="text-[11px] font-medium text-[#1A1A2E] underline underline-offset-2"
+                  >
+                    {showAllLogs ? "最近の分だけにする" : `すべて表示（${logs.length}件）`}
+                  </button>
+                )}
+              </div>
+            )}
+            {(sa && !showAllLogs ? logs.slice(0, RECENT_LOG_COUNT) : logs).map((log) => {
               const config = statusConfig[log.status] || statusConfig.empty;
               return (
                 <div key={log.id} className="card overflow-hidden">

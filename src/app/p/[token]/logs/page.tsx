@@ -7,7 +7,8 @@
 
 import { notFound } from "next/navigation";
 import { getParticipantWithLogsByToken, getUnreadFeedbackCount, getFeedbackByParticipant } from "@/lib/supabase";
-import { isStandaloneTenant } from "@/lib/standalone";
+import { isStandaloneTenant, computeUnlockState } from "@/lib/standalone";
+import { getTodayJST } from "@/lib/date-utils";
 import LogsClient, { type LogsInitialData } from "./LogsClient";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +42,8 @@ export default async function LogsPageServer({
   // standalone: ローソク足の長期表示は初日から常時（2026-06-10夜 本藤さん決定。
   // 解禁ゲートが残るのは AI分析のみ）
   const standaloneCandle = await isStandaloneTenant(tenantId);
+  // AI分析（これまで）の表示は解禁後のみ（§6 のゲートはAPI側でも検証される）
+  const standaloneUnlocked = standaloneCandle && computeUnlockState(result.logs, getTodayJST()).unlocked;
 
   const initialData: LogsInitialData = {
     logs: result.logs.map((l) => ({
@@ -68,6 +71,7 @@ export default async function LogsPageServer({
       mission: 0, // filled by client-side background revalidate
     },
     standaloneCandle,
+    standaloneUnlocked,
   };
 
   console.log(

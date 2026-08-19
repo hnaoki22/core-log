@@ -54,10 +54,15 @@ core-log/
 │   │   └── verify/[token]/     # OTP 検証画面
 │   ├── components/features/
 │   │   ├── DailyQuestionsBlock.tsx   # 3問×textarea+マイク（朝/夕で再利用）
-│   │   └── VoiceInput.tsx            # Whisper 録音/送信
+│   │   ├── VoiceInput.tsx            # Whisper 録音/送信
+│   │   ├── MoodCandlestick.tsx       # 気分ローソク足（日足・21日・ホーム）
+│   │   ├── MoodTrendLong.tsx         # 気分の長期ビュー（週足＋日々の線・約3ヶ月・ログ画面）
+│   │   └── ReportHistoryList.tsx     # 過去のAI分析の開閉リスト（レポート画面／ログ画面で共用）
 │   ├── lib/
 │   │   ├── feature-flags.ts          # FEATURE_CATALOG（§5 で詳述）
 │   │   ├── daily-questions.ts        # メゾ層 store（JST / 7曜日 / legacy flat 後方互換）
+│   │   ├── mood-series.ts            # 気分の週足・日々の中点の集計（純関数・テスト付き）
+│   │   ├── standalone-report.ts      # 21日AIレポート（生成・最新取得・過去一覧 listStandaloneReports）
 │   │   ├── supabase.ts               # DB 操作の中心（PostgREST 0 行成功ガード入り）
 │   │   ├── tenant-from-token.ts      # token → tenant_id 解決
 │   │   ├── feature-flags.ts, email.ts, otp.ts, session.ts, logger.ts, ...
