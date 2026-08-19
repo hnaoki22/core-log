@@ -4,6 +4,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { EnergyGlyph } from "@/components/EnergyGlyph";
 import { MoodTrendLong } from "@/components/features/MoodTrendLong";
 import { ReportHistoryList, type ReportHistoryItem, type ReportNote } from "@/components/features/ReportHistoryList";
+import type { QuickNoteItem } from "@/components/features/QuickNoteSheet";
 import { formatDateTimeJST, formatTimeJST } from "@/lib/date-utils";
 import { useFeatures } from "@/lib/use-features";
 import { useState, useEffect } from "react";
@@ -73,6 +74,8 @@ export type LogsInitialData = {
   standaloneCandle?: boolean;
   // standalone §6: 解禁後のみ true。「AI分析（これまで）」の閲覧セクションを出す
   standaloneUnlocked?: boolean;
+  // 途中メモ（standalone のみ）: 日付 → その日のメモ（書いた順）。各日の展開行と CSV の列に使う
+  quickNotesByDate?: Record<string, QuickNoteItem[]>;
 };
 
 // standalone のログ一覧は最新N件だけ見せ、残りは折りたたむ
@@ -94,6 +97,9 @@ export default function LogsClient({ token, initialData }: Props) {
   // AI分析（これまで）: 生成せずに保存済みの分析を閲覧（standalone・解禁後のみ）
   const sa = !!initialData.standaloneCandle;
   const unlocked = !!initialData.standaloneUnlocked;
+  // 途中メモ（standalone のみ・サーバー初期値。一覧の再取得では変わらない）
+  const notesByDate = initialData.quickNotesByDate ?? {};
+  const notesFor = (date: string): QuickNoteItem[] => notesByDate[date] ?? [];
   const { isOn } = useFeatures();
   const notesEnabled = isOn("tier-e.selfInsightNote");
   const [reports, setReports] = useState<ReportHistoryItem[] | null>(null); // null=未取得
@@ -189,7 +195,8 @@ export default function LogsClient({ token, initialData }: Props) {
   // Excel opens Japanese text without mojibake. HM feedback / manager comment
   // are intentionally excluded — this is the participant's own export.
   const handleDownloadCsv = () => {
-    const headers = ["日付", "曜日", "朝の意図", "本日の振り返り", "エネルギー", "ステータス"];
+    // standalone のみ末尾に「途中メモ」列（時刻つき・複数は「 ／ 」区切り）。従来テナントの列構成は不変。
+    const headers = ["日付", "曜日", "朝の意図", "本日の振り返り", "エネルギー", "ステータス", ...(sa ? ["途中メモ"] : [])];
     const rows = [...logs]
       // Oldest → newest reads naturally in a spreadsheet.
       .sort((a, b) => a.date.localeCompare(b.date))
@@ -201,6 +208,9 @@ export default function LogsClient({ token, initialData }: Props) {
           csvCell(log.eveningInsight || ""),
           csvCell(log.energy ? energyLabel[log.energy] : ""),
           csvCell(statusLabel[log.status] ?? ""),
+          ...(sa
+            ? [csvCell(notesFor(log.date).map((n) => `${formatTime(n.createdAt)} ${n.text}`).join(" ／ "))]
+            : []),
         ].join(","),
       );
     // ﻿ = UTF-8 BOM. Without it Excel interprets the file as Shift-JIS
@@ -347,6 +357,9 @@ export default function LogsClient({ token, initialData }: Props) {
                         <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${config.bg} ${config.text}`}>
                           {config.label}
                         </span>
+                        {sa && notesFor(log.date).length > 0 && (
+                          <span className="text-[10px] text-[#8B8489]">メモ{notesFor(log.date).length}</span>
+                        )}
                       </div>
                     </div>
 
@@ -383,6 +396,21 @@ export default function LogsClient({ token, initialData }: Props) {
                             )}
                           </div>
                           <p className="text-sm text-[#2C2C4A] leading-relaxed">{log.eveningInsight}</p>
+                        </div>
+                      )}
+
+                      {/* 途中メモ（standalone）: 日中に「＋」から書き足した一言を、その日の記録に添える */}
+                      {sa && notesFor(log.date).length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-medium text-[#5B5560] tracking-wide uppercase mb-1">途中メモ</p>
+                          <div className="space-y-1">
+                            {notesFor(log.date).map((n) => (
+                              <p key={n.id} className="text-sm text-[#2C2C4A] leading-relaxed whitespace-pre-wrap">
+                                <span className="text-[10px] text-[#C9BDAE] mr-2 tabular-nums">{formatTime(n.createdAt)}</span>
+                                {n.text}
+                              </p>
+                            ))}
+                          </div>
                         </div>
                       )}
 

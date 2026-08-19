@@ -4,6 +4,7 @@ import { getTodayJST, getCurrentHourJST, formatDateTimeJST } from "@/lib/date-ut
 import { BottomNav } from "@/components/BottomNav";
 import { useFeatures } from "@/lib/use-features";
 import { MoodCandlestick } from "@/components/features/MoodCandlestick";
+import { QuickNoteSheet, QuickNoteButton, type QuickNoteItem } from "@/components/features/QuickNoteSheet";
 import { EnergyGlyph, EnergyDot, ENERGY_COLORS } from "@/components/EnergyGlyph";
 import {
   IconRepeat,
@@ -68,6 +69,9 @@ export type ParticipantHomeInitialData = {
   // unlocked=false の間は分析系UI（チャート・トレンド・機能メニュー）を非表示、
   // unlocked=true で「ふっと現れる」カード＋ローソク足＋振り返り/AI分析が解禁。
   standalone?: { unlocked: boolean; daysElapsed: number; entryDays: number } | null;
+  // 途中メモ（standalone のみ・今日の分）。ホーム右上「＋」の中身（2026-08-18 太田さん FB）。
+  // 従来テナントでは undefined/[]。
+  quickNotes?: QuickNoteItem[];
 };
 
 interface Props {
@@ -95,6 +99,9 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
 
   // standalone §6: サーバーが確定した段階開示の状態（null=従来テナント）
   const sa = initialData.standalone ?? null;
+  // 途中メモ（standalone のみ）: 「＋」で開くシート。今日の分はサーバー初期値→シート内で更新
+  const [quickNotes, setQuickNotes] = useState<QuickNoteItem[]>(initialData.quickNotes ?? []);
+  const [noteSheetOpen, setNoteSheetOpen] = useState(false);
   // 「ふっと現れる」一回性の演出: 初回表示のみ大きなカードを fade-in。
   // 既読は端末ローカル（localStorage）に記録し、以降は通常メニューとして残す。
   const [unlockSeen, setUnlockSeen] = useState(true); // SSR と初回描画を一致させるため true 始まり
@@ -251,40 +258,53 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
           </Link>
         )}
 
-        {/* Today CTA Card */}
+        {/* Today CTA Card
+            standalone: 右上「＋」は「途中メモ」（朝夕とは別枠で、気づいた時に一言を書き足す）。
+            2026-08-18 定例・太田さん FB「押しても記入するのと同じで意味が薄い」→ 中身を実装。
+            カード本体は従来どおり記入画面へ。従来テナントは飾りの「＋」のまま（挙動不変）。 */}
         {todayStatus.href ? (
-          <Link href={todayStatus.href}>
-            <div className="bg-[#1A1A2E] text-white p-5 rounded-2xl cursor-pointer hover:bg-[#141423] transition-all shadow-lg">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <p className="text-gray-400 text-xs font-medium tracking-wide uppercase mb-1">Today</p>
-                  <p className="text-lg font-semibold tracking-tight">{todayStatus.text}</p>
-                  <p className="text-gray-400 text-xs mt-1">{todayStatus.sub}</p>
+          <div className="relative">
+            <Link href={todayStatus.href}>
+              <div className="bg-[#1A1A2E] text-white p-5 rounded-2xl cursor-pointer hover:bg-[#141423] transition-all shadow-lg">
+                <div className="flex items-start justify-between mb-3">
+                  <div className={sa ? "pr-16 min-w-0" : "min-w-0"}>
+                    <p className="text-gray-400 text-xs font-medium tracking-wide uppercase mb-1">Today</p>
+                    <p className="text-lg font-semibold tracking-tight">{todayStatus.text}</p>
+                    <p className="text-gray-400 text-xs mt-1">{todayStatus.sub}</p>
+                  </div>
+                  {!sa && (
+                    <div className="bg-white/10 rounded-xl p-2.5">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                      </svg>
+                    </div>
+                  )}
                 </div>
-                <div className="bg-white/10 rounded-xl p-2.5">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                  </svg>
+                <div className="bg-white/10 rounded-xl py-2.5 text-center text-sm font-medium">
+                  記入する
                 </div>
               </div>
-              <div className="bg-white/10 rounded-xl py-2.5 text-center text-sm font-medium">
-                記入する
-              </div>
-            </div>
-          </Link>
+            </Link>
+            {sa && (
+              <QuickNoteButton count={quickNotes.length} onClick={() => setNoteSheetOpen(true)} variant="dark" />
+            )}
+          </div>
         ) : (
-          <div className="card-rule border-l-[#2D6A4F] p-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#EFF5F1] rounded-full flex items-center justify-center">
+          <div className="card-rule border-l-[#2D6A4F] p-5 relative">
+            <div className={`flex items-center gap-3 ${sa ? "pr-16" : ""}`}>
+              <div className="w-10 h-10 bg-[#EFF5F1] rounded-full flex items-center justify-center flex-shrink-0">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12"/>
                 </svg>
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="font-semibold text-[#1A1A2E]">{todayStatus.text}</p>
                 <p className="text-xs text-[#5B5560] mt-0.5">{todayStatus.sub}</p>
               </div>
             </div>
+            {sa && (
+              <QuickNoteButton count={quickNotes.length} onClick={() => setNoteSheetOpen(true)} variant="light" />
+            )}
           </div>
         )}
 
@@ -645,6 +665,18 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
           )}
         </div>
       </div>
+
+      {/* 途中メモのシート。コンテンツ枠（relative z-10 + アニメーション）の中に置くと
+          その stacking context に閉じ込められて BottomNav（z-50）の下に潜るため、ルート直下に置く */}
+      {sa && (
+        <QuickNoteSheet
+          token={token}
+          open={noteSheetOpen}
+          onClose={() => setNoteSheetOpen(false)}
+          notes={quickNotes}
+          onNotesChange={setQuickNotes}
+        />
+      )}
 
       <BottomNav active="home" baseUrl={`/p/${token}`} badges={badges} />
     </div>

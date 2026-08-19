@@ -18,6 +18,10 @@
 // あわせて、保存済みの前回レポート要旨を比較素材として渡し、「前回からの
 // 変化・継続」に各レンズが1文触れる＝「3週間の塊の推移」の最小形。
 //
+// 途中メモ（2026-08-19 追加）: ホーム右上「＋」から日中に書き足した短いメモ
+// （quick_notes / src/lib/quick-notes.ts）を、窓内の各日に時刻つきで添えて素材に含める
+// （2026-08-18 定例で「＋＝途中追加」が決まり、8/19 本藤さん「AI分析の素材にも含める」）。
+//
 // LLM 呼び出しは llm.ts の llmJson / truncateForLLM 経由。
 // 出力は standalone_reports に永続化（kan_no_ki_observations は観の期の
 // 週次ドメイン専用のため再利用しない＝プリフライト判断）。
@@ -26,6 +30,8 @@ import { llmJson, truncateForLLM } from "@/lib/llm";
 import { getClient, NotionLogEntry, getSkipReasonsByParticipant } from "@/lib/supabase";
 import { isLogSubmitted } from "@/lib/stats";
 import { logger } from "@/lib/logger";
+import { formatTimeJST } from "@/lib/date-utils";
+import { getQuickNotesInRange, groupQuickNotesByDate, type QuickNote } from "@/lib/quick-notes";
 
 export type StandaloneReport = {
   correlationLens: string;
@@ -69,6 +75,54 @@ const MOOD_LABEL: Record<string, string> = {
 
 function moodLabel(v: string | null | undefined): string {
   return v ? MOOD_LABEL[v] ?? v : "未記入";
+}
+
+// 1日あたり素材に載せる途中メモの上限（トークン量の保険。超えた分は件数だけ伝える）
+export const REPORT_QUICK_NOTES_PER_DAY = 6;
+
+/**
+ * 日次素材の行を組む（純関数）。
+ * 各提出日の「朝夕の気分・体調・意図・振り返り」に、その日の途中メモ（2026-08-19 追加。
+ * 日中に本人が書き足した短いメモ）を時刻つきで添える。朝夕の記入が無い日にメモだけが
+ * ある場合も、その日を「（朝夕の記入なし）」として素材に含める（沈黙の日にも本人の
+ * 言葉が残っていることがある）。日付順に返す。
+ */
+export function buildReportDailyLines(
+  windowed: NotionLogEntry[],
+  notesByDate: Record<string, QuickNote[]> = {}
+): string[] {
+  const noteLines = (date: string): string[] => {
+    const notes = notesByDate[date] ?? [];
+    const shown = notes.slice(0, REPORT_QUICK_NOTES_PER_DAY);
+    const lines = shown.map(
+      (n) => `  途中メモ（${formatTimeJST(n.createdAt) || "時刻不明"}）「${truncateForLLM(n.text, 120)}」`
+    );
+    if (notes.length > shown.length) lines.push(`  （途中メモ 他${notes.length - shown.length}件）`);
+    return lines;
+  };
+
+  const logDates = new Set(windowed.map((l) => l.date));
+  const entries: { date: string; text: string }[] = windowed.map((l) => {
+    const parts = [
+      `${l.date}: 朝の気分=${moodLabel(l.energy)} / 夕の気分=${moodLabel(l.eveningEnergy)}`,
+    ];
+    if (l.morningCondition) parts.push(`  朝の体調「${truncateForLLM(l.morningCondition, 80)}」`);
+    if (l.eveningCondition) parts.push(`  夕の体調「${truncateForLLM(l.eveningCondition, 80)}」`);
+    if (l.morningIntent) parts.push(`  朝の意図「${truncateForLLM(l.morningIntent, 160)}」`);
+    if (l.eveningInsight) parts.push(`  夕の振り返り「${truncateForLLM(l.eveningInsight, 160)}」`);
+    parts.push(...noteLines(l.date));
+    return { date: l.date, text: parts.join("\n") };
+  });
+
+  for (const date of Object.keys(notesByDate)) {
+    if (logDates.has(date)) continue;
+    const lines = noteLines(date);
+    if (lines.length === 0) continue;
+    entries.push({ date, text: [`${date}: （朝夕の記入なし）`, ...lines].join("\n") });
+  }
+
+  entries.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  return entries.map((e) => e.text);
 }
 
 // standalone_reports の1行 → StoredStandaloneReport（getLatest / list 共通の変換。純関数）
@@ -196,17 +250,12 @@ export async function generateStandaloneReport(
     ? `\n### 前回のレポート要旨（対象期間 ${prior.periodStart} 〜 ${prior.periodEnd}）\n相関レンズ: ${truncateForLLM(prior.report.correlationLens || "", 400)}\nテーマ反復レンズ: ${truncateForLLM(prior.report.themeLens || "", 400)}`
     : "";
 
-  // 日次データの整形（フィールドごとに切り詰めて総量を抑える）
-  const dailyLines = windowed.map((l) => {
-    const parts = [
-      `${l.date}: 朝の気分=${moodLabel(l.energy)} / 夕の気分=${moodLabel(l.eveningEnergy)}`,
-    ];
-    if (l.morningCondition) parts.push(`  朝の体調「${truncateForLLM(l.morningCondition, 80)}」`);
-    if (l.eveningCondition) parts.push(`  夕の体調「${truncateForLLM(l.eveningCondition, 80)}」`);
-    if (l.morningIntent) parts.push(`  朝の意図「${truncateForLLM(l.morningIntent, 160)}」`);
-    if (l.eveningInsight) parts.push(`  夕の振り返り「${truncateForLLM(l.eveningInsight, 160)}」`);
-    return parts.join("\n");
-  });
+  // 途中メモ（窓内）。取得失敗はレポート生成を止めない（logger 済み・メモ無しで続行）。
+  const quickNotes = await getQuickNotesInRange(participant.id, tenantId, windowStart, latestDate);
+  const notesByDate = groupQuickNotesByDate(quickNotes ?? []);
+
+  // 日次データの整形（フィールドごとに切り詰めて総量を抑える。途中メモも各日に添える）
+  const dailyLines = buildReportDailyLines(windowed, notesByDate);
 
   // スキップ記録（沈黙も情報として・咎めない素材に）。窓内のギャップのみ渡す。
   const skips = (await getSkipReasonsByParticipant(participant.id, tenantId))
@@ -233,6 +282,8 @@ export async function generateStandaloneReport(
 2つのレンズで観ます（両方必須。素材が薄いレンズは薄いなりに正直に書く）:
 1. 相関レンズ: 朝の気分と夕の気分の動き（朝より上がった日・下がった日のパターン）。気分の高い日と低めの日とで、朝の意図のテーマがどう変わるか、そして意図がどこまで果たされたか（達成の勾配）。体調の記述と気分の関係。
 2. テーマ反復レンズ: 朝の意図に繰り返し現れるテーマや言葉。期間の最初と最近とで、同じテーマの言葉の使い方・扱いがどう変わったか（反復と習熟の輪郭）。気分があまり動かない人ではこちらを主役に。
+
+素材に「途中メモ」（日中、気づいた時に本人が書き足した短いメモ。時刻つき）が含まれることがあります。朝夕の記入と同じく本人の言葉として扱い、朝の意図と夕の振り返りのあいだで何が動いていたかを観る手がかりにしてよい（原文引用可）。メモの有無や件数を評価しない。無い日・無い人については触れない。
 
 前回のレポート要旨が素材として渡された場合は、各レンズの終わりに「前回の観察から続いているもの・変わって見えるもの」へ1文だけ触れます（比較のための比較はしない。無理に差を作らない）。渡されていない初回は触れません。
 

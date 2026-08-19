@@ -24,6 +24,8 @@ import { EnergyGlyph, ENERGY_COLORS, ENERGY_TINTS } from "@/components/EnergyGly
 import { ConditionGauges } from "@/components/features/ConditionGauges";
 import { type GaugeRaws, type GaugeKey, gaugeDefsFor } from "@/lib/condition-gauges";
 import { getPlaceholderFromPool } from "@/lib/logform-placeholder-pool";
+import { formatTimeJST } from "@/lib/date-utils";
+import type { QuickNoteItem } from "@/components/features/QuickNoteSheet";
 
 type TodayLog = {
   id: string;
@@ -76,11 +78,30 @@ export type StandaloneInputInitialData = {
   logformV2: boolean;
   prevDay: PrevDayRecord | null;
   inertiaNudge: string | null;  // F5 惰性検知の翌朝メッセージ（表示する時だけ非null）
+  // 途中メモ（ホーム右上「＋」で日中に書き足した一言・今日の分。2026-08-18 太田さん FB）。
+  // ②の画面で「今日の途中メモ」として見返せるようにする。無ければ []。
+  todayNotes?: QuickNoteItem[];
 };
 
 interface Props {
   token: string;
   initialData: StandaloneInputInitialData;
+}
+
+// 途中メモ（今日の分）の参照カード。参照であって主役ではない（今朝の記録カードと同じ muted 配色）。
+function TodayNotesCard({ notes }: { notes: QuickNoteItem[] }) {
+  if (notes.length === 0) return null;
+  return (
+    <div className="bg-[#FBF8F4] border border-[#EFE8DD] p-4 rounded-2xl space-y-2">
+      <p className="text-[10px] text-[#8B8489] font-medium tracking-wide uppercase">今日の途中メモ（{notes.length}件）</p>
+      {notes.map((n) => (
+        <p key={n.id} className="text-sm text-[#5B5560] leading-relaxed whitespace-pre-wrap">
+          <span className="text-[#8B8489] text-xs mr-2 tabular-nums">{formatTimeJST(n.createdAt)}</span>
+          {n.text}
+        </p>
+      ))}
+    </div>
+  );
 }
 
 // F4: 前日ログの1項目 + 「引き継ぐ」ボタン（項目単位のコピー。一括ボタンは作らない）
@@ -111,6 +132,7 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
   const logformV2 = initialData.logformV2;   // logform v2 レイヤー
   const prevDay = initialData.prevDay;
   const inertiaNudge = initialData.inertiaNudge; // F5 惰性検知メッセージ
+  const todayNotes = initialData.todayNotes ?? []; // 途中メモ（今日の分）
 
   const [step, setStep] = useState(1);
   const [condition, setCondition] = useState("");   // ①体調・自由記述（v1）。v2 ではゲージに置換
@@ -500,6 +522,8 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
         {/* ②意図（朝）/ 結果（夕・朝の意図を再掲） */}
         {step === 2 && (
           <div className="space-y-4">
+            {/* 途中メモ（今日の分）: 朝は先頭に。夕は「今朝の記録」の下に出す */}
+            {isMorning && <TodayNotesCard notes={todayNotes} />}
             {isMorning ? (
               logformV2 ? (
                 <>
@@ -578,6 +602,8 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
                     今朝の記録はありません。夕方だけの記入でも大丈夫です。
                   </p>
                 )}
+                {/* 日中に「＋」から書き足した途中メモ（忘れないうちの一言）を、振り返りの手がかりに再掲 */}
+                <TodayNotesCard notes={todayNotes} />
                 {logformV2 ? (
                   <>
                     {/* 太田さん7/15 §2: 夕画面2は「どうなりましたか（上）→ 一番頑張ったことは（下）」。

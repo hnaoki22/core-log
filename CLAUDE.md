@@ -57,12 +57,14 @@ core-log/
 │   │   ├── VoiceInput.tsx            # Whisper 録音/送信
 │   │   ├── MoodCandlestick.tsx       # 気分ローソク足（日足・21日・ホーム）
 │   │   ├── MoodTrendLong.tsx         # 気分の長期ビュー（週足＋日々の線・約3ヶ月・ログ画面）
-│   │   └── ReportHistoryList.tsx     # 過去のAI分析の開閉リスト（レポート画面／ログ画面で共用）
+│   │   ├── ReportHistoryList.tsx     # 過去のAI分析の開閉リスト（レポート画面／ログ画面で共用）
+│   │   └── QuickNoteSheet.tsx        # 途中メモのシート＋「＋ メモ」ボタン（ホーム・standalone のみ）
 │   ├── lib/
 │   │   ├── feature-flags.ts          # FEATURE_CATALOG（§5 で詳述）
 │   │   ├── daily-questions.ts        # メゾ層 store（JST / 7曜日 / legacy flat 後方互換）
 │   │   ├── mood-series.ts            # 気分の週足・日々の中点の集計（純関数・テスト付き）
 │   │   ├── standalone-report.ts      # 21日AIレポート（生成・最新取得・過去一覧 listStandaloneReports）
+│   │   ├── quick-notes.ts            # 途中メモ（quick_notes 表の保存/取得/削除・本人と装置だけ）
 │   │   ├── supabase.ts               # DB 操作の中心（PostgREST 0 行成功ガード入り）
 │   │   ├── tenant-from-token.ts      # token → tenant_id 解決
 │   │   ├── feature-flags.ts, email.ts, otp.ts, session.ts, logger.ts, ...
@@ -151,7 +153,7 @@ PR タイトル例（リポの履歴に合わせる）:
 
 `src/lib/feature-flags.ts` の `FEATURE_CATALOG` は **2026-06-10 時点で 52 件 / 12 カテゴリ**（mode カテゴリ + `standalone_mode` を追加。§9 決定で `tier-f.beforeAfter` と `tier-d.heroAssessment` を削除——打合せ文字起こしの「色軸評価」は「4軸評価」の誤変換で、正対象は HERO自己評価と本藤さん確認済み）。
 
-**mode カテゴリ（2026-06-10 追加）**: `standalone_mode` = 商品版の動作モード。ON のテナントは①朝夕3画面入力（体調→意図/結果→気分、`evening_energy` 分離保存）②気分ローソク足③分析機能の段階開示（21日+記入10日）④マネージャー/管理者のログ本文閲覧を API レベルで遮断＋投稿通知メール停止⑤未記入フォローアップ。大幸薬品では `applyTenantFlagGuards` が強制 OFF（tier-0 と同じ防御）。サーバー判定は `src/lib/standalone.ts`（`isStandaloneTenant` / `standaloneGuard` / `computeUnlockState` / `computeSkipFollowup`）、21日レポートは `src/lib/standalone-report.ts` + `standalone_reports` テーブル、スキップ記録は `skip_reasons` テーブル（migration: `20260610_standalone_mode_schema.sql`）。
+**mode カテゴリ（2026-06-10 追加）**: `standalone_mode` = 商品版の動作モード。ON のテナントは①朝夕3画面入力（体調→意図/結果→気分、`evening_energy` 分離保存）②気分ローソク足③分析機能の段階開示（21日+記入10日）④マネージャー/管理者のログ本文閲覧を API レベルで遮断＋投稿通知メール停止⑤未記入フォローアップ。大幸薬品では `applyTenantFlagGuards` が強制 OFF（tier-0 と同じ防御）。サーバー判定は `src/lib/standalone.ts`（`isStandaloneTenant` / `standaloneGuard` / `computeUnlockState` / `computeSkipFollowup`）、21日レポートは `src/lib/standalone-report.ts` + `standalone_reports` テーブル、スキップ記録は `skip_reasons` テーブル（migration: `20260610_standalone_mode_schema.sql`）。途中メモ（ホーム右上「＋」の中身。2026-08-18 定例・太田さん FB）は `src/lib/quick-notes.ts` + `quick_notes` テーブル（migration: `20260819_quick_notes.sql`）+ `/api/standalone/quick-note`。本人と装置だけが読み、AI分析の素材にも入る（管理者・上司向けの読み取り経路を作らないこと）。
 
 | カテゴリ | 件数 | 代表 |
 |---|---:|---|
