@@ -25,6 +25,7 @@ import {
 import { computeParticipantStats } from "@/lib/stats";
 import { getTodayJST, calculateWeekNum } from "@/lib/date-utils";
 import { isStandaloneTenant, computeUnlockState } from "@/lib/standalone";
+import { getQuickNotesForDate } from "@/lib/quick-notes";
 import ParticipantHomeClient, { type ParticipantHomeInitialData } from "./ParticipantHomeClient";
 
 // Avoid Next.js trying to cache this — data is per-token and changes on each
@@ -73,6 +74,12 @@ export default async function ParticipantHome({
       })()
     : null;
 
+  // 途中メモ（ホーム右上「＋」）: standalone のみ、今日の分を初期描画に載せる。
+  // 取得失敗は logger 済み・空で描画（シートを開いたときに読み直す）。従来テナントは触れない。
+  const quickNotes = standaloneOn
+    ? (await getQuickNotesForDate(participant.id, tenantId, todayJST)) ?? []
+    : [];
+
   const initialData: ParticipantHomeInitialData = {
     participant: {
       id: participant.id,
@@ -95,6 +102,7 @@ export default async function ParticipantHome({
       hasFeedback: l.hasFeedback,
     })),
     standalone,
+    quickNotes,
     badges: {
       feedback: unreadCount,
       feedbackTotal: feedbacks.length,

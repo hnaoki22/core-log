@@ -9,6 +9,7 @@ import { notFound } from "next/navigation";
 import { getParticipantWithLogsByToken, getUnreadFeedbackCount, getFeedbackByParticipant } from "@/lib/supabase";
 import { isStandaloneTenant, computeUnlockState } from "@/lib/standalone";
 import { getTodayJST } from "@/lib/date-utils";
+import { getQuickNotesInRange, groupQuickNotesByDate } from "@/lib/quick-notes";
 import LogsClient, { type LogsInitialData } from "./LogsClient";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +44,20 @@ export default async function LogsPageServer({
   // 解禁ゲートが残るのは AI分析のみ）
   const standaloneCandle = await isStandaloneTenant(tenantId);
   // AI分析（これまで）の表示は解禁後のみ（§6 のゲートはAPI側でも検証される）
-  const standaloneUnlocked = standaloneCandle && computeUnlockState(result.logs, getTodayJST()).unlocked;
+  const todayJST = getTodayJST();
+  const standaloneUnlocked = standaloneCandle && computeUnlockState(result.logs, todayJST).unlocked;
+
+  // 途中メモ（standalone のみ）: ログ一覧の各日に添える＋CSV の列にする。
+  // 範囲は「最も古いログの日〜今日」。取得失敗は logger 済み・無しで描画（一覧は止めない）。
+  let quickNotesByDate: LogsInitialData["quickNotesByDate"] = undefined;
+  if (standaloneCandle) {
+    const oldest = result.logs.reduce<string | null>(
+      (min, l) => (l.date && (!min || l.date < min) ? l.date : min),
+      null
+    );
+    const notes = await getQuickNotesInRange(participant.id, tenantId, oldest ?? todayJST, todayJST);
+    quickNotesByDate = groupQuickNotesByDate(notes ?? []);
+  }
 
   const initialData: LogsInitialData = {
     logs: result.logs.map((l) => ({
@@ -72,6 +86,7 @@ export default async function LogsPageServer({
     },
     standaloneCandle,
     standaloneUnlocked,
+    quickNotesByDate,
   };
 
   console.log(

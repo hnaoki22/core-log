@@ -15,6 +15,7 @@ import { getTodayQuestionsForTenant, getTodayDayKey } from "@/lib/daily-question
 import InputClient, { type InputPageInitialData } from "./InputClient";
 import StandaloneInputClient, { type PrevDayRecord } from "./StandaloneInputClient";
 import { gaugesToRaws } from "@/lib/condition-gauges";
+import { getQuickNotesForDate } from "@/lib/quick-notes";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -166,6 +167,11 @@ export default async function InputPageServer({
         console.warn(`[inertia] detection skipped (non-fatal): ${String(e)}`);
       }
     }
+    // 途中メモ（ホーム右上「＋」で日中に書き足した一言）: 今日の分を②の画面で見返せるように渡す。
+    // 取得失敗は logger 済み・空で描画（記入フローは止めない）。
+    const todayNotes = participant.tenantId
+      ? (await getQuickNotesForDate(participant.id, participant.tenantId, today)) ?? []
+      : [];
     return (
       <StandaloneInputClient
         token={token}
@@ -182,6 +188,7 @@ export default async function InputPageServer({
           logformV2,
           prevDay,
           inertiaNudge,
+          todayNotes,
         }}
       />
     );
