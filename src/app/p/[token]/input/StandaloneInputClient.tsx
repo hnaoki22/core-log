@@ -5,7 +5,7 @@
 // 朝・夕とも3画面遷移。所要目標: 朝1分・夕3分（「朝晩あわせて5分」）。
 //   朝: ①体調「今朝、体はどんな感じですか？」（自由記述・空のまま次へ進める）
 //       → ②意図「今日の意図」 → ③気分（4段階。energy に保存）
-//   夕: ①体調「今、体はどんな感じですか？」
+//   夕: ①体調「一日を終えて、いまはどんな感じですか？」（logform v2。v1 は「今、体はどんな感じですか？」）
 //       → ②結果「今朝の意図、やってみてどうでしたか？」（朝の意図を上部に再掲）
 //       → ③気分（4段階。evening_energy に保存）
 //
@@ -502,8 +502,18 @@ export default function StandaloneInputClient({ token, initialData }: Props) {
                 )}
               </div>
             )}
+            {/* ①の見出し。夕の v2 だけ「体」に限定しない言い方にする（2026-08-24 太田さん Slack）:
+                v2 の夕ゲージは 今日の充実度／体の疲労感／頭のさえ（EVENING_GAUGE_KEYS）で、
+                充実度だけが「体」ではなく一日の質を聞くため、「体はどんな感じですか？」だと
+                最初の項目と噛み合わない。「一日を終えて」で3項目を束ね、「いま」の感覚を聞く
+                ①の役割は保つ（②「どうなりましたか」＝言葉で振り返る段との差を消さない）。
+                朝（睡眠の質/疲労/冴え＝すべて体）と、夕の v1（体調の自由記述のみ）は従来のまま。 */}
             <p className="text-[#1A1A2E] font-medium text-base leading-relaxed">
-              {isMorning ? "今朝、体はどんな感じですか？" : "今、体はどんな感じですか？"}
+              {isMorning
+                ? "今朝、体はどんな感じですか？"
+                : logformV2
+                  ? "一日を終えて、いまはどんな感じですか？"
+                  : "今、体はどんな感じですか？"}
             </p>
             {logformV2 ? (
               <ConditionGauges value={gauges} onChange={setGauges} onFirstInteract={handleFocus} defs={gaugeDefsFor(isMorning)} />
