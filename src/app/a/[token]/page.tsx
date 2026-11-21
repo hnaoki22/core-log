@@ -1205,15 +1205,19 @@ export default function AdminDashboard() {
                     管理画面のどこにも無く、URL を直接入力するしかなかった。フラグを ON に
                     する前に問いを用意する場所なので、例示管理と同じく常時表示する。
                     閲覧中のテナントを引き継ぐ（「全テナント」のときは管理者の home テナントが
-                    開く。編集ページ上部の「編集中」とテナント選択で確認・切替できる）。*/}
-                <Link
-                  href={`/a/${token}/features/daily-questions${selectedTenantSlug ? `?tenant=${encodeURIComponent(selectedTenantSlug)}` : ""}`}
-                  className="card p-4 hover:shadow-md transition-shadow"
-                >
-                  <div className="w-9 h-9 rounded-lg bg-[#F2F2F7] flex items-center justify-center text-[#1A1A2E] mb-2"><IconFile size={18} /></div>
-                  <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">毎日の問い</h3>
-                  <p className="text-xs text-[#8B8489]">入力画面に出す朝・夕の問い（曜日ごと・1行1問）</p>
-                </Link>
+                    開く。編集ページ上部の「編集中」とテナント選択で確認・切替できる）。
+                    編集ページの API は管理者（isAdmin）専用なので、閲覧者（observer）には
+                    カードを出さない（出すと、開いても Unauthorized になる入口が増える）。*/}
+                {!isObserver && (
+                  <Link
+                    href={`/a/${token}/features/daily-questions${selectedTenantSlug ? `?tenant=${encodeURIComponent(selectedTenantSlug)}` : ""}`}
+                    className="card p-4 hover:shadow-md transition-shadow"
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-[#F2F2F7] flex items-center justify-center text-[#1A1A2E] mb-2"><IconFile size={18} /></div>
+                    <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">毎日の問い</h3>
+                    <p className="text-xs text-[#8B8489]">入力画面に出す朝・夕の問い（曜日ごと・1行1問）</p>
+                  </Link>
+                )}
               </div>
             </div>
           </>
