@@ -7,12 +7,16 @@
 //   このカードは API を呼ばない。
 // - 1 件も無いときは、設定先（ミッション画面）への案内を出す。
 // - 呼び名（ミッション／イシュー）は親が MissionTerms で渡す（feature.missionLabelIssue）。
+// - 仮説つきで保存された文（composeIssuePurpose）は、仮説を折りたたまずに出し、
+//   残り（目指す状態・行動）だけを 3 行に折りたたむ。見出しのない文は従来どおり全体を折りたたむ。
 
 import Link from "next/link";
 import { useState } from "react";
 import {
   formatMissionDeadline,
   isLongPurpose,
+  parseIssuePurpose,
+  ISSUE_HYPOTHESIS_LABEL,
   type MissionContextItem,
   type MissionTerms,
 } from "@/lib/mission-context";
@@ -48,24 +52,38 @@ export function MissionContextCard({ missions, terms, missionPageHref }: Props) 
       <div className="space-y-3">
         {missions.map((m) => {
           const deadline = formatMissionDeadline(m.deadline);
-          const long = isLongPurpose(m.purpose);
+          const parts = parseIssuePurpose(m.purpose);
+          const hypothesis = parts.structured ? parts.hypothesis : null;
+          // 折りたたむ対象。仮説つきの文は残りの部分だけ、見出しのない文は従来どおり全体。
+          const body = parts.structured ? parts.plan : m.purpose;
+          const long = isLongPurpose(body);
           const open = expanded[m.id] === true;
           return (
             <div key={m.id} className="min-w-0">
               <p className="text-sm text-[#1A1A2E] font-medium leading-relaxed whitespace-pre-wrap break-words">
                 {m.title}
               </p>
-              {deadline && <p className="text-[11px] text-[#8B8489] mt-0.5">期限: {deadline}</p>}
-              {m.purpose && (
+              {hypothesis && (
+                <div className="mt-1.5">
+                  <p className="text-[10px] text-[#8B8489] font-medium tracking-wide">{ISSUE_HYPOTHESIS_LABEL}</p>
+                  <p className="text-sm text-[#1A1A2E] leading-relaxed whitespace-pre-wrap break-words">
+                    {hypothesis}
+                  </p>
+                </div>
+              )}
+              {deadline && (
+                <p className={`text-[11px] text-[#8B8489] ${hypothesis ? "mt-1.5" : "mt-0.5"}`}>期限: {deadline}</p>
+              )}
+              {body && (
                 <p
                   className={`text-xs text-[#5B5560] leading-relaxed whitespace-pre-wrap break-words mt-1.5 ${
                     long && !open ? "line-clamp-3" : ""
                   }`}
                 >
-                  {m.purpose}
+                  {body}
                 </p>
               )}
-              {m.purpose && long && (
+              {body && long && (
                 <button
                   type="button"
                   aria-expanded={open}

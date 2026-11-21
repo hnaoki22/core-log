@@ -181,7 +181,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   {
     key: "feature.missionOnInput",
     label: "入力画面にミッションを表示",
-    description: "本人の進行中のミッション（名前と、背景・目的の先頭 3 行。続きは開いて読める）を、従来型の入力画面（朝・夕）の問いの上に表示。1 件も無いときは、ミッション画面への案内を出す。Mission機能（feature.mission）が ON のテナントで使う。standalone商品モードのテナントでは表示されない。",
+    description: "本人の進行中のミッション（名前と、背景・目的の先頭 3 行。続きは開いて読める。仮説つきで設定されたものは、仮説を常に表示）を、従来型の入力画面（朝・夕）の問いの上に表示。1 件も無いときは、ミッション画面への案内を出す。Mission機能（feature.mission）が ON のテナントで使う。standalone商品モードのテナントでは表示されない。",
     category: "existing",
     defaultEnabled: false,
     phase1Enabled: false,
@@ -191,7 +191,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   {
     key: "feature.missionLabelIssue",
     label: "ミッションを「イシュー」と表示",
-    description: "参加者画面で、Mission機能の呼び名を「ミッション」から「イシュー（解くべき問題）」に切り替える（下のタブ、ミッション画面の見出しと設定フォーム、入力画面の表示）。通知メールと、マネージャー・管理者の画面は「ミッション」のまま。",
+    description: "参加者画面で、Mission機能の呼び名を「ミッション」から「イシュー（解くべき問い）」に切り替える（下のタブ、ミッション画面の見出しと設定フォーム、入力画面の表示）。設定フォームに「仮説」の欄（必須）が加わり、「完了にする」は「このイシューを閉じる」（理由の記入が必須）になる。通知メールと、マネージャー・管理者の画面は「ミッション」のまま。",
     category: "existing",
     defaultEnabled: false,
     phase1Enabled: false,

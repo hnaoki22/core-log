@@ -1,10 +1,14 @@
 import { describe, it, expect } from "vitest";
 import {
+  ISSUE_HYPOTHESIS_HEADING,
+  ISSUE_PLAN_HEADING,
   MAX_MISSIONS_ON_INPUT,
+  composeIssuePurpose,
   formatMissionDeadline,
   isActiveMissionStatus,
   isLongPurpose,
   missionTerms,
+  parseIssuePurpose,
   selectActiveMissions,
 } from "./mission-context";
 
@@ -173,13 +177,59 @@ describe("missionTerms", () => {
     expect(t.emptyHint).toBe("上のボタンから自分でミッションを設定できます");
   });
 
+  it("keeps the closing flow and the form as they were when the flag is off", () => {
+    // 閉じる操作まわりの文言も、元の画面に書かれていたものと一字一句同じ。
+    const t = missionTerms(false);
+    expect(t.closeButton).toBe("完了にする");
+    expect(t.closeNotePlaceholder).toBe("振り返りコメント（任意）");
+    expect(t.closeConfirm).toBe("完了にする");
+    expect(t.closeNoteRequired).toBe(false);
+    expect(t.closedNoteLabel).toBe("最終振り返り");
+    expect(t.closedStatusLabel).toBe("完了");
+    expect(t.closedSectionTitle).toBe("完了");
+    // 仮説の欄は出さない（従来のフォームのまま）。
+    expect(t.hypothesisLabel).toBeNull();
+    expect(t.hypothesisPlaceholder).toBeNull();
+  });
+
   it("switches every participant-facing label to イシュー when the flag is on", () => {
     const t = missionTerms(true);
     expect(t.tab).toBe("イシュー");
-    expect(t.pageTitle).toBe("イシュー（解くべき問題）");
-    expect(t.inputCardHeading).toBe("設定したイシュー（解くべき問題）");
-    for (const value of Object.values(t)) {
+    expect(t.pageTitle).toBe("イシュー（解くべき問い）");
+    expect(t.titleLabel).toBe("イシュー（解くべき問い） *");
+    expect(t.inputCardHeading).toBe("設定したイシュー（解くべき問い）");
+    const texts = Object.values(t).filter((v): v is string => typeof v === "string");
+    expect(texts.length).toBeGreaterThan(10);
+    for (const value of texts) {
       expect(value).not.toContain("ミッション");
+      // 呼び名の説明は「解くべき問い」にそろえる（「解くべき問題」を残さない）。
+      expect(value).not.toContain("解くべき問題");
+    }
+  });
+
+  it("adds a required hypothesis field when the flag is on", () => {
+    const t = missionTerms(true);
+    expect(t.hypothesisLabel).toBe("仮説（いまの時点の答え） *");
+    expect(t.hypothesisPlaceholder).toBe(
+      "その問いに、今の自分はどう答えるか。こうなっているはず、という答えを一文で"
+    );
+    // 入力欄の案内は書き方だけ。答えの見本（「例:」）は置かない。
+    expect(t.titlePlaceholder).not.toContain("例");
+    expect(t.hypothesisPlaceholder).not.toContain("例");
+    expect(t.purposePlaceholder).not.toContain("例");
+  });
+
+  it("closes an issue with a reason instead of marking it complete when the flag is on", () => {
+    const t = missionTerms(true);
+    expect(t.closeButton).toBe("このイシューを閉じる");
+    expect(t.closeNotePlaceholder).toBe("閉じる理由（解決した、見直した など）");
+    expect(t.closeConfirm).toBe("閉じる");
+    expect(t.closeNoteRequired).toBe(true);
+    expect(t.closedNoteLabel).toBe("閉じた理由");
+    expect(t.closedStatusLabel).toBe("終了");
+    expect(t.closedSectionTitle).toBe("閉じたイシュー");
+    for (const value of [t.closeButton, t.closeNotePlaceholder, t.closeConfirm, t.closedNoteLabel, t.closedStatusLabel, t.closedSectionTitle]) {
+      expect(value).not.toContain("完了");
     }
   });
 
@@ -191,5 +241,101 @@ describe("missionTerms", () => {
   it("falls back to the default wording for a non-boolean argument", () => {
     // @ts-expect-error 実行時に undefined が来ても既定の呼び名を返す
     expect(missionTerms(undefined).tab).toBe("ミッション");
+  });
+});
+
+// 仮説つきの「背景・目的」。テストの文言は合成データ（実在の記入は使わない）。
+describe("composeIssuePurpose", () => {
+  it("puts the hypothesis and the plan under their headings, separated by a blank line", () => {
+    expect(composeIssuePurpose("合成の仮説", "合成の計画")).toBe(
+      "【仮説】\n合成の仮説\n\n【目指す状態と、これからの行動】\n合成の計画"
+    );
+  });
+
+  it("trims each part and keeps line breaks inside a part", () => {
+    expect(composeIssuePurpose("  仮説の文  \n", "\n1行目\n2行目\n")).toBe(
+      "【仮説】\n仮説の文\n\n【目指す状態と、これからの行動】\n1行目\n2行目"
+    );
+  });
+
+  it("omits the heading of an empty part", () => {
+    expect(composeIssuePurpose("仮説だけ", "")).toBe("【仮説】\n仮説だけ");
+    expect(composeIssuePurpose("仮説だけ", "   ")).toBe("【仮説】\n仮説だけ");
+    expect(composeIssuePurpose("", "計画だけ")).toBe("【目指す状態と、これからの行動】\n計画だけ");
+  });
+
+  it("returns an empty string when both parts are empty or missing", () => {
+    expect(composeIssuePurpose("", "")).toBe("");
+    expect(composeIssuePurpose(null, undefined)).toBe("");
+  });
+});
+
+describe("parseIssuePurpose", () => {
+  it("splits what composeIssuePurpose wrote back into the two parts", () => {
+    const saved = composeIssuePurpose("合成の仮説", "1行目\n2行目");
+    expect(parseIssuePurpose(saved)).toEqual({
+      structured: true,
+      hypothesis: "合成の仮説",
+      plan: "1行目\n2行目",
+    });
+  });
+
+  it("reads a hypothesis-only text and a plan-only text", () => {
+    expect(parseIssuePurpose("【仮説】\n仮説だけ")).toEqual({ structured: true, hypothesis: "仮説だけ", plan: null });
+    expect(parseIssuePurpose("【目指す状態と、これからの行動】\n計画だけ")).toEqual({
+      structured: true,
+      hypothesis: null,
+      plan: "計画だけ",
+    });
+  });
+
+  it("leaves a text without the headings as it is (missions set before this form, or by a manager)", () => {
+    expect(parseIssuePurpose("従来の背景・目的\n2行目")).toEqual({
+      structured: false,
+      hypothesis: null,
+      plan: "従来の背景・目的\n2行目",
+    });
+  });
+
+  it("does not split when the heading is not at the very start", () => {
+    // 文の途中に「【仮説】」と書いてあっても、見出しとしては扱わない。
+    const text = "はじめに書いた文。\n【仮説】\nこれは本文の一部";
+    expect(parseIssuePurpose(text)).toEqual({ structured: false, hypothesis: null, plan: text });
+  });
+
+  it("returns nulls for null, undefined, empty or whitespace-only input", () => {
+    const empty = { structured: false, hypothesis: null, plan: null };
+    expect(parseIssuePurpose(null)).toEqual(empty);
+    expect(parseIssuePurpose(undefined)).toEqual(empty);
+    expect(parseIssuePurpose("")).toEqual(empty);
+    expect(parseIssuePurpose("  \n ")).toEqual(empty);
+  });
+
+  it("accepts Windows line breaks and surrounding blank lines", () => {
+    const saved = "\r\n【仮説】\r\n仮説の文\r\n\r\n【目指す状態と、これからの行動】\r\n計画の文\r\n";
+    expect(parseIssuePurpose(saved)).toEqual({ structured: true, hypothesis: "仮説の文", plan: "計画の文" });
+  });
+
+  it("treats a heading with nothing under it as empty", () => {
+    expect(parseIssuePurpose("【仮説】")).toEqual({ structured: true, hypothesis: null, plan: null });
+    expect(parseIssuePurpose("【仮説】\n\n【目指す状態と、これからの行動】\n計画の文")).toEqual({
+      structured: true,
+      hypothesis: null,
+      plan: "計画の文",
+    });
+  });
+
+  it("keeps a hypothesis that itself begins with the heading text", () => {
+    const saved = composeIssuePurpose("【仮説】と書き始めた文", "計画の文");
+    expect(parseIssuePurpose(saved)).toEqual({
+      structured: true,
+      hypothesis: "【仮説】と書き始めた文",
+      plan: "計画の文",
+    });
+  });
+
+  it("uses the headings exported for the form", () => {
+    expect(ISSUE_HYPOTHESIS_HEADING).toBe("【仮説】");
+    expect(ISSUE_PLAN_HEADING).toBe("【目指す状態と、これからの行動】");
   });
 });

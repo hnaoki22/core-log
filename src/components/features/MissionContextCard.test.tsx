@@ -9,7 +9,7 @@ vi.mock("next/link", () => ({
 }));
 
 import { MissionContextCard } from "./MissionContextCard";
-import { missionTerms, type MissionContextItem } from "@/lib/mission-context";
+import { composeIssuePurpose, missionTerms, type MissionContextItem } from "@/lib/mission-context";
 
 // テストの文言は合成データ（実在の記入・実在の人物の記述は使わない）。
 const HREF = "/p/test-token/mission";
@@ -79,14 +79,61 @@ describe("MissionContextCard（描画）", () => {
   });
 
   it("呼び名を切り替えたテナントでは「イシュー」で出し、「ミッション」の語を出さない", () => {
-    const withItem = render([{ id: "m1", title: "合成の問題", purpose: null, deadline: null }], true);
-    expect(withItem).toContain("設定したイシュー（解くべき問題）");
+    const withItem = render([{ id: "m1", title: "合成の問い", purpose: null, deadline: null }], true);
+    expect(withItem).toContain("設定したイシュー（解くべき問い）");
     expect(withItem).not.toContain("ミッション");
 
     const empty = render([], true);
-    expect(empty).toContain("イシュー（解くべき問題）を設定すると、ここに表示されます。");
+    expect(empty).toContain("イシュー（解くべき問い）と仮説を設定すると、ここに表示されます。");
     expect(empty).toContain("イシューを設定する");
     expect(empty).not.toContain("ミッション");
+  });
+
+  it("仮説つきで設定された文は、仮説を折りたたまずに出し、見出しの記号は出さない", () => {
+    const purpose = composeIssuePurpose("合成の仮説の文", "合成の計画の文");
+    const html = render([{ id: "m1", title: "合成の問い", purpose, deadline: "2026-12-17" }], true);
+    expect(html).toContain(">仮説</p>");
+    expect(html).toContain("合成の仮説の文");
+    expect(html).toContain("合成の計画の文");
+    expect(html).toContain("期限: 12/17");
+    // 保存用の見出し（【仮説】など）は画面に出さない。
+    expect(html).not.toContain("【仮説】");
+    expect(html).not.toContain("【目指す状態と、これからの行動】");
+    // 問い → 仮説 → 期限 → 目指す状態・行動 の順。
+    const order = ["合成の問い", "合成の仮説の文", "期限: 12/17", "合成の計画の文"].map((s) => html.indexOf(s));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(order.every((i) => i >= 0)).toBe(true);
+  });
+
+  it("仮説が長くても折りたたまず、残りの部分だけを 3 行に折りたたむ", () => {
+    const longHypothesis = "あ".repeat(120);
+    const longPlan = ["1行目", "2行目", "3行目", "4行目", "5行目"].join("\n");
+    const html = render(
+      [{ id: "m1", title: "合成の問い", purpose: composeIssuePurpose(longHypothesis, longPlan), deadline: null }],
+      true
+    );
+    expect(html).toContain(longHypothesis);
+    expect(html).toContain("続きを見る");
+    // 折りたたみの指定は 1 か所（残りの部分）だけ。
+    expect(html.split("line-clamp-3").length - 1).toBe(1);
+    const clampAt = html.indexOf("line-clamp-3");
+    expect(clampAt).toBeGreaterThan(html.indexOf(longHypothesis));
+  });
+
+  it("仮説だけが設定されているときは、仮説を出し、「続きを見る」は出さない", () => {
+    const html = render(
+      [{ id: "m1", title: "合成の問い", purpose: composeIssuePurpose("あ".repeat(120), ""), deadline: null }],
+      true
+    );
+    expect(html).toContain(">仮説</p>");
+    expect(html).not.toContain("続きを見る");
+    expect(html).not.toContain("line-clamp-3");
+  });
+
+  it("見出しのない文（従来の登録）は、仮説の欄を出さず、これまでどおり全体を出す", () => {
+    const html = render([{ id: "m1", title: "合成のミッション", purpose: "従来の背景と目的", deadline: null }]);
+    expect(html).not.toContain(">仮説</p>");
+    expect(html).toContain("従来の背景と目的");
   });
 
   it("本文の記号はそのまま文字として出す（HTML として解釈しない）", () => {

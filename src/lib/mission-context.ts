@@ -1,5 +1,6 @@
 // 入力画面の「進行中のミッション」表示（feature.missionOnInput）と、
 // ミッションの呼び名の切り替え（feature.missionLabelIssue）で使う純関数。
+// 呼び名を切り替えたテナントの設定フォームにある「仮説」の、保存用のまとめ方と読み方もここに置く。
 // DB にも React にも依存しない（テスト: mission-context.test.ts）。
 
 export type MissionContextItem = {
@@ -82,6 +83,67 @@ export function isLongPurpose(purpose: string | null | undefined): boolean {
   return text.length > PURPOSE_PREVIEW_CHARS;
 }
 
+// ── 仮説つきの「背景・目的」────────────────────────────────────────────
+// イシューの呼び名のテナント（feature.missionLabelIssue）では、設定フォームに「仮説」の欄がある。
+// 保存先は増やさず、既存の「背景・目的」（missions.purpose）に見出しをつけて 1 本にまとめる
+// （朝・夕の問いの答えを 1 つの欄にまとめる daily-question-answers.ts と同じ考え方）。
+// 読むときは見出しで分ける。見出しのない文（従来の登録、マネージャー画面で書いた文）は
+// 分けずに、そのまま 1 つの文として扱う。
+
+export const ISSUE_HYPOTHESIS_HEADING = "【仮説】";
+export const ISSUE_PLAN_HEADING = "【目指す状態と、これからの行動】";
+/** 画面に出すときの見出し（入力画面のカードと、ミッション画面）。 */
+export const ISSUE_HYPOTHESIS_LABEL = "仮説";
+
+/** 仮説と、目指す状態・行動を、保存用の 1 本の文字列にまとめる。どちらも空なら空文字。 */
+export function composeIssuePurpose(
+  hypothesis: string | null | undefined,
+  plan: string | null | undefined
+): string {
+  const h = typeof hypothesis === "string" ? hypothesis.trim() : "";
+  const p = typeof plan === "string" ? plan.trim() : "";
+  const blocks: string[] = [];
+  if (h !== "") blocks.push(`${ISSUE_HYPOTHESIS_HEADING}\n${h}`);
+  if (p !== "") blocks.push(`${ISSUE_PLAN_HEADING}\n${p}`);
+  return blocks.join("\n\n");
+}
+
+export type IssuePurposeParts = {
+  /** 見出しつきで保存された文か。false のときは分けていない（plan に全文が入る）。 */
+  structured: boolean;
+  hypothesis: string | null;
+  plan: string | null;
+};
+
+/**
+ * 保存された「背景・目的」を、仮説と、目指す状態・行動に分ける。
+ * 先頭が見出し（【仮説】か【目指す状態と、これからの行動】）で始まる文だけを分ける。
+ */
+export function parseIssuePurpose(purpose: string | null | undefined): IssuePurposeParts {
+  if (typeof purpose !== "string") return { structured: false, hypothesis: null, plan: null };
+  const text = purpose.replace(/\r\n?/g, "\n").trim();
+  if (text === "") return { structured: false, hypothesis: null, plan: null };
+
+  if (text.startsWith(ISSUE_PLAN_HEADING)) {
+    const plan = text.slice(ISSUE_PLAN_HEADING.length).trim();
+    return { structured: true, hypothesis: null, plan: plan === "" ? null : plan };
+  }
+  if (!text.startsWith(ISSUE_HYPOTHESIS_HEADING)) {
+    return { structured: false, hypothesis: null, plan: text };
+  }
+
+  const rest = text.slice(ISSUE_HYPOTHESIS_HEADING.length);
+  const planMarker = `\n${ISSUE_PLAN_HEADING}`;
+  const at = rest.indexOf(planMarker);
+  const hypothesis = (at === -1 ? rest : rest.slice(0, at)).trim();
+  const plan = at === -1 ? "" : rest.slice(at + planMarker.length).trim();
+  return {
+    structured: true,
+    hypothesis: hypothesis === "" ? null : hypothesis,
+    plan: plan === "" ? null : plan,
+  };
+}
+
 /** 参加者画面でミッション機能を何と呼ぶか。 */
 export type MissionTerms = {
   /** 下のタブ。幅が狭いので 5 文字以内。 */
@@ -91,6 +153,9 @@ export type MissionTerms = {
   createButton: string;
   titleLabel: string;
   titlePlaceholder: string;
+  /** 設定フォームの「仮説」の欄。null のときは欄を出さない（従来のフォームのまま）。 */
+  hypothesisLabel: string | null;
+  hypothesisPlaceholder: string | null;
   purposeLabel: string;
   purposePlaceholder: string;
   submit: string;
@@ -99,6 +164,16 @@ export type MissionTerms = {
   inputCardHeading: string;
   inputCardEmpty: string;
   inputCardEmptyLink: string;
+  /** 進行中のものを閉じる操作（ボタン → 理由の欄 → 確定のボタン）。 */
+  closeButton: string;
+  closeNotePlaceholder: string;
+  closeConfirm: string;
+  /** 閉じるときに、理由の記入を必須にするか。 */
+  closeNoteRequired: boolean;
+  /** 閉じたあとの表示（書いた理由の見出し／状態のバッジ／一覧の見出し）。 */
+  closedNoteLabel: string;
+  closedStatusLabel: string;
+  closedSectionTitle: string;
 };
 
 // 既定の呼び名。ミッション画面とタブに元から書かれていた文言と一字一句同じにしてある
@@ -110,6 +185,8 @@ const MISSION_TERMS: MissionTerms = {
   createButton: "新しいミッションを設定",
   titleLabel: "ミッション名 *",
   titlePlaceholder: "例: Q3営業戦略の提案書を自力で完成させる",
+  hypothesisLabel: null,
+  hypothesisPlaceholder: null,
   purposeLabel: "背景・目的",
   purposePlaceholder: "このミッションを設定する背景や、達成に向けた期待を記入",
   submit: "ミッションを設定",
@@ -118,27 +195,45 @@ const MISSION_TERMS: MissionTerms = {
   inputCardHeading: "進行中のミッション",
   inputCardEmpty: "進行中のミッションを設定すると、ここに表示されます。",
   inputCardEmptyLink: "ミッションを設定する",
+  closeButton: "完了にする",
+  closeNotePlaceholder: "振り返りコメント（任意）",
+  closeConfirm: "完了にする",
+  closeNoteRequired: false,
+  closedNoteLabel: "最終振り返り",
+  closedStatusLabel: "完了",
+  closedSectionTitle: "完了",
 };
 
 // feature.missionLabelIssue が ON のテナントの呼び名。
-// 1 つ目の欄（ミッション名）に「解くべき問題」を一文で、2 つ目の欄（背景・目的）に
-// 目指す状態と行動を書いてもらう。入力画面には 1 つ目の欄が常に見える形で出る。
-// 入力欄の案内は書き方だけを示し、答えの見本は置かない。
+// 1 つ目の欄（ミッション名）に「解くべき問い」を一文で、新しい欄にその仮説（いまの時点の答え）を、
+// 3 つ目の欄（背景・目的）に目指す状態と行動を書いてもらう。入力画面には、問いと仮説が
+// 常に見える形で出る。入力欄の案内は書き方だけを示し、答えの見本は置かない。
+// 仮説は確かめると変わるので、書き直すのではなく、理由を書いて閉じ、新しく設定してもらう
+// （前の問い・仮説と、変えた理由が残る）。
 const ISSUE_TERMS: MissionTerms = {
   tab: "イシュー",
-  pageTitle: "イシュー（解くべき問題）",
-  pageSubtitle: "設定したイシューと、目指す状態・これからの行動",
+  pageTitle: "イシュー（解くべき問い）",
+  pageSubtitle: "設定したイシューと仮説、目指す状態・これからの行動",
   createButton: "新しいイシューを設定",
-  titleLabel: "イシュー（解くべき問題） *",
-  titlePlaceholder: "誰の、どんな問題を解くのかを、一文で",
+  titleLabel: "イシュー（解くべき問い） *",
+  titlePlaceholder: "誰の、どんな問題を解くのか。問いの形で、一文で",
+  hypothesisLabel: "仮説（いまの時点の答え） *",
+  hypothesisPlaceholder: "その問いに、今の自分はどう答えるか。こうなっているはず、という答えを一文で",
   purposeLabel: "目指す状態と、これからの行動",
   purposePlaceholder: "いつまでに、どうなっていたいか。そのために、いつ、何をするか",
   submit: "イシューを設定",
   emptyTitle: "イシューはまだ設定されていません",
   emptyHint: "上のボタンから設定できます",
-  inputCardHeading: "設定したイシュー（解くべき問題）",
-  inputCardEmpty: "イシュー（解くべき問題）を設定すると、ここに表示されます。",
+  inputCardHeading: "設定したイシュー（解くべき問い）",
+  inputCardEmpty: "イシュー（解くべき問い）と仮説を設定すると、ここに表示されます。",
   inputCardEmptyLink: "イシューを設定する",
+  closeButton: "このイシューを閉じる",
+  closeNotePlaceholder: "閉じる理由（解決した、見直した など）",
+  closeConfirm: "閉じる",
+  closeNoteRequired: true,
+  closedNoteLabel: "閉じた理由",
+  closedStatusLabel: "終了",
+  closedSectionTitle: "閉じたイシュー",
 };
 
 /** useIssueLabel = feature.missionLabelIssue が ON か。 */
