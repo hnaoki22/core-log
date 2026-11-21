@@ -172,7 +172,7 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   {
     key: "feature.dailyQuestions",
     label: "朝・夕の問い 6 問表示",
-    description: "テナント毎にカスタマイズした朝3問・夕3問を入力画面に表示。各問いに音声入力ボタン付き。reflection-lab で先行検証中。",
+    description: "テナント毎に登録した朝・夕の問い（各スロット最大3問を表示）を、従来型の入力画面に表示。問いは管理画面の「毎日の問い」で編集する。各問いのマイクは音声入力（tier-e.voiceInput）が ON のテナントだけに出る。standalone商品モードのテナントでは表示されない。",
     category: "existing",
     defaultEnabled: false,
     phase1Enabled: false,

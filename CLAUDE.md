@@ -214,7 +214,7 @@ PR タイトル例（リポの履歴に合わせる）:
   - `src/components/features/DailyQuestionsBlock.tsx` — 問いごとの textarea。Whisper マイクは `voiceEnabled`（= `tier-e.voiceInput` が ON）のときだけ表示。答えは親（InputClient の `dailyAnswers`）が持つ（step 2 から「戻る」で戻っても入力が残るようにするため）
   - `src/lib/daily-question-answers.ts` — 答えを `Q1: 問い\nA1: 答え` の形で 1 本にまとめ、既存の `morning_intent` / `evening_insight` に保存する。どの問いにも答えが無いときは空文字（未記入のまま「次へ」に進めない）
   - `src/app/p/[token]/input/InputClient.tsx` — 「今日の軸 ── X」ヘッダ（軸が空の曜日は出さない）、`isMorning` で朝/夕切替
-  - `src/app/a/[token]/features/daily-questions/page.tsx` + `src/app/api/admin/daily-questions/route.ts` — 管理画面での編集・保存（1 行 1 問）。保存済みの空の軸は空のまま読み込む
+  - `src/app/a/[token]/features/daily-questions/page.tsx` + `src/app/api/admin/daily-questions/route.ts` — 管理画面での編集・保存（1 行 1 問）。保存済みの空の軸は空のまま読み込む。入口は管理画面トップ「参加者向け例示」の「毎日の問い」カード（閲覧中のテナントを `?tenant=` で引き継ぐ。`?tenant=` なしで開くと管理者の home テナントが編集対象になるので、ページ上部の「編集中」を確認する）
 - 問いの欄が出るのは従来型の入力画面（`InputClient`）だけ。`standalone_mode` が ON のテナントは `StandaloneInputClient` に分岐するため、フラグが ON でも問いの欄は出ない（2026-11-21 コード確認）。`tier-s.structuredInput` と同時に ON にしないこと（画面は問いの欄を出すが、「次へ」の判定と保存は構造化入力の欄を見るため、記入を完了できない）。
 
 42 問の文章は Cowork mode 由来の叩き台で、書籍 v2.5 体系・三慧・10 理論との整合は本藤さんが書き直す前提。**Claude Code 側で文言を勝手に書き換えない**（vocabulary-guard 必発火領域）。

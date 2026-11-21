@@ -1194,6 +1194,19 @@ export default function AdminDashboard() {
                   <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">例示管理</h3>
                   <p className="text-xs text-[#8B8489]">各道場の問い・記入欄プレースホルダー (AI 生成可)</p>
                 </Link>
+                {/* 毎日の問い（feature.dailyQuestions の問いの編集）。このページへの入口が
+                    管理画面のどこにも無く、URL を直接入力するしかなかった。フラグを ON に
+                    する前に問いを用意する場所なので、例示管理と同じく常時表示する。
+                    閲覧中のテナントを引き継ぐ（「全テナント」のときは管理者の home テナントが
+                    開く。編集ページ上部の「編集中」とテナント選択で確認・切替できる）。*/}
+                <Link
+                  href={`/a/${token}/features/daily-questions${selectedTenantSlug ? `?tenant=${encodeURIComponent(selectedTenantSlug)}` : ""}`}
+                  className="card p-4 hover:shadow-md transition-shadow"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-[#F2F2F7] flex items-center justify-center text-[#1A1A2E] mb-2"><IconFile size={18} /></div>
+                  <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">毎日の問い</h3>
+                  <p className="text-xs text-[#8B8489]">入力画面に出す朝・夕の問い（曜日ごと・1行1問）</p>
+                </Link>
               </div>
             </div>
           </>
