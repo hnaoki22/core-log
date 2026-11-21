@@ -10,40 +10,44 @@ import {
   getManagerByTokenFromSupabase as getManagerByTokenSupabase,
   getTenantBySlug,
 } from "@/lib/supabase";
-import { resolveAdminTenantContext, resolveManagerTenantStrict } from "@/lib/tenant-context";
+import { resolveAdminTenantContext } from "@/lib/tenant-context";
+import { buildLoginPath, managerKind } from "@/lib/admin-directory";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { token, type, data } = body;
 
-    // Admin authorization check
+    // 追加できるのは管理者（is_admin）だけ。
+    // これまでは、有効なマネージャーのトークンなら役割を問わず通っていた（閲覧者・
+    // マネージャーのトークンでも、参加者や管理者のアカウントを作れた）。
     if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
     const manager = await getManagerByTokenSupabase(token);
-    if (!manager) {
+    if (!manager || manager.isAdmin !== true) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // For create operations, require a specific target tenant.
-    // Admin with ?tenant=slug → that tenant. Otherwise admin's home tenant.
-    // If admin is in 全テナント mode, reject (ambiguous target).
+    // 追加先の環境（テナント）は、必ず ?tenant=slug で受け取る。
+    // これまでは、指定がないと管理者の所属テナントに黙って追加していた。全環境を表示した
+    // まま追加すると、意図しない環境に入り、どこに入ったのかが画面で分からなかった。
+    // 知らない slug のときも、所属テナントには落とさずに断る。
     const tenantSlug = request.nextUrl.searchParams.get("tenant");
-    const tenantResult = resolveManagerTenantStrict(manager);
-    if (!tenantResult.ok) {
-      return NextResponse.json(tenantResult.errorBody, { status: tenantResult.status });
+    if (!tenantSlug) {
+      return NextResponse.json({ error: "追加先の環境を選んでください" }, { status: 400 });
     }
-    let tenantId = tenantResult.tenantId;
-    if (manager.isAdmin && tenantSlug) {
-      const t = await getTenantBySlug(tenantSlug);
-      if (t) tenantId = t.id;
-    } else if (manager.isAdmin && !tenantSlug && !manager.tenantId) {
-      return NextResponse.json(
-        { error: "作成先テナントを指定してください（全テナント状態では作成できません）" },
-        { status: 400 }
-      );
+    const targetTenant = await getTenantBySlug(tenantSlug);
+    if (!targetTenant) {
+      return NextResponse.json({ error: "追加先の環境が見つかりません" }, { status: 400 });
     }
+    const tenantId = targetTenant.id;
+    const tenantInfo = {
+      id: targetTenant.id,
+      slug: targetTenant.slug,
+      name: targetTenant.name,
+      companyName: targetTenant.companyName,
+    };
 
     if (type === "participant") {
       const { name, email, department, dojoPhase, managerId } = data;
@@ -71,7 +75,10 @@ export async function POST(request: NextRequest) {
           id: result.id,
           token: result.token,
           name,
+          // ログイン用のパス。画面はこれを使う（これまでは返しておらず、追加後の表示の URL が欠けていた）
+          url: buildLoginPath("participant", result.token),
         },
+        tenant: tenantInfo,
       });
     }
 
@@ -110,7 +117,9 @@ export async function POST(request: NextRequest) {
           id: result.id,
           token: result.token,
           name,
+          url: buildLoginPath(managerKind(normalizedRole, finalIsAdmin), result.token),
         },
+        tenant: tenantInfo,
       });
     }
 

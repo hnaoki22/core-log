@@ -12,6 +12,7 @@ import { computeParticipantStats } from "@/lib/stats";
 import { getTodayJST, calculateWeekNum } from "@/lib/date-utils";
 import { resolveManagerTenantStrict } from "@/lib/tenant-context";
 import { isStandaloneTenant } from "@/lib/standalone";
+import { tokenForViewer } from "@/lib/admin-directory";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
   const viewerRole = manager.role;
+  // 参加者・マネージャーのトークン（ほかの人の画面を開ける値）は、管理者にだけ返す。
+  // 閲覧者には返さない。閲覧者本人の行だけは返す（tokenForViewer の説明を参照）。
+  const viewerIsAdmin = manager.isAdmin === true;
 
   // Determine which tenant to view
   // tenantSlug === null means "全テナント" (all tenants) was selected (admin only)
@@ -90,7 +94,7 @@ export async function GET(request: NextRequest) {
 
       return {
         id: p.id,
-        token: p.token,
+        token: tokenForViewer(p.token, { isAdmin: viewerIsAdmin }),
         name: p.name,
         department: p.department,
         dojoPhase: p.dojoPhase,
@@ -128,7 +132,7 @@ export async function GET(request: NextRequest) {
       console.error(`Error processing data for ${p.name}:`, error);
       return {
         id: p.id,
-        token: p.token,
+        token: tokenForViewer(p.token, { isAdmin: viewerIsAdmin }),
         name: p.name,
         department: p.department,
         dojoPhase: p.dojoPhase,
@@ -158,7 +162,7 @@ export async function GET(request: NextRequest) {
   // Manager data
   const managerData = managers.map((m) => ({
     id: m.id,
-    token: m.token,
+    token: tokenForViewer(m.token, { isAdmin: viewerIsAdmin, isSelf: m.id === manager.id }),
     name: m.name,
     email: m.email || "",
     department: m.department,
@@ -174,6 +178,9 @@ export async function GET(request: NextRequest) {
     participants: enrichedParticipants,
     managers: managerData,
     viewerRole,
+    // 管理者（is_admin）か。画面は、管理者にだけ出す欄（環境とユーザー）の出し分けにこれを使う。
+    // role の文字列ではなく、サーバーの権限の判定（is_admin）と同じ値で決めるため。
+    viewerIsAdmin,
     tenantId: tenantId || "all",
     tenants: tenants.map((t) => ({ id: t.id, name: t.name, slug: t.slug, companyName: t.companyName })),
   });
