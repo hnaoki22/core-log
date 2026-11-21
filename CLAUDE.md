@@ -58,7 +58,8 @@ core-log/
 │   │   ├── MoodCandlestick.tsx       # 気分ローソク足（日足・21日・ホーム）
 │   │   ├── MoodTrendLong.tsx         # 気分の長期ビュー（週足＋日々の線・約3ヶ月・ログ画面）
 │   │   ├── ReportHistoryList.tsx     # 過去のAI分析の開閉リスト（レポート画面／ログ画面で共用）
-│   │   └── QuickNoteSheet.tsx        # 途中メモのシート＋「＋ メモ」ボタン（ホーム・standalone のみ）
+│   │   ├── QuickNoteSheet.tsx        # 途中メモのシート＋「＋ メモ」ボタン（ホーム・standalone のみ）
+│   │   └── MissionContextCard.tsx    # 入力画面の問いの上に、本人の進行中のミッションを出すカード（feature.missionOnInput。表示だけ・API は呼ばない）
 │   ├── lib/
 │   │   ├── feature-flags.ts          # FEATURE_CATALOG（§5 で詳述）
 │   │   ├── daily-questions.ts        # メゾ層 store（JST / 7曜日 / legacy flat 後方互換）
@@ -67,6 +68,7 @@ core-log/
 │   │   ├── standalone-report.ts      # 21日AIレポート（生成・最新取得・過去一覧 listStandaloneReports）
 │   │   ├── quick-notes.ts            # 途中メモ（quick_notes 表の保存/取得/削除・本人と装置だけ）
 │   │   ├── feedback-draft.ts         # 管理画面「AI下書き」のモデル選択・リクエスト組立て・応答の読み取り（純関数・テスト付き）
+│   │   ├── mission-context.ts        # 入力画面に出すミッションの絞り込み（進行中・最大3件）と、呼び名（ミッション／イシュー）の文言表（純関数・テスト付き）
 │   │   ├── supabase.ts               # DB 操作の中心（PostgREST 0 行成功ガード入り）
 │   │   ├── tenant-from-token.ts      # token → tenant_id 解決
 │   │   ├── feature-flags.ts, email.ts, otp.ts, session.ts, logger.ts, ...
@@ -155,24 +157,29 @@ PR タイトル例（リポの履歴に合わせる）:
 
 ## 5. 機能フラグ（FEATURE_CATALOG 実数）
 
-`src/lib/feature-flags.ts` の `FEATURE_CATALOG` は **2026-06-10 時点で 52 件 / 12 カテゴリ**（mode カテゴリ + `standalone_mode` を追加。§9 決定で `tier-f.beforeAfter` と `tier-d.heroAssessment` を削除——打合せ文字起こしの「色軸評価」は「4軸評価」の誤変換で、正対象は HERO自己評価と本藤さん確認済み）。
+`src/lib/feature-flags.ts` の `FEATURE_CATALOG` は **2026-11-21 時点で 56 件 / 12 カテゴリ**（下の表はコードを数え直した値。2026-06-10 に mode カテゴリ + `standalone_mode` を追加。§9 決定で `tier-f.beforeAfter` と `tier-d.heroAssessment` を削除——打合せ文字起こしの「色軸評価」は「4軸評価」の誤変換で、正対象は HERO自己評価と本藤さん確認済み）。
 
 **mode カテゴリ（2026-06-10 追加）**: `standalone_mode` = 商品版の動作モード。ON のテナントは①朝夕3画面入力（体調→意図/結果→気分、`evening_energy` 分離保存）②気分ローソク足③分析機能の段階開示（21日+記入10日）④マネージャー/管理者のログ本文閲覧を API レベルで遮断＋投稿通知メール停止⑤未記入フォローアップ。大幸薬品では `applyTenantFlagGuards` が強制 OFF（tier-0 と同じ防御）。サーバー判定は `src/lib/standalone.ts`（`isStandaloneTenant` / `standaloneGuard` / `computeUnlockState` / `computeSkipFollowup`）、21日レポートは `src/lib/standalone-report.ts` + `standalone_reports` テーブル、スキップ記録は `skip_reasons` テーブル（migration: `20260610_standalone_mode_schema.sql`）。途中メモ（ホーム右上「＋」の中身。2026-08-18 定例・太田さん FB）は `src/lib/quick-notes.ts` + `quick_notes` テーブル（migration: `20260819_quick_notes.sql`）+ `/api/standalone/quick-note`。本人と装置だけが読み、AI分析の素材にも入る（管理者・上司向けの読み取り経路を作らないこと）。
 
 | カテゴリ | 件数 | 代表 |
 |---|---:|---|
-| `mode` 動作モード | 1 | **standalone_mode**（商品版。大幸は非表示&強制OFF） |
+| `mode` 動作モード | 2 | **standalone_mode**（商品版。大幸は非表示&強制OFF）, logform_v2（standalone の上に重ねる入力フォーム刷新版） |
 | `core` | 3 | morningInput / eveningInput / logHistory |
-| `existing` | 11 | energyTracking, mission, streak, badges, animations, reminderMail, managerFeedback, csvExport, otpAuth, managerAnalytics, **dailyQuestions** |
+| `existing` | 13 | energyTracking, mission, streak, badges, animations, reminderMail, managerFeedback, csvExport, otpAuth, managerAnalytics, **dailyQuestions**, **missionOnInput**, **missionLabelIssue** |
 | `tier-0` 観の期(KAN のキー) | 10 | kanNoKi / weeklyMirror / bodyPrompt / silenceObservation / peerComparison(.tenant/.crossTenant/.industry/.global) / transitionSignal（reflection-lab 限定・大幸薬品は非表示&強制OFF） |
 | `tier-s` Differentiators | 4 | ruminationDetection, doubleLoopPrompt, weeklyConceptualization, structuredInput |
 | `tier-a` Manager Safety Net | 5 | oneOnOneBriefing, burnoutScore, consultantSpotlight, psychSafetyMonitor, managerSelfReflection |
 | `tier-b` Cultural Engine | 4 | aar, knowledgeLibrary, cultureScore, peerReflection |
 | `tier-c` Competency Trap Escape | 3 | unlearnChallenge, identityTracking, outsightTask |
 | `tier-d` PsyCap | 2 | efficacyBooster, hopeDesign（heroAssessment＝4軸自己評価は 2026-06-10 §9 決定で削除） |
-| `tier-e` UX | 4 | microRitualOptimizer, ruminationTimer, calendarBlock, voiceInput |
+| `tier-e` UX | 5 | microRitualOptimizer, ruminationTimer, calendarBlock, voiceInput, selfInsightNote |
 | `tier-f` ROI/Evidence | 2 | growthRoi, clientReport（beforeAfter は 2026-06-10 §9 決定で削除） |
 | `tier-g` Business Model | 3 | multiTenant, pitchGenerator, consultIntervention |
+
+**ミッションを入力画面に出す 2 つのフラグ（2026-11-21 追加。どちらも既定 OFF・`feature.mission` に依存）**:
+- `feature.missionOnInput` = 本人の進行中のミッションを、従来型の入力画面（`InputClient`）の問いの上に出す。読み取りはサーバー（`/p/[token]/input` の `page.tsx`）が `getMissionsByParticipantId`（参加者 ID で引く。氏名では引かない）で行い、`selectActiveMissions`（進行中・新しい順・最大 3 件）を通して `MissionContextCard` に渡す。`initialMissions` は **`null` = 出さない（スイッチ OFF／読めなかった）、`[]` = 未設定（ミッション画面への案内を出す）**。失敗を `[]` にしないこと（設定済みの人に「設定すると表示されます」と出る）。standalone のテナントは `StandaloneInputClient` に分岐するので出ない。
+- `feature.missionLabelIssue` = 参加者画面での呼び名を「ミッション」から「イシュー（解くべき問題）」に切り替える。文言は `src/lib/mission-context.ts` の `missionTerms()` に集約（下のタブ・`/p/[token]/mission` の見出しと設定フォーム・入力画面のカード）。**OFF のときの文言は、元から画面にあった文言と一字一句同じ**（テストで固定）。通知メール（`mission_created` / `mission_comment`）と、マネージャー・管理者の画面は切り替えていない。「フル」プリセットには含めない（呼び名の切り替えは機能の追加ではないため）。
+- 参加者画面にはミッションの名前・内容を書き直す欄が無い（完了にして作り直すか、マネージャー画面の「ミッション管理」→「編集」）。AI下書きにミッションは渡していない。
 
 保存形式: テナント毎に `ai_settings.value` 行（`tenant_id`, `key='feature_flags'`, `value=JSON`）。flat shape（`{flagKey: bool}`）が現行、legacy nested shape（`{default: {...}}`）は読み取り側で互換維持。
 
@@ -186,7 +193,7 @@ PR タイトル例（リポの履歴に合わせる）:
 3. 飾りフラグ（UI に出るがコードに繋がっていない）禁止
 4. **新しいカテゴリ（`tier-*` 等）を追加する場合は、同一 PR で `src/app/a/[token]/features/page.tsx` の `FlagCategory` 型 / `CATEGORY_META` / `CATEGORY_ORDER` を 1:1 で更新する。** 未更新だと features ページのグルーピングで `grouped[未知カテゴリ]` が undefined となり `undefined.push` で白画面クラッシュする（2026-06-02 / PR #30 の事故）。グルーピングは `(grouped[cat] ??= []).push(f)` で動的初期化し、未知カテゴリでも落ちない構造を保つこと。
 
-参考：core-log-engineer SKILL.md は「660 行・28 機能・7 ティア」と古い数値を持っている。**現状の真実は 53 機能・11 カテゴリ**。スキル本文の数値より、このリポの `src/lib/feature-flags.ts` を信用する。
+参考：core-log-engineer SKILL.md は「660 行・28 機能・7 ティア」と古い数値を持っている。**現状の真実は 56 機能・12 カテゴリ（2026-11-21）**。スキル本文の数値より、このリポの `src/lib/feature-flags.ts` を信用する。
 
 ---
 
