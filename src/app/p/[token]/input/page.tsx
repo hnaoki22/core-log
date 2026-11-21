@@ -6,7 +6,8 @@
 // we can SEE where the time goes per request.
 
 import { notFound } from "next/navigation";
-import { getParticipantWithLogsByToken, hasRecentInertiaNudge, insertInertiaNudge } from "@/lib/supabase";
+import { getParticipantWithLogsByToken, getMissionsByParticipantId, hasRecentInertiaNudge, insertInertiaNudge } from "@/lib/supabase";
+import { selectActiveMissions, type MissionContextItem } from "@/lib/mission-context";
 import { computeInertiaNudge } from "@/lib/inertia-nudge";
 import { getTodayJST, getCurrentHourJST, isGracePeriod, calculateWeekNum, MORNING_CLOSE_HOUR_JST } from "@/lib/date-utils";
 import { getFlagsForTenant } from "@/lib/feature-flags";
@@ -206,6 +207,21 @@ export default async function InputPageServer({
     day: getTodayDayKey(),
   };
 
+  // 入力画面の問いの上に出す「進行中のミッション」（feature.missionOnInput）。
+  // スイッチが ON のテナントだけ読む（OFF のテナントでは問い合わせ自体を行わない）。
+  // 読めなかったとき（null）はカードを出さない。0 件（[]）のときは設定先への案内を出すので、
+  // 失敗を 0 件として扱うと、設定済みの人に「設定すると表示されます」と出てしまう。
+  // 失敗は getMissionsByParticipantId が記録済みで、記入のフローは止めない。
+  let initialMissions: MissionContextItem[] | null = null;
+  if (
+    participant.tenantId &&
+    flagMap["feature.missionOnInput"] === true &&
+    flagMap["feature.mission"] === true
+  ) {
+    const allMissions = await getMissionsByParticipantId(participant.id, participant.tenantId);
+    initialMissions = allMissions === null ? null : selectActiveMissions(allMissions);
+  }
+
   const initialData: InputPageInitialData = {
     participant: {
       name: participant.name,
@@ -219,6 +235,7 @@ export default async function InputPageServer({
     initialFlags: flagMap,
     initialKanNoKiPhase,
     initialDailyQuestions,
+    initialMissions,
   };
 
   const tDone = Date.now();

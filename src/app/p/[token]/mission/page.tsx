@@ -3,6 +3,8 @@
 import { useParams } from "next/navigation";
 import { BottomNav } from "@/components/BottomNav";
 import { useState, useEffect, useCallback } from "react";
+import { useFeatures } from "@/lib/use-features";
+import { missionTerms } from "@/lib/mission-context";
 
 type Mission = {
   id: string;
@@ -28,6 +30,10 @@ type MissionComment = {
 export default function MissionPage() {
   const params = useParams();
   const token = params.token as string;
+  // 呼び名（ミッション／イシュー）。feature.missionLabelIssue が ON のテナントは「イシュー」。
+  // OFF のテナントでは、元からこの画面に書かれていた文言がそのまま出る。
+  const { isOn } = useFeatures();
+  const terms = missionTerms(isOn("feature.missionLabelIssue"));
 
   const [missions, setMissions] = useState<Mission[]>([]);
   const [participantName, setParticipantName] = useState("");
@@ -275,8 +281,8 @@ export default function MissionPage() {
       {/* Header */}
       <div className="gradient-header text-white px-6 pt-12 pb-6">
         <div className="max-w-md mx-auto relative z-10">
-          <h1 className="text-xl font-semibold tracking-tight">ミッション</h1>
-          <p className="text-indigo-200 text-sm mt-1 font-light">上司と共有するミッションと進捗</p>
+          <h1 className="text-xl font-semibold tracking-tight">{terms.pageTitle}</h1>
+          <p className="text-indigo-200 text-sm mt-1 font-light">{terms.pageSubtitle}</p>
         </div>
       </div>
 
@@ -290,31 +296,31 @@ export default function MissionPage() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
-            新しいミッションを設定
+            {terms.createButton}
           </button>
         )}
 
         {/* Create Form */}
         {showCreateForm && (
           <div className="card p-5 mb-5">
-            <h3 className="font-semibold text-sm text-[#1A1A2E] mb-4">新しいミッションを設定</h3>
+            <h3 className="font-semibold text-sm text-[#1A1A2E] mb-4">{terms.createButton}</h3>
             <div className="space-y-3">
               <div>
-                <label className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase block mb-1.5">ミッション名 *</label>
+                <label className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase block mb-1.5">{terms.titleLabel}</label>
                 <input
                   type="text"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="例: Q3営業戦略の提案書を自力で完成させる"
+                  placeholder={terms.titlePlaceholder}
                   className="w-full text-sm border border-[#E5DCD0] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 focus:border-[#1A1A2E] bg-white transition-all"
                 />
               </div>
               <div>
-                <label className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase block mb-1.5">背景・目的</label>
+                <label className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase block mb-1.5">{terms.purposeLabel}</label>
                 <textarea
                   value={newPurpose}
                   onChange={(e) => setNewPurpose(e.target.value)}
-                  placeholder="このミッションを設定する背景や、達成に向けた期待を記入"
+                  placeholder={terms.purposePlaceholder}
                   className="w-full text-sm border border-[#E5DCD0] rounded-xl px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 focus:border-[#1A1A2E] bg-white transition-all"
                   rows={3}
                 />
@@ -340,7 +346,7 @@ export default function MissionPage() {
                   disabled={creating || !newTitle.trim()}
                   className="text-xs bg-[#1A1A2E] text-white rounded-xl px-4 py-2 hover:bg-[#141423] disabled:bg-[#C9BDAE] disabled:text-[#8B8489] transition-colors"
                 >
-                  {creating ? "作成中..." : "ミッションを設定"}
+                  {creating ? "作成中..." : terms.submit}
                 </button>
               </div>
             </div>
@@ -354,8 +360,8 @@ export default function MissionPage() {
                 <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
               </svg>
             </div>
-            <p className="text-[#5B5560] text-sm mb-1">ミッションはまだありません</p>
-            <p className="text-xs text-[#C9BDAE]">上のボタンから自分でミッションを設定できます</p>
+            <p className="text-[#5B5560] text-sm mb-1">{terms.emptyTitle}</p>
+            <p className="text-xs text-[#C9BDAE]">{terms.emptyHint}</p>
           </div>
         ) : missions.length > 0 ? (
           <div className="space-y-6">
@@ -413,8 +419,8 @@ export default function MissionPage() {
                           <div className="px-4 pb-4 space-y-3 border-t border-[#EFE8DD]">
                             {mission.purpose && (
                               <div className="bg-[#F5F0EB] p-3 rounded-xl border border-[#EFE8DD] mt-3">
-                                <p className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase mb-1">背景・目的</p>
-                                <p className="text-sm text-[#2C2C4A] leading-relaxed">{mission.purpose}</p>
+                                <p className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase mb-1">{terms.purposeLabel}</p>
+                                <p className="text-sm text-[#2C2C4A] leading-relaxed whitespace-pre-wrap break-words">{mission.purpose}</p>
                               </div>
                             )}
 
@@ -669,8 +675,8 @@ export default function MissionPage() {
                           <div className="px-4 pb-4 space-y-3 border-t border-[#EFE8DD]">
                             {mission.purpose && (
                               <div className="bg-[#F5F0EB] p-3 rounded-xl border border-[#EFE8DD] mt-3">
-                                <p className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase mb-1">背景・目的</p>
-                                <p className="text-sm text-[#2C2C4A] leading-relaxed">{mission.purpose}</p>
+                                <p className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase mb-1">{terms.purposeLabel}</p>
+                                <p className="text-sm text-[#2C2C4A] leading-relaxed whitespace-pre-wrap break-words">{mission.purpose}</p>
                               </div>
                             )}
 
@@ -925,8 +931,8 @@ export default function MissionPage() {
                           <div className="px-4 pb-4 space-y-3 border-t border-[#EFE8DD]">
                             {mission.purpose && (
                               <div className="bg-[#F5F0EB] p-3 rounded-xl border border-[#EFE8DD] mt-3">
-                                <p className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase mb-1">背景・目的</p>
-                                <p className="text-sm text-[#2C2C4A] leading-relaxed">{mission.purpose}</p>
+                                <p className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase mb-1">{terms.purposeLabel}</p>
+                                <p className="text-sm text-[#2C2C4A] leading-relaxed whitespace-pre-wrap break-words">{mission.purpose}</p>
                               </div>
                             )}
 
