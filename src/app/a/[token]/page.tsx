@@ -68,6 +68,13 @@ type TenantInfo = {
   companyName: string;
 };
 
+// テナントの表示名。会社名だけだと、同じ会社の別テナント（社内検証と Reflection Lab など）が
+// 同じ表示になり、選び間違える。テナント名を先に出し、会社名は補足にする
+// （機能設定・毎日の問いのページのテナント名と同じ呼び方になる）。
+function tenantLabel(t: { name: string; companyName?: string | null }): string {
+  return t.companyName && t.companyName !== t.name ? `${t.name}（${t.companyName}）` : t.name;
+}
+
 type AdminData = {
   participants: ParticipantData[];
   managers: ManagerData[];
@@ -678,7 +685,7 @@ export default function AdminDashboard() {
                 <option value="" className="text-gray-900">全テナント（デフォルト）</option>
                 {data.tenants.map((t) => (
                   <option key={t.slug} value={t.slug} className="text-gray-900">
-                    {t.companyName || t.name}
+                    {tenantLabel(t)}
                   </option>
                 ))}
               </select>
@@ -1667,7 +1674,7 @@ export default function AdminDashboard() {
                   <select name="tenantSlug" required defaultValue="" className="input-field text-sm bg-white">
                     <option value="" disabled>選択してください</option>
                     {data.tenants.map((t) => (
-                      <option key={t.slug} value={t.slug}>{t.companyName || t.name}</option>
+                      <option key={t.slug} value={t.slug}>{tenantLabel(t)}</option>
                     ))}
                   </select>
                   <p className="text-[11px] text-[#8B8489] mt-1">「全テナント表示」中のため、追加先を選んでください。</p>
@@ -1677,9 +1684,10 @@ export default function AdminDashboard() {
               {selectedTenantSlug && data?.tenants && (
                 <div className="bg-[#FBF8F4] rounded-lg px-3 py-2.5 text-xs text-[#5B5560]">
                   <span className="font-medium">追加先テナント：</span>
-                  {data.tenants.find((t) => t.slug === selectedTenantSlug)?.companyName ||
-                    data.tenants.find((t) => t.slug === selectedTenantSlug)?.name ||
-                    selectedTenantSlug}
+                  {(() => {
+                    const t = data.tenants.find((t) => t.slug === selectedTenantSlug);
+                    return t ? tenantLabel(t) : selectedTenantSlug;
+                  })()}
                 </div>
               )}
               <div className="flex gap-3 pt-2">
