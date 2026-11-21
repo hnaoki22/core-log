@@ -67,7 +67,10 @@ export default function DailyQuestionsAdminPage() {
               const src = json.weekly[d.key];
               if (src) {
                 base[d.key] = {
-                  axis: src.axis || d.defaultAxis,
+                  // 保存済みの「空の軸」は空のまま読み込む。`||` で既定の軸に置き換えると、
+                  // 軸を使わないテナントで再編集→保存のたびに既定の軸が書き込まれ、
+                  // 参加者画面に「今日の軸 ── …」が出てしまう。
+                  axis: typeof src.axis === "string" ? src.axis : d.defaultAxis,
                   morning: Array.isArray(src.morning) ? src.morning : [],
                   evening: Array.isArray(src.evening) ? src.evening : [],
                 };
