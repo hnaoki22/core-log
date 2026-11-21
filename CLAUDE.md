@@ -59,7 +59,8 @@ core-log/
 │   │   ├── MoodTrendLong.tsx         # 気分の長期ビュー（週足＋日々の線・約3ヶ月・ログ画面）
 │   │   ├── ReportHistoryList.tsx     # 過去のAI分析の開閉リスト（レポート画面／ログ画面で共用）
 │   │   ├── QuickNoteSheet.tsx        # 途中メモのシート＋「＋ メモ」ボタン（ホーム・standalone のみ）
-│   │   └── MissionContextCard.tsx    # 入力画面の問いの上に、本人の進行中のミッションを出すカード（feature.missionOnInput。表示だけ・API は呼ばない）
+│   │   ├── MissionContextCard.tsx    # 入力画面の問いの上に、本人の進行中のミッションを出すカード（feature.missionOnInput。表示だけ・API は呼ばない）
+│   │   └── MissionPurposeView.tsx    # ミッション画面の「背景・目的」の表示。仮説つきで保存された文は、仮説と残りを分けて出す（表示だけ）
 │   ├── lib/
 │   │   ├── feature-flags.ts          # FEATURE_CATALOG（§5 で詳述）
 │   │   ├── daily-questions.ts        # メゾ層 store（JST / 7曜日 / legacy flat 後方互換）
@@ -68,7 +69,7 @@ core-log/
 │   │   ├── standalone-report.ts      # 21日AIレポート（生成・最新取得・過去一覧 listStandaloneReports）
 │   │   ├── quick-notes.ts            # 途中メモ（quick_notes 表の保存/取得/削除・本人と装置だけ）
 │   │   ├── feedback-draft.ts         # 管理画面「AI下書き」のモデル選択・リクエスト組立て・応答の読み取り（純関数・テスト付き）
-│   │   ├── mission-context.ts        # 入力画面に出すミッションの絞り込み（進行中・最大3件）と、呼び名（ミッション／イシュー）の文言表（純関数・テスト付き）
+│   │   ├── mission-context.ts        # 入力画面に出すミッションの絞り込み（進行中・最大3件）、呼び名（ミッション／イシュー）の文言表、仮説つきの「背景・目的」のまとめ方と読み方（純関数・テスト付き）
 │   │   ├── supabase.ts               # DB 操作の中心（PostgREST 0 行成功ガード入り）
 │   │   ├── tenant-from-token.ts      # token → tenant_id 解決
 │   │   ├── feature-flags.ts, email.ts, otp.ts, session.ts, logger.ts, ...
@@ -178,8 +179,10 @@ PR タイトル例（リポの履歴に合わせる）:
 
 **ミッションを入力画面に出す 2 つのフラグ（2026-11-21 追加。どちらも既定 OFF・`feature.mission` に依存）**:
 - `feature.missionOnInput` = 本人の進行中のミッションを、従来型の入力画面（`InputClient`）の問いの上に出す。読み取りはサーバー（`/p/[token]/input` の `page.tsx`）が `getMissionsByParticipantId`（参加者 ID で引く。氏名では引かない）で行い、`selectActiveMissions`（進行中・新しい順・最大 3 件）を通して `MissionContextCard` に渡す。`initialMissions` は **`null` = 出さない（スイッチ OFF／読めなかった）、`[]` = 未設定（ミッション画面への案内を出す）**。失敗を `[]` にしないこと（設定済みの人に「設定すると表示されます」と出る）。standalone のテナントは `StandaloneInputClient` に分岐するので出ない。
-- `feature.missionLabelIssue` = 参加者画面での呼び名を「ミッション」から「イシュー（解くべき問題）」に切り替える。文言は `src/lib/mission-context.ts` の `missionTerms()` に集約（下のタブ・`/p/[token]/mission` の見出しと設定フォーム・入力画面のカード）。**OFF のときの文言は、元から画面にあった文言と一字一句同じ**（テストで固定）。通知メール（`mission_created` / `mission_comment`）と、マネージャー・管理者の画面は切り替えていない。「フル」プリセットには含めない（呼び名の切り替えは機能の追加ではないため）。
-- 参加者画面にはミッションの名前・内容を書き直す欄が無い（完了にして作り直すか、マネージャー画面の「ミッション管理」→「編集」）。AI下書きにミッションは渡していない。
+- `feature.missionLabelIssue` = 参加者画面での呼び名を「ミッション」から「イシュー（解くべき問い）」に切り替える。文言は `src/lib/mission-context.ts` の `missionTerms()` に集約（下のタブ・`/p/[token]/mission` の見出しと設定フォーム・入力画面のカード）。**OFF のときの文言は、元から画面にあった文言と一字一句同じ**（テストで固定）。通知メール（`mission_created` / `mission_comment`）と、マネージャー・管理者の画面は切り替えていない。「フル」プリセットには含めない（呼び名の切り替えは機能の追加ではないため）。ON のテナントでは、文言のほかに次の 2 点が変わる。
+  - **設定フォームに「仮説」の欄（必須）が加わる**。保存先は増やしていない。仮説と「目指す状態・行動」を `composeIssuePurpose()` で見出しつきの 1 本（`【仮説】…` / `【目指す状態と、これからの行動】…`）にまとめ、既存の `missions.purpose` に保存する（`daily-question-answers.ts` と同じ考え方）。読む側は `parseIssuePurpose()` で分ける：入力画面のカードは仮説を折りたたまずに出し、ミッション画面は `MissionPurposeView` で 2 つの枠に分ける。先頭が見出しで始まらない文（従来の登録、マネージャー画面で書いた文）は分けずにそのまま出す。**マネージャー・管理者の画面には、見出しつきの文がそのまま見える**（そこで編集すると見出しも編集対象になる）。必須の判定は画面側だけ（API は従来どおり）。
+  - **「完了にする」が「このイシューを閉じる」になり、理由の記入が必須になる**（`closeNoteRequired`）。DB の値は従来どおり status=`完了`・`final_review` に理由。仮説は確かめると変わるので、書き直すのではなく「理由を書いて閉じ、新しく設定する」運用（前の問い・仮説と、変えた理由が残る）。
+- 参加者画面にはミッションの名前・内容を書き直す欄が無い（閉じて作り直すか、マネージャー画面の「ミッション管理」→「編集」）。上の運用のため、書き直す欄は意図して足していない。AI下書きにミッションは渡していない。
 
 保存形式: テナント毎に `ai_settings.value` 行（`tenant_id`, `key='feature_flags'`, `value=JSON`）。flat shape（`{flagKey: bool}`）が現行、legacy nested shape（`{default: {...}}`）は読み取り側で互換維持。
 
