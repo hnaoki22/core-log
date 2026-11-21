@@ -1,10 +1,19 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import Link from "next/link";
 import { useFeatures } from "@/lib/use-features";
 import { EnergyGlyph } from "@/components/EnergyGlyph";
+import { AdminDirectory } from "@/components/admin/AdminDirectory";
+import { EnvironmentBanner } from "@/components/admin/EnvironmentBanner";
+import {
+  environmentLabel,
+  sectionByEnvironment,
+  toJstDateString,
+  type DirectoryEnvironment,
+  type DirectoryUser,
+} from "@/lib/admin-directory";
 import {
   IconChartBar,
   IconTrendingUp,
@@ -72,19 +81,45 @@ type TenantInfo = {
 // 同じ表示になり、選び間違える。テナント名を先に出し、会社名は補足にする
 // （機能設定・毎日の問いのページのテナント名と同じ呼び方になる）。
 function tenantLabel(t: { name: string; companyName?: string | null }): string {
-  return t.companyName && t.companyName !== t.name ? `${t.name}（${t.companyName}）` : t.name;
+  return environmentLabel(t);
+}
+
+// 「環境とユーザー」の一覧（/api/admin/directory の応答。管理者にだけ返る）
+type AdminDirectoryData = {
+  environments: DirectoryEnvironment[];
+  users: DirectoryUser[];
+  truncated?: boolean;
+};
+
+// 一覧の 1 行と、その行の前に出す環境の見出し（その環境の最初の行にだけ入る）
+type SectionRow<T> = { row: T; header: DirectoryEnvironment | null; unknownHeader: boolean };
+
+// 一覧（参加者一覧・マネージャー一覧）で、環境の区切りに出す見出し
+function EnvironmentSectionHeader({ environment }: { environment: DirectoryEnvironment | null }) {
+  return (
+    <div className="px-4 py-2 bg-[#FBF8F4] text-[11px] font-semibold text-[#5B5560] flex flex-wrap items-center gap-2">
+      <span className="break-words">{environment ? environmentLabel(environment) : "環境が分からない行"}</span>
+      {environment?.purpose && (
+        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-white border border-[#E5DCD0] whitespace-nowrap">
+          {environment.purpose.label}
+        </span>
+      )}
+    </div>
+  );
 }
 
 type AdminData = {
   participants: ParticipantData[];
   managers: ManagerData[];
   viewerRole?: "admin" | "observer" | "manager";
+  /** 管理者（is_admin）か。管理者にだけ出す欄の出し分けに使う */
+  viewerIsAdmin?: boolean;
   tenantId?: string;
   tenants?: TenantInfo[];
 };
 
 type ManagerOption = { id: string; name: string };
-type AddResult = { type: "participant" | "manager"; name: string; token: string; url: string } | null;
+type AddResult = { type: "participant" | "manager"; name: string; token: string; url: string; environment: string } | null;
 
 // energy 状態は EnergyGlyph（線画フェイス）で表示する
 
@@ -149,6 +184,34 @@ export default function AdminDashboard() {
   useEffect(() => {
     setAppOrigin(window.location.origin);
   }, []);
+
+  // 「環境とユーザー」の一覧。管理者にだけ返る（閲覧者には 403 が返るので、取りにいかない）。
+  // ダッシュボードのデータを取り直すたびに取り直す（追加・編集のあとに一覧が古くならないように）。
+  const [directory, setDirectory] = useState<AdminDirectoryData | null>(null);
+  const [directoryError, setDirectoryError] = useState(false);
+  useEffect(() => {
+    if (data?.viewerIsAdmin !== true) return;
+    let cancelled = false;
+    fetch(`/api/admin/directory?token=${token}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: AdminDirectoryData) => {
+        if (cancelled) return;
+        setDirectory(d);
+        setDirectoryError(false);
+      })
+      .catch(() => {
+        if (!cancelled) setDirectoryError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, data]);
+
+  // 追加・インポートの追加先。いま選んでいる環境。環境が 1 つしかないときは、その環境。
+  // 全環境を表示しているあいだは空にして、追加のボタンを止める（追加先が決まらないまま
+  // 追加すると、管理者の所属環境に黙って入り、どこに入ったのかが分からなくなるため）。
+  const addTargetSlug =
+    selectedTenantSlug || (data?.tenants && data.tenants.length === 1 ? data.tenants[0].slug : "");
 
   // Participant edit state
   const [editingParticipant, setEditingParticipant] = useState<ParticipantData | null>(null);
@@ -380,7 +443,9 @@ export default function AdminDashboard() {
     const form = e.currentTarget;
     const formData = new FormData(form);
     try {
-      const tenantParam = selectedTenantSlug ? `?tenant=${selectedTenantSlug}` : "";
+      // 追加先の環境は、必ず 1 つに決めてから送る（決まっていないと、サーバーが断る）
+      if (!addTargetSlug) { alert("追加先の環境を選んでください"); return; }
+      const tenantParam = `?tenant=${encodeURIComponent(addTargetSlug)}`;
       const res = await fetch(`/api/admin/members${tenantParam}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -396,7 +461,7 @@ export default function AdminDashboard() {
       });
       const result = await res.json();
       if (result.success) {
-        setAddResult({ type: "participant", name: result.participant.name, token: result.participant.token, url: result.participant.url });
+        setAddResult({ type: "participant", name: result.participant.name, token: result.participant.token, url: result.participant.url, environment: result.tenant ? tenantLabel(result.tenant) : "" });
         setShowAddParticipant(false);
         const refreshRes = await fetch(`/api/admin?token=${token}${selectedTenantSlug ? `&tenant=${selectedTenantSlug}` : ""}`);
         if (refreshRes.ok) setData(await refreshRes.json());
@@ -410,11 +475,11 @@ export default function AdminDashboard() {
     const form = e.currentTarget;
     const formData = new FormData(form);
     try {
-      // モーダル内で選択されたテナントを優先（admin が全テナント表示中に追加先を指定する用途）。
-      // 未指定時はページレベルで選択中のテナントへフォールバック。
-      const formTenantSlug = (formData.get("tenantSlug") as string | null) || "";
-      const effectiveTenantSlug = formTenantSlug || selectedTenantSlug;
-      const tenantParam = effectiveTenantSlug ? `?tenant=${effectiveTenantSlug}` : "";
+      // 追加先の環境は、必ず 1 つに決めてから送る（決まっていないと、サーバーが断る）。
+      // 全環境を表示しているあいだは「+ マネージャーを追加」を押せないので、
+      // フォームの中で追加先を選ぶ欄は置いていない（参加者の追加と同じ決まりにそろえた）。
+      if (!addTargetSlug) { alert("追加先の環境を選んでください"); return; }
+      const tenantParam = `?tenant=${encodeURIComponent(addTargetSlug)}`;
       // 役割は admin / manager / observer の 3 択。admin の場合は isAdmin も true に。
       const role = (formData.get("role") as string | null) || "manager";
       const isAdmin = role === "admin";
@@ -433,7 +498,7 @@ export default function AdminDashboard() {
       });
       const result = await res.json();
       if (result.success) {
-        setAddResult({ type: "manager", name: result.manager.name, token: result.manager.token, url: result.manager.url });
+        setAddResult({ type: "manager", name: result.manager.name, token: result.manager.token, url: result.manager.url, environment: result.tenant ? tenantLabel(result.tenant) : "" });
         setShowAddManager(false);
         const refreshRes = await fetch(`/api/admin?token=${token}${selectedTenantSlug ? `&tenant=${selectedTenantSlug}` : ""}`);
         if (refreshRes.ok) setData(await refreshRes.json());
@@ -642,6 +707,30 @@ export default function AdminDashboard() {
 
   const { participants, managers } = data;
   const isObserver = data.viewerRole === "observer";
+
+  // 環境の表示まわり（管理者のみ。directory は管理者にだけ返る）
+  const selectedEnvironment = directory?.environments.find((env) => env.slug === selectedTenantSlug) ?? null;
+  // 全環境を表示しているときだけ、一覧を環境ごとに区切る
+  const showEnvironmentSections = !selectedTenantSlug && directory !== null && directory.environments.length > 1;
+  // 参加者と管理する側は別の表なので、id の対応も別々に持つ（同じ id が両方の表にあっても取り違えない）
+  const participantEnvironmentId = new Map(
+    (directory?.users ?? []).filter((u) => u.kind === "participant").map((u) => [u.id, u.environmentId])
+  );
+  const managerEnvironmentId = new Map(
+    (directory?.users ?? []).filter((u) => u.kind !== "participant").map((u) => [u.id, u.environmentId])
+  );
+  const participantRows: SectionRow<ParticipantData>[] = showEnvironmentSections && directory
+    ? sectionByEnvironment(participants, directory.environments, (id) => participantEnvironmentId.get(id))
+    : participants.map((row) => ({ row, header: null, unknownHeader: false }));
+  const managerRows: SectionRow<ManagerData>[] = showEnvironmentSections && directory
+    ? sectionByEnvironment(managers, directory.environments, (id) => managerEnvironmentId.get(id))
+    : managers.map((row) => ({ row, header: null, unknownHeader: false }));
+  // 追加・インポートは、追加先の環境が 1 つに決まっているときだけ（addTargetSlug の説明を参照）
+  const canAddMembers = addTargetSlug !== "";
+  const addTargetLabel = (() => {
+    const t = data.tenants?.find((x) => x.slug === addTargetSlug);
+    return t ? tenantLabel(t) : addTargetSlug;
+  })();
   const avgCompletionRate = participants.length > 0
     ? Math.round(participants.reduce((sum, p) => sum + (p.completionRate ?? p.entryRate), 0) / participants.length) : 0;
   const totalFeedbacks = participants.reduce((sum, p) => sum + p.fbCount, 0);
@@ -672,23 +761,30 @@ export default function AdminDashboard() {
           <p className="text-gray-400 text-sm font-light ml-7">CORE Log システム全体の状況</p>
           {/* Tenant switcher — only visible for admins with multiple tenants */}
           {data.tenants && data.tenants.length > 1 && data.viewerRole === "admin" && (
-            <div className="ml-7 mt-2 flex items-center gap-2">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+            <div className="ml-7 mt-2 flex items-center gap-2 min-w-0">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 flex-shrink-0">
                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
               </svg>
               <select
                 value={selectedTenantSlug}
                 onChange={(e) => setSelectedTenantSlug(e.target.value)}
-                className="bg-white/15 text-white text-xs font-medium px-3 py-1.5 rounded-lg border border-white/20 outline-none cursor-pointer hover:bg-white/25 transition-colors appearance-none pr-7"
+                aria-label="表示する環境"
+                className="min-w-0 max-w-full bg-white/15 text-white text-xs font-medium px-3 py-1.5 rounded-lg border border-white/20 outline-none cursor-pointer hover:bg-white/25 transition-colors appearance-none pr-7"
                 style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center" }}
               >
-                <option value="" className="text-gray-900">全テナント（デフォルト）</option>
+                <option value="" className="text-gray-900">全環境</option>
                 {data.tenants.map((t) => (
                   <option key={t.slug} value={t.slug} className="text-gray-900">
                     {tenantLabel(t)}
                   </option>
                 ))}
               </select>
+            </div>
+          )}
+          {/* いま見ている環境の帯。取り違えたまま登録や設定をしないように、いつも出す（管理者のみ） */}
+          {data.viewerIsAdmin === true && directory && (
+            <div className="ml-7 mt-2">
+              <EnvironmentBanner environment={selectedEnvironment} />
             </div>
           )}
           {isObserver && (
@@ -767,6 +863,12 @@ export default function AdminDashboard() {
               </button>
             </div>
             <div className="bg-[#F5F0EB] rounded-xl p-3.5 space-y-2 text-sm">
+              {addResult.environment && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[#8B8489] w-16 text-xs">追加先</span>
+                  <span className="text-xs font-medium text-[#1A1A2E] break-words">{addResult.environment}</span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <span className="text-[#8B8489] w-16 text-xs">トークン</span>
                 <code className="bg-white px-2.5 py-1 rounded-lg border border-[#E5DCD0] font-mono text-[#1A1A2E] text-xs select-all">{addResult.token}</code>
@@ -779,6 +881,24 @@ export default function AdminDashboard() {
               </div>
               <p className="text-[11px] text-amber-600 mt-1">このURLを本人にお伝えください</p>
             </div>
+          </div>
+        )}
+
+        {/* 環境とユーザー（管理者のみ）：だれがどの環境にいるか、ログイン用のURL */}
+        {data.viewerIsAdmin === true && directory && (
+          <AdminDirectory
+            environments={directory.environments}
+            users={directory.users}
+            truncated={directory.truncated}
+            selectedSlug={selectedTenantSlug}
+            onSelect={setSelectedTenantSlug}
+            origin={appOrigin}
+            todayJst={toJstDateString(new Date().toISOString()) ?? ""}
+          />
+        )}
+        {data.viewerIsAdmin === true && !directory && directoryError && (
+          <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-700">
+            環境とユーザーの一覧を取得できませんでした。ページを読み込み直してください。
           </div>
         )}
 
@@ -915,17 +1035,20 @@ export default function AdminDashboard() {
             <h2 className="text-sm font-semibold text-[#1A1A2E] whitespace-nowrap">参加者一覧</h2>
             {!isObserver && (
               <div className="flex items-center gap-2 flex-wrap">
-                <button onClick={() => { setShowImportModal(true); setImportStep("input"); setCsvText(""); setImportPreview(null); setImportResult(null); setImportError(null); }} className="text-xs px-4 py-2 rounded-xl border border-[#C4A882] text-[#8B7355] hover:bg-[#FBF8F4] transition-colors whitespace-nowrap">
+                <button onClick={() => { setShowImportModal(true); setImportStep("input"); setCsvText(""); setImportPreview(null); setImportResult(null); setImportError(null); }} disabled={!canAddMembers} className="text-xs px-4 py-2 rounded-xl border border-[#C4A882] text-[#8B7355] hover:bg-[#FBF8F4] transition-colors whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed">
                   CSV一括インポート
                 </button>
-                <button onClick={() => setShowAddParticipant(true)} className="btn-accent text-xs px-4 py-2 whitespace-nowrap">
+                <button onClick={() => setShowAddParticipant(true)} disabled={!canAddMembers} className="btn-accent text-xs px-4 py-2 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed">
                   + 参加者を追加
                 </button>
+                {!canAddMembers && (
+                  <span className="text-[11px] text-[#8B8489] whitespace-nowrap">環境を1つ選ぶと追加できます</span>
+                )}
               </div>
             )}
           </div>
           <div className="divide-y divide-[#EFE8DD]">
-            {participants.map((p) => {
+            {participantRows.map(({ row: p, header, unknownHeader }) => {
               const cRate = p.completionRate ?? p.entryRate;
               const status = getStatusBadge(cRate, p.streak, p.entryDays, p.businessDaysElapsed ?? 0);
               const todayIcon = p.todayStatus === "complete" ? "◎"
@@ -933,7 +1056,9 @@ export default function AdminDashboard() {
               const todayColor = p.todayStatus === "complete" ? "text-emerald-600"
                 : (p.todayStatus === "morning_only" || p.todayStatus === "evening_only") ? "text-amber-500" : "";
               return (
-                <div key={p.id} className="p-4 hover:bg-[#FBF8F4] transition-colors">
+                <Fragment key={p.id}>
+                {(header || unknownHeader) && <EnvironmentSectionHeader environment={header} />}
+                <div className="p-4 hover:bg-[#FBF8F4] transition-colors">
                   {/* Stack vertically on mobile to avoid the right-side button
                       group from crushing the left column into single-character
                       width. Above sm breakpoint (≥640px) the cards lay out
@@ -1013,6 +1138,7 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 </div>
+                </Fragment>
               );
             })}
           </div>
@@ -1024,18 +1150,23 @@ export default function AdminDashboard() {
             <h2 className="text-sm font-semibold text-[#1A1A2E] whitespace-nowrap">マネージャー一覧</h2>
             {!isObserver && (
               <div className="flex items-center gap-2 flex-wrap">
-                <button onClick={() => { setShowManagerImport(true); setManagerImportStep("input"); setManagerCsvText(""); setManagerImportPreview(null); setManagerImportResult(null); setManagerImportError(null); }} className="text-xs px-4 py-2 rounded-xl border border-[#C4A882] text-[#8B7355] hover:bg-[#FBF8F4] transition-colors whitespace-nowrap">
+                <button onClick={() => { setShowManagerImport(true); setManagerImportStep("input"); setManagerCsvText(""); setManagerImportPreview(null); setManagerImportResult(null); setManagerImportError(null); }} disabled={!canAddMembers} className="text-xs px-4 py-2 rounded-xl border border-[#C4A882] text-[#8B7355] hover:bg-[#FBF8F4] transition-colors whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed">
                   CSVインポート
                 </button>
-                <button onClick={() => setShowAddManager(true)} className="text-xs font-medium px-4 py-2 rounded-xl bg-amber-500 text-white hover:bg-amber-600 transition-colors whitespace-nowrap">
+                <button onClick={() => setShowAddManager(true)} disabled={!canAddMembers} className="text-xs font-medium px-4 py-2 rounded-xl bg-amber-500 text-white hover:bg-amber-600 transition-colors whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed">
                   + マネージャーを追加
                 </button>
+                {!canAddMembers && (
+                  <span className="text-[11px] text-[#8B8489] whitespace-nowrap">環境を1つ選ぶと追加できます</span>
+                )}
               </div>
             )}
           </div>
           <div className="divide-y divide-[#EFE8DD]">
-            {managers.map((m) => (
-              <div key={m.id} className="p-4">
+            {managerRows.map(({ row: m, header, unknownHeader }) => (
+              <Fragment key={m.id}>
+              {(header || unknownHeader) && <EnvironmentSectionHeader environment={header} />}
+              <div className="p-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -1065,6 +1196,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
+              </Fragment>
             ))}
           </div>
         </div>
@@ -1223,43 +1355,14 @@ export default function AdminDashboard() {
           </>
         )}
 
-        {/* Quick Links */}
+        {/* 外部ツール。参加者・マネージャーの画面へのリンクは、上の「環境とユーザー」に移した
+            （環境ごとに分かれ、管理者にだけ出る）。 */}
         <div className="card overflow-hidden mb-8">
           <div className="px-5 py-4 border-b border-[#EFE8DD]">
-            <h2 className="text-sm font-semibold text-[#1A1A2E]">クイックリンク</h2>
+            <h2 className="text-sm font-semibold text-[#1A1A2E]">外部ツール</h2>
           </div>
           <div className="p-4 space-y-3">
-            {/* Manager links */}
-            {data?.managers && data.managers.length > 0 && (
-              <div>
-                <div className="text-[10px] font-semibold text-[#8B8489] uppercase tracking-wider mb-2">マネージャー画面</div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {data.managers.map((m: ManagerData) => (
-                    <Link key={m.id} href={`/m/${m.token}`} className="block p-3 bg-amber-50/50 rounded-xl border border-amber-100 hover:bg-amber-50 transition-colors">
-                      <div className="font-medium text-amber-600 text-xs mb-0.5">{m.name}</div>
-                      <div className="text-[10px] text-[#8B8489]">{m.department || ""}{m.role === "admin" ? " · 管理者" : m.role === "observer" ? " · 閲覧者" : ""}</div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* Participant links */}
-            {data?.participants && data.participants.length > 0 && (
-              <div>
-                <div className="text-[10px] font-semibold text-[#8B8489] uppercase tracking-wider mb-2">参加者画面</div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {data.participants.map((p: ParticipantData) => (
-                    <Link key={p.id} href={`/p/${p.token}`} className="block p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 hover:bg-indigo-50 transition-colors">
-                      <div className="font-medium text-[#1A1A2E] text-xs mb-0.5">{p.name}</div>
-                      <div className="text-[10px] text-[#8B8489]">{p.managerId && data?.managers ? `上司: ${data.managers.find((m: ManagerData) => m.id === p.managerId)?.name || ""}` : ""}</div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* External links */}
             <div>
-              <div className="text-[10px] font-semibold text-[#8B8489] uppercase tracking-wider mb-2">外部ツール</div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <a href="https://supabase.com/dashboard/project/vnfmbkftbnjruwsdlvtv" target="_blank" rel="noopener noreferrer" className="block p-3 bg-emerald-50/50 rounded-xl border border-emerald-100 hover:bg-emerald-50 transition-colors">
                   <div className="font-medium text-emerald-600 text-xs mb-0.5">Supabase Dashboard</div>
@@ -1293,6 +1396,11 @@ export default function AdminDashboard() {
               <p className="text-xs text-[#8B8489] mt-1">トークンは自動生成されます</p>
             </div>
             <form onSubmit={handleAddParticipant} className="p-5 space-y-4">
+              {/* 追加先の環境を必ず見せる（このフォームは、追加先が 1 つに決まっているときだけ開ける） */}
+              <div className="bg-[#FBF8F4] rounded-lg px-3 py-2.5 text-xs text-[#5B5560]">
+                <span className="font-medium">追加先の環境：</span>
+                {addTargetLabel}
+              </div>
               <div>
                 <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">名前 *</label>
                 <input name="name" required placeholder="例: 山田 太郎" className="input-field text-sm" />
@@ -1650,6 +1758,11 @@ export default function AdminDashboard() {
               <p className="text-xs text-[#8B8489] mt-1">トークンは自動生成されます</p>
             </div>
             <form onSubmit={handleAddManager} className="p-5 space-y-4">
+              {/* 追加先の環境を必ず見せる（このフォームは、追加先が 1 つに決まっているときだけ開ける） */}
+              <div className="bg-[#FBF8F4] rounded-lg px-3 py-2.5 text-xs text-[#5B5560]">
+                <span className="font-medium">追加先の環境：</span>
+                {addTargetLabel}
+              </div>
               <div>
                 <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">名前 *</label>
                 <input name="name" required placeholder="例: 鈴木 花子" className="input-field text-sm" />
@@ -1671,29 +1784,6 @@ export default function AdminDashboard() {
                 </select>
                 <p className="text-[11px] text-[#8B8489] mt-1">後から編集モーダルでも変更できます。</p>
               </div>
-              {/* テナント選択：admin が全テナント表示中で、テナントが 2 つ以上ある場合のみ表示 */}
-              {data?.viewerRole === "admin" && !selectedTenantSlug && data?.tenants && data.tenants.length > 1 && (
-                <div>
-                  <label className="block text-xs font-medium text-[#2C2C4A] mb-1.5">所属テナント *</label>
-                  <select name="tenantSlug" required defaultValue="" className="input-field text-sm bg-white">
-                    <option value="" disabled>選択してください</option>
-                    {data.tenants.map((t) => (
-                      <option key={t.slug} value={t.slug}>{tenantLabel(t)}</option>
-                    ))}
-                  </select>
-                  <p className="text-[11px] text-[#8B8489] mt-1">「全テナント表示」中のため、追加先を選んでください。</p>
-                </div>
-              )}
-              {/* 特定テナント表示中の場合：追加先を明示（情報のみ） */}
-              {selectedTenantSlug && data?.tenants && (
-                <div className="bg-[#FBF8F4] rounded-lg px-3 py-2.5 text-xs text-[#5B5560]">
-                  <span className="font-medium">追加先テナント：</span>
-                  {(() => {
-                    const t = data.tenants.find((t) => t.slug === selectedTenantSlug);
-                    return t ? tenantLabel(t) : selectedTenantSlug;
-                  })()}
-                </div>
-              )}
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowAddManager(false)} className="btn-secondary flex-1 py-2.5 text-sm">キャンセル</button>
                 <button type="submit" disabled={submitting} className="btn-primary flex-1 py-2.5 text-sm">{submitting ? "追加中..." : "追加する"}</button>

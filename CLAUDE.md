@@ -44,6 +44,7 @@ core-log/
 │   ├── app/
 │   │   ├── api/                # Next.js Route Handlers
 │   │   │   ├── admin/          # tenant-scoped CRUD（PR #16 以降は「target の tenant_id」を採用）
+│   │   │   │   └── directory/route.ts         # 管理画面「環境とユーザー」の一覧（管理者＝is_admin だけに返す。§3 参照）
 │   │   │   ├── features/
 │   │   │   │   ├── daily-questions/route.ts   # メゾ層 API（曜日ローテ）
 │   │   │   │   └── voice-input/route.ts       # Whisper proxy（OpenAI）
@@ -61,6 +62,9 @@ core-log/
 │   │   ├── QuickNoteSheet.tsx        # 途中メモのシート＋「＋ メモ」ボタン（ホーム・standalone のみ）
 │   │   ├── MissionContextCard.tsx    # 入力画面の問いの上に、本人の進行中のミッションを出すカード（feature.missionOnInput。表示だけ・API は呼ばない）
 │   │   └── MissionPurposeView.tsx    # ミッション画面の「背景・目的」の表示。仮説つきで保存された文は、仮説と残りを分けて出す（表示だけ）
+│   ├── components/admin/
+│   │   ├── AdminDirectory.tsx        # 管理画面「環境とユーザー」の欄（環境の一覧／環境ごとのユーザーと「画面を開く」「URLをコピー」。管理者にだけ出す。表示だけ・API は呼ばない）
+│   │   └── EnvironmentBanner.tsx     # 管理画面のヘッダーの「表示中の環境」の帯（本番は赤・テスト用は緑。表示だけ）
 │   ├── lib/
 │   │   ├── feature-flags.ts          # FEATURE_CATALOG（§5 で詳述）
 │   │   ├── daily-questions.ts        # メゾ層 store（JST / 7曜日 / legacy flat 後方互換）
@@ -70,6 +74,8 @@ core-log/
 │   │   ├── quick-notes.ts            # 途中メモ（quick_notes 表の保存/取得/削除・本人と装置だけ）
 │   │   ├── feedback-draft.ts         # 管理画面「AI下書き」のモデル選択・リクエスト組立て・応答の読み取り（純関数・テスト付き）
 │   │   ├── mission-context.ts        # 入力画面に出すミッションの絞り込み（進行中・最大3件）、呼び名（ミッション／イシュー）の文言表、仮説つきの「背景・目的」のまとめ方と読み方（純関数・テスト付き）
+│   │   ├── admin-directory.ts        # 「環境とユーザー」の決まり：環境の用途の呼び名、ユーザーの種別、ログイン用のパス、一覧の並べ方、トークンをだれに返すか（純関数・テスト付き）
+│   │   ├── admin-directory-store.ts  # 「環境とユーザー」の読み取り（tenants / participants / managers。logs は読まない。サーバー側だけ）
 │   │   ├── supabase.ts               # DB 操作の中心（PostgREST 0 行成功ガード入り）
 │   │   ├── tenant-from-token.ts      # token → tenant_id 解決
 │   │   ├── feature-flags.ts, email.ts, otp.ts, session.ts, logger.ts, ...
@@ -108,6 +114,15 @@ core-log/
 | reflection-lab | `affbe130-f2f7-4387-82d6-e7419e17400d` | 本藤さん ドッグフーディング |
 
 reflection-lab の参加者は 本藤直樹 / 土居由奈 / 太田至彦 の 3 名（5/18 時点で本藤さん以外は未案内）。
+
+**管理画面の「環境とユーザー」（2026-11-21 追加）**: 画面では、テナントを「環境」と呼ぶ。管理画面（`/a/[token]`）の上部に、管理者（`is_admin`）にだけ出る欄を置いた。だれがどの環境にいるか、1 人ずつのログイン用 URL が分かるようにするため（それまでは、全環境を表示すると所属が画面で分からず、URL はページのいちばん下のリンクでしか分からなかった）。
+- **環境の一覧**：用途・人数・入力画面の型（従来型／商品モード）・確認コード（OTP）の有無。押すと、ページ全体がその環境に切り替わる（ヘッダーの選択欄と同じ `selectedTenantSlug`）。
+- **ユーザーの一覧**：環境ごとに区切り、1 人ずつ「画面を開く」「URLをコピー」。URL の文字列は、ふだんは画面に出さない（画面の共有やスクリーンショットに残さないため。コピーできなかったときだけ、その人の分を欄に出す）。全環境を表示しているあいだは、本番の環境だけ閉じておく。
+- **ヘッダーの帯**（`EnvironmentBanner`）：いま表示している環境と用途。本番は赤、テスト用は緑。
+- **用途の呼び名**は `resolveEnvironmentPurpose()`（`src/lib/admin-directory.ts`）が決める：①保護対象の本番テナント（`DAIKO_TENANT_ID`）は、設定に関係なく「本番」 ②`tenants.config.purpose`（`production` / `test` / `internal` / `trial` / `demo`。それ以外の文字列は、そのまま呼び名になる。16 文字まで） ③なければ `plan`（`demo` → デモ、`experimental` → 試用）。どれでもなければ、用途は出さない。
+- 読み取りは `GET /api/admin/directory`（`loadAdminDirectory()`）。tenants / participants / managers だけを読む。**logs は読まない**（「最後の記入日」を出していないのは、§8 項目 10 の観の期の除外と両立する形で正しく出せないため）。
+- **追加・CSV インポートは、追加先の環境を 1 つ選んでから**。全環境を表示しているあいだは、4 つのボタンを止める。`POST /api/admin/members` は `?tenant=<slug>` が必須（§8 項目 12）。
+- 管理画面の一覧（参加者一覧・マネージャー一覧）は、全環境を表示しているときだけ、環境ごとの見出しで区切る（`sectionByEnvironment()`）。
 
 ---
 
@@ -258,6 +273,10 @@ PR タイトル例（リポの履歴に合わせる）:
    - 詳細：`~/.claude/skills/human-mature-canonical-vocabulary-guard/SKILL.md` の Step 1（正典パス）と Step 2.5（二層構造）
 10. **観の期（`phase_mode='kan-no-ki'`）のログは「本人と装置だけ」。** 上司・伴走者・コンサル（spotlight）・briefing・burnout など管理者向けに logs を読む全経路で kan-no-ki を除外する。共有関数 `getLogsByParticipant` / `getAllLogsForTenant` は**既定で除外**し、本人向けの読み取りのみ `{ includeKanNoKi: true }` を渡す。logs を直クエリする新規の管理者向けコードは `.neq("phase_mode","kan-no-ki")` を必須とする。道場1 移行後も過去の観の期ログは上司へ開かない（2026-06-02 確認・恒久対策）。
 11. **standalone テナント（`standalone_mode=true`）のログ本文はテナント丸ごと「本人と装置だけ」。** マネージャー/管理者向けにログ本文・日次気分値を返す新規 API・ページは、必ず `standaloneGuard(tenantId, surface)`（403）または本文ストリッピングを入れる。日報投稿通知メール（本文スニペット付き）も standalone では送らない。UI 非表示だけで済ませることは禁止（2026-06-10 仕様書 §7）。energy は「朝の気分」、夕の気分は `evening_energy`（standalone のみ書き込み）。夕の記入判定に energy を使わない。
+12. **ほかの人のトークン（ログイン用 URL）を返すのは、管理者（`is_admin`）にだけ。追加は、追加先の環境を必ず指定する。**（2026-11-21）
+    - トークンは、その人の画面を開ける値。`GET /api/admin` は、閲覧者（observer）には参加者・マネージャーのトークンを空文字で返す（本人の行だけは返す。`tokenForViewer()`）。`GET /api/admin/directory` は管理者以外に 403。新しく作る API・画面でも、トークンやログイン用のパスを返す・出すのは管理者にだけにする。
+    - 画面の出し分けは、応答の `viewerIsAdmin`（サーバーの `is_admin` と同じ値）で決める。`viewerRole` の文字列だけで「管理者」と判断しない。
+    - `POST /api/admin/members` は、管理者以外に 403、`?tenant=<slug>` がなければ 400、知らない slug も 400。**指定がないときに管理者の所属テナントへ黙って追加する動きに戻さないこと**（全環境を表示したまま追加した人が、意図しない環境に入り、どこに入ったのかが画面で分からなかった）。
 
 ---
 
@@ -291,6 +310,9 @@ PR タイトル例（リポの履歴に合わせる）:
 - **core-log-engineer SKILL.md の数値が古い**（28 機能 / 7 ティア → 実態 43 機能 / 10 カテゴリ）。SKILL.md 改訂は別 PR で実施
 - **`.claude/skills/core-log-review` と `~/.claude/skills/core-log-engineer` の重複整理**（§1 参照）
 - **OPENAI_API_KEY ローテーション**（§7 参照、5/16 セッションでキーが露出した可能性）
+- **全環境を表示したときの集計が、同じ氏名で混ざる恐れ**（2026-11-21 コード確認・未再現）：`getAllLogsForTenant()` は記入を氏名（`participant_name`）でまとめ、`GET /api/admin` は `allLogsMap.get(p.name)` で引く。別の環境に同じ氏名の参加者がいると、全環境の表示では両方の行に同じ記入が入る。環境を 1 つ選んだ表示には影響しない。直すときは共有関数の呼び出し元をすべて確認する
+- **CSV インポートの API は、`?tenant=` がないと管理者の所属テナントに入れる**（2026-11-21 コード確認）：`POST /api/admin/import` は `resolveAdminTargetTenant()` の動きのまま。画面側は、全環境を表示しているあいだインポートのボタンを止めている（§3）。API も `POST /api/admin/members` と同じく必須にするかは未決
+- **§3 のテナントの表は、実際の値と合っていない箇所がある**（slug、テナントの数）。値は Supabase の `tenants` 表か、管理画面の「環境とユーザー」で確認する
 
 ---
 
