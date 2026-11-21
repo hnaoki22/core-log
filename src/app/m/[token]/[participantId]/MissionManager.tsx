@@ -387,7 +387,7 @@ export default function MissionManager({ token, participantName, initialMissions
                   {mission.purpose && (
                     <div className="bg-[#F5F0EB] p-3 rounded-lg">
                       <p className="text-xs font-semibold text-gray-400 mb-1">背景・目的</p>
-                      <p className="text-sm text-[#1A1A2E]">{mission.purpose}</p>
+                      <p className="text-sm text-[#1A1A2E] whitespace-pre-wrap break-words">{mission.purpose}</p>
                     </div>
                   )}
 
