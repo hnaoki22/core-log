@@ -492,6 +492,7 @@ export default function InputPage({ token, initialData }: Props) {
                     else setEvening(combined);
                   }}
                   onFirstFocus={handleFocus}
+                  voiceEnabled={useVoice}
                 />
               </>
             ) : useStructured ? (

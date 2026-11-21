@@ -1,6 +1,9 @@
 "use client";
 
-// DailyQuestionsBlock — renders 3 questions, each with its own textarea + Whisper mic.
+// DailyQuestionsBlock — renders the day's questions, each with its own textarea.
+// The Whisper mic is rendered only when the caller passes voiceEnabled=true
+// (= the tenant has `tier-e.voiceInput` ON). Tenants without voice input would
+// otherwise get a mic button whose request the voice-input API rejects (403).
 //
 // Why a separate component:
 //   InputClient.tsx already juggles 5 modes (free/structured/double-loop/...).
@@ -25,6 +28,12 @@ interface Props {
   onCombinedChange: (combined: string) => void;
   /** Called on first focus into any answer field (parity with existing handleFocus). */
   onFirstFocus?: () => void;
+  /**
+   * Whether to show the Whisper mic. Required (no default) so every caller
+   * decides explicitly — pass `isOn("tier-e.voiceInput")`, the same gate the
+   * free-text textarea in InputClient uses.
+   */
+  voiceEnabled: boolean;
 }
 
 function buildCombined(questions: string[], answers: string[]): string {
@@ -37,6 +46,7 @@ export function DailyQuestionsBlock({
   questions,
   onCombinedChange,
   onFirstFocus,
+  voiceEnabled,
 }: Props) {
   const [answers, setAnswers] = useState<string[]>(() =>
     questions.map(() => "")
@@ -100,14 +110,16 @@ export function DailyQuestionsBlock({
               value={answers[i] || ""}
               onChange={(e) => handleAnswerChange(i, e.target.value)}
               onFocus={handleFocus}
-              placeholder="ここに書く（音声入力も可）"
+              placeholder={voiceEnabled ? "ここに書く（音声入力も可）" : "ここに書く"}
               className="input-field min-h-[120px] resize-none leading-relaxed pr-12"
             />
-            <div className="absolute bottom-3 right-3">
-              <VoiceInputButton
-                onTextReceived={(text) => handleVoice(i, text)}
-              />
-            </div>
+            {voiceEnabled && (
+              <div className="absolute bottom-3 right-3">
+                <VoiceInputButton
+                  onTextReceived={(text) => handleVoice(i, text)}
+                />
+              </div>
+            )}
             <p className="text-[11px] text-[#C9BDAE] text-right mt-1">
               {(answers[i] || "").length} 文字
             </p>
