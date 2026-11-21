@@ -53,7 +53,7 @@ core-log/
 │   │   ├── m/[token]/          # マネージャー UI
 │   │   └── verify/[token]/     # OTP 検証画面
 │   ├── components/features/
-│   │   ├── DailyQuestionsBlock.tsx   # 3問×textarea+マイク（朝/夕で再利用）
+│   │   ├── DailyQuestionsBlock.tsx   # 問いごとの textarea（朝/夕で再利用）。マイクは tier-e.voiceInput が ON のテナントのみ
 │   │   ├── VoiceInput.tsx            # Whisper 録音/送信
 │   │   ├── MoodCandlestick.tsx       # 気分ローソク足（日足・21日・ホーム）
 │   │   ├── MoodTrendLong.tsx         # 気分の長期ビュー（週足＋日々の線・約3ヶ月・ログ画面）
@@ -65,6 +65,7 @@ core-log/
 │   │   ├── mood-series.ts            # 気分の週足・日々の中点の集計（純関数・テスト付き）
 │   │   ├── standalone-report.ts      # 21日AIレポート（生成・最新取得・過去一覧 listStandaloneReports）
 │   │   ├── quick-notes.ts            # 途中メモ（quick_notes 表の保存/取得/削除・本人と装置だけ）
+│   │   ├── feedback-draft.ts         # 管理画面「AI下書き」のモデル選択・リクエスト組立て・応答の読み取り（純関数・テスト付き）
 │   │   ├── supabase.ts               # DB 操作の中心（PostgREST 0 行成功ガード入り）
 │   │   ├── tenant-from-token.ts      # token → tenant_id 解決
 │   │   ├── feature-flags.ts, email.ts, otp.ts, session.ts, logger.ts, ...
@@ -80,6 +81,8 @@ core-log/
 - Next.js 14.2 (App Router) + React 18 + TypeScript strict + TailwindCSS
 - Supabase (PostgreSQL + PostgREST) — project `vnfmbkftbnjruwsdlvtv`、リージョン ap-southeast-2
 - Anthropic Claude API（反芻検知・コンサル分析・将来のミクロ層）/ OpenAI API（Whisper）
+  - モデル指定は 2 系統（2026-11-21）。共通ヘルパー `src/lib/llm.ts` は `ANTHROPIC_MODEL`（既定 `claude-sonnet-4-6`）。`temperature` を送り `content[0]` を読むため、5.x 系モデルへは未移行（指定すると全機能が壊れる）。管理画面の「AI下書き」は `src/lib/feedback-draft.ts` が `ANTHROPIC_MODEL_FEEDBACK`（既定 `claude-sonnet-5-5`）で別管理し、5.x 系の応答（先頭が thinking ブロック、`max_tokens` を thinking と共有）に対応済み。
+  - 「AI下書き」の指示文（`ai_settings.system_prompt`）は、管理画面で閲覧中のテナント（`?tenant=<slug>`）のものを使う。slug 未指定のときは管理者の home テナント。
 - Resend（メール、100通/日制限）
 - デプロイ：Vercel（main への push で auto deploy）
 - ノード要件：`>=20.0.0`（`package.json`）
@@ -207,7 +210,7 @@ PR タイトル例（リポの履歴に合わせる）:
 - 主要ファイル:
   - `src/lib/daily-questions.ts` — store / 60s キャッシュ / parseWeekly
   - `src/app/api/features/daily-questions/route.ts` — GET `?token=` → `{enabled, day, axis, morning[], evening[]}`
-  - `src/components/features/DailyQuestionsBlock.tsx` — 3 問の textarea + Whisper マイク
+  - `src/components/features/DailyQuestionsBlock.tsx` — 問いごとの textarea。Whisper マイクは `voiceEnabled`（= `tier-e.voiceInput` が ON）のときだけ表示
   - `src/app/p/[token]/input/InputClient.tsx:407` — 「今日の軸 ── X」ヘッダ、`isMorning` で朝/夕切替
 
 42 問の文章は Cowork mode 由来の叩き台で、書籍 v2.5 体系・三慧・10 理論との整合は本藤さんが書き直す前提。**Claude Code 側で文言を勝手に書き換えない**（vocabulary-guard 必発火領域）。
