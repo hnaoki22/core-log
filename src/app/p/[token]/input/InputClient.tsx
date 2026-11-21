@@ -111,6 +111,14 @@ export default function InputPage({ token, initialData }: Props) {
     day: initialData.initialDailyQuestions.day,
   });
   const [dailyQuestionsEnabled, setDailyQuestionsEnabled] = useState(initialData.initialDailyQuestions.enabled);
+  // 問いごとの答え。問いの欄は step 1 でだけ描画されるため、答えを欄の側で持つと、
+  // 気分の画面（step 2）で「戻る」を押したときに入力欄が空に戻ってしまう。そのため答えは
+  // この親で持つ。朝と夕を分けて持つのは、下の再取得で isMorning が朝→夕に切り替わる
+  // ことがあり、朝の問いへの答えを夕の問いの欄に持ち越さないため。
+  const [dailyAnswers, setDailyAnswers] = useState<{ morning: string[]; evening: string[] }>({
+    morning: [],
+    evening: [],
+  });
 
   // 観の期(KAN のキー)関連 state — SSR で先読みした値を初期値に
   // null なら観の期外、オブジェクトなら観の期参加者
@@ -487,9 +495,15 @@ export default function InputPage({ token, initialData }: Props) {
                 )}
                 <DailyQuestionsBlock
                   questions={isMorning ? dailyQuestions.morning : dailyQuestions.evening}
-                  onCombinedChange={(combined) => {
-                    if (isMorning) setMorning(combined);
-                    else setEvening(combined);
+                  answers={isMorning ? dailyAnswers.morning : dailyAnswers.evening}
+                  onAnswersChange={(nextAnswers, combined) => {
+                    if (isMorning) {
+                      setDailyAnswers((prev) => ({ ...prev, morning: nextAnswers }));
+                      setMorning(combined);
+                    } else {
+                      setDailyAnswers((prev) => ({ ...prev, evening: nextAnswers }));
+                      setEvening(combined);
+                    }
                   }}
                   onFirstFocus={handleFocus}
                   voiceEnabled={useVoice}

@@ -12,6 +12,10 @@ import path from "path";
 //     are a follow-up.
 
 export default defineConfig({
+  // tsconfig.json は jsx: "preserve"（JSX の変換を Next.js に任せる設定）なので、
+  // そのままでは .tsx の部品を import するテストを解析できない。テストのときだけ
+  // JSX を変換する（アプリのビルドには関係しない。Next.js はこのファイルを読まない）。
+  oxc: { jsx: { runtime: "automatic" } },
   test: {
     environment: "node",
     globals: false,

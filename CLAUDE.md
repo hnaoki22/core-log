@@ -53,7 +53,7 @@ core-log/
 │   │   ├── m/[token]/          # マネージャー UI
 │   │   └── verify/[token]/     # OTP 検証画面
 │   ├── components/features/
-│   │   ├── DailyQuestionsBlock.tsx   # 問いごとの textarea（朝/夕で再利用）。マイクは tier-e.voiceInput が ON のテナントのみ
+│   │   ├── DailyQuestionsBlock.tsx   # 問いごとの textarea（朝/夕で再利用）。答えは親（InputClient）が持つ。マイクは tier-e.voiceInput が ON のテナントのみ
 │   │   ├── VoiceInput.tsx            # Whisper 録音/送信
 │   │   ├── MoodCandlestick.tsx       # 気分ローソク足（日足・21日・ホーム）
 │   │   ├── MoodTrendLong.tsx         # 気分の長期ビュー（週足＋日々の線・約3ヶ月・ログ画面）
@@ -62,6 +62,7 @@ core-log/
 │   ├── lib/
 │   │   ├── feature-flags.ts          # FEATURE_CATALOG（§5 で詳述）
 │   │   ├── daily-questions.ts        # メゾ層 store（JST / 7曜日 / legacy flat 後方互換）
+│   │   ├── daily-question-answers.ts # 問いへの答えを「Q1: 問い / A1: 答え」の 1 本の文字列にまとめる（純関数・テスト付き）
 │   │   ├── mood-series.ts            # 気分の週足・日々の中点の集計（純関数・テスト付き）
 │   │   ├── standalone-report.ts      # 21日AIレポート（生成・最新取得・過去一覧 listStandaloneReports）
 │   │   ├── quick-notes.ts            # 途中メモ（quick_notes 表の保存/取得/削除・本人と装置だけ）
@@ -72,7 +73,7 @@ core-log/
 │   └── middleware.ts                 # セキュリティヘッダ / レート制限 / OTP セッション検証
 ├── supabase/migrations/              # 全 DDL（runtime DDL 禁止）
 ├── .claude/skills/core-log-review/   # repo-local skill（§1 参照）
-├── test-utils/, vitest.config.ts     # Vitest テスト基盤
+├── test-utils/, vitest.config.ts     # Vitest テスト基盤（Node 環境・DOM なし。.tsx の部品は react-dom/server での描画テストまで。入力操作のテストは不可）
 ├── next.config.mjs, tailwind.config.ts, tsconfig.json
 └── vercel.json
 ```
@@ -210,8 +211,11 @@ PR タイトル例（リポの履歴に合わせる）:
 - 主要ファイル:
   - `src/lib/daily-questions.ts` — store / 60s キャッシュ / parseWeekly
   - `src/app/api/features/daily-questions/route.ts` — GET `?token=` → `{enabled, day, axis, morning[], evening[]}`
-  - `src/components/features/DailyQuestionsBlock.tsx` — 問いごとの textarea。Whisper マイクは `voiceEnabled`（= `tier-e.voiceInput` が ON）のときだけ表示
-  - `src/app/p/[token]/input/InputClient.tsx:407` — 「今日の軸 ── X」ヘッダ、`isMorning` で朝/夕切替
+  - `src/components/features/DailyQuestionsBlock.tsx` — 問いごとの textarea。Whisper マイクは `voiceEnabled`（= `tier-e.voiceInput` が ON）のときだけ表示。答えは親（InputClient の `dailyAnswers`）が持つ（step 2 から「戻る」で戻っても入力が残るようにするため）
+  - `src/lib/daily-question-answers.ts` — 答えを `Q1: 問い\nA1: 答え` の形で 1 本にまとめ、既存の `morning_intent` / `evening_insight` に保存する。どの問いにも答えが無いときは空文字（未記入のまま「次へ」に進めない）
+  - `src/app/p/[token]/input/InputClient.tsx` — 「今日の軸 ── X」ヘッダ（軸が空の曜日は出さない）、`isMorning` で朝/夕切替
+  - `src/app/a/[token]/features/daily-questions/page.tsx` + `src/app/api/admin/daily-questions/route.ts` — 管理画面での編集・保存（1 行 1 問）。保存済みの空の軸は空のまま読み込む
+- 問いの欄が出るのは従来型の入力画面（`InputClient`）だけ。`standalone_mode` が ON のテナントは `StandaloneInputClient` に分岐するため、フラグが ON でも問いの欄は出ない（2026-11-21 コード確認）。`tier-s.structuredInput` と同時に ON にしないこと（画面は問いの欄を出すが、「次へ」の判定と保存は構造化入力の欄を見るため、記入を完了できない）。
 
 42 問の文章は Cowork mode 由来の叩き台で、書籍 v2.5 体系・三慧・10 理論との整合は本藤さんが書き直す前提。**Claude Code 側で文言を勝手に書き換えない**（vocabulary-guard 必発火領域）。
 
