@@ -463,7 +463,8 @@ export default function AdminDashboard() {
     setAiDraftLoading(true);
     try {
       const targetParticipant = data?.participants.find((p) => p.name === fbTargetName);
-      const res = await fetch("/api/feedback/draft", {
+      // 閲覧中のテナントを渡す。サーバーはそのテナントに保存された AI への指示文を使う。
+      const res = await fetch(`/api/feedback/draft${selectedTenantSlug ? `?tenant=${selectedTenantSlug}` : ""}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
