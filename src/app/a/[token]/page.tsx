@@ -1346,7 +1346,9 @@ export default function AdminDashboard() {
               </div>
               <p className="text-xs text-amber-600 font-medium mt-1">対象: {fbTargetName}</p>
               {(() => { const p = data?.participants.find((p) => p.name === fbTargetName); return p?.fbPolicy ? (
-                <p className="text-[10px] text-violet-500 mt-1 bg-violet-50 rounded-md px-2 py-1">FB方針: {p.fbPolicy}</p>
+                // FB方針は複数行・長文になりうる（本人の計画の抜粋＋支援の方向）。改行を残し、
+                // 高さを抑えて中でスクロールさせる（長いとモーダルが画面からはみ出すため）。
+                <p className="text-[10px] text-violet-500 mt-1 bg-violet-50 rounded-md px-2 py-1 max-h-24 overflow-y-auto whitespace-pre-wrap">FB方針: {p.fbPolicy}</p>
               ) : null; })()}
             </div>
             {fbSuccess ? (
@@ -1939,7 +1941,7 @@ export default function AdminDashboard() {
               <div>
                 <label className="text-xs font-medium text-[#5B5560] block mb-1">FB方針</label>
                 <textarea value={editForm.fbPolicy} onChange={(e) => setEditForm({ ...editForm, fbPolicy: e.target.value })}
-                  className="w-full text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none h-20 resize-none"
+                  className="w-full text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none h-40 resize-y"
                   placeholder="フィードバックの方針を入力" />
               </div>
               <div className="grid grid-cols-2 gap-4">
