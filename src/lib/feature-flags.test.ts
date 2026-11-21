@@ -68,3 +68,53 @@ describe("applyTenantFlagGuards", () => {
     for (const k of tier0Keys) expect(input[k]).toBe(true);
   });
 });
+
+// 入力画面へのミッション表示（feature.missionOnInput）と、呼び名の切り替え
+// （feature.missionLabelIssue）。どちらも、スイッチを入れるまで既存テナントの表示を
+// 変えないことが前提なので、既定値とプリセットでの扱いを固定する。
+describe("mission flags (input screen / label)", () => {
+  const missionKeys = ["feature.missionOnInput", "feature.missionLabelIssue"];
+  const byKey = (key: string) => FEATURE_CATALOG.find((f) => f.key === key);
+
+  it("are in the catalog, default OFF, and depend on the Mission feature", () => {
+    for (const key of missionKeys) {
+      const f = byKey(key);
+      expect(f, key).toBeDefined();
+      expect(f!.defaultEnabled).toBe(false);
+      expect(f!.phase1Enabled).toBe(false);
+      expect(f!.implemented).toBe(true);
+      expect(f!.dependencies).toEqual(["feature.mission"]);
+      // features 画面のグルーピングは既存カテゴリだけを前提にしている（CLAUDE.md §5 ルール 4）
+      expect(f!.category).toBe("existing");
+    }
+  });
+
+  it("stay OFF in every preset except 'full'", () => {
+    for (const preset of PRESETS) {
+      if (preset.id === "full") continue;
+      const flags = preset.getFlags();
+      for (const key of missionKeys) expect(flags[key], `${preset.id}:${key}`).toBe(false);
+    }
+  });
+
+  it("'full' turns the input-screen display ON but never switches the label", () => {
+    const full = PRESETS.find((p) => p.id === "full")!.getFlags();
+    expect(full["feature.missionOnInput"]).toBe(true);
+    expect(full["feature.missionLabelIssue"]).toBe(false);
+  });
+
+  it("are not forced either way by the daiko guard (the tenant's stored value decides)", () => {
+    const on = applyTenantFlagGuards(DAIKO_TENANT_ID, {
+      "feature.missionOnInput": true,
+      "feature.missionLabelIssue": true,
+    });
+    expect(on["feature.missionOnInput"]).toBe(true);
+    expect(on["feature.missionLabelIssue"]).toBe(true);
+    const off = applyTenantFlagGuards(DAIKO_TENANT_ID, {
+      "feature.missionOnInput": false,
+      "feature.missionLabelIssue": false,
+    });
+    expect(off["feature.missionOnInput"]).toBe(false);
+    expect(off["feature.missionLabelIssue"]).toBe(false);
+  });
+});

@@ -3,6 +3,9 @@
 import { useParams } from "next/navigation";
 import { BottomNav } from "@/components/BottomNav";
 import { useState, useEffect, useCallback } from "react";
+import { useFeatures } from "@/lib/use-features";
+import { missionTerms, composeIssuePurpose } from "@/lib/mission-context";
+import { MissionPurposeView } from "@/components/features/MissionPurposeView";
 
 type Mission = {
   id: string;
@@ -28,6 +31,10 @@ type MissionComment = {
 export default function MissionPage() {
   const params = useParams();
   const token = params.token as string;
+  // 呼び名（ミッション／イシュー）。feature.missionLabelIssue が ON のテナントは「イシュー」。
+  // OFF のテナントでは、元からこの画面に書かれていた文言がそのまま出る。
+  const { isOn } = useFeatures();
+  const terms = missionTerms(isOn("feature.missionLabelIssue"));
 
   const [missions, setMissions] = useState<Mission[]>([]);
   const [participantName, setParticipantName] = useState("");
@@ -49,9 +56,14 @@ export default function MissionPage() {
   // Create form state
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newTitle, setNewTitle] = useState("");
+  // 「仮説」の欄。イシューの呼び名のテナント（terms.hypothesisLabel がある）だけで使う。
+  const [newHypothesis, setNewHypothesis] = useState("");
   const [newPurpose, setNewPurpose] = useState("");
   const [newDeadline, setNewDeadline] = useState("");
   const [creating, setCreating] = useState(false);
+  // 仮説の欄を出すテナントでは、仮説を書かないと設定できない。
+  const needsHypothesis = terms.hypothesisLabel !== null;
+  const canCreate = newTitle.trim() !== "" && (!needsHypothesis || newHypothesis.trim() !== "");
 
   useEffect(() => {
     async function fetchMissions() {
@@ -172,7 +184,7 @@ export default function MissionPage() {
   };
 
   const handleCreate = async () => {
-    if (!newTitle.trim()) return;
+    if (!canCreate) return;
     setCreating(true);
     try {
       const res = await fetch("/api/mission", {
@@ -182,7 +194,9 @@ export default function MissionPage() {
           token,
           participantName,
           title: newTitle.trim(),
-          purpose: newPurpose.trim(),
+          // 仮説の欄があるテナントでは、仮説と「目指す状態・行動」を見出しつきで 1 本にまとめ、
+          // 既存の「背景・目的」に保存する（保存先は増やさない）。
+          purpose: needsHypothesis ? composeIssuePurpose(newHypothesis, newPurpose) : newPurpose.trim(),
           deadline: newDeadline,
         }),
       });
@@ -194,6 +208,7 @@ export default function MissionPage() {
           if (data.missions) setMissions(data.missions);
         }
         setNewTitle("");
+        setNewHypothesis("");
         setNewPurpose("");
         setNewDeadline("");
         setShowCreateForm(false);
@@ -242,7 +257,7 @@ export default function MissionPage() {
   };
 
   const getStatusStyle = (status: string) => {
-    if (status === "完了" || status === "completed") return { bg: "bg-emerald-50", text: "text-emerald-600", dot: "bg-emerald-500", label: "完了" };
+    if (status === "完了" || status === "completed") return { bg: "bg-emerald-50", text: "text-emerald-600", dot: "bg-emerald-500", label: terms.closedStatusLabel };
     if (status === "進行中" || status === "in_progress") return { bg: "bg-indigo-50", text: "text-[#1A1A2E]", dot: "bg-[#1A1A2E]", label: "進行中" };
     return { bg: "bg-gray-50", text: "text-[#8B8489]", dot: "bg-[#C9BDAE]", label: "未着手" };
   };
@@ -275,8 +290,8 @@ export default function MissionPage() {
       {/* Header */}
       <div className="gradient-header text-white px-6 pt-12 pb-6">
         <div className="max-w-md mx-auto relative z-10">
-          <h1 className="text-xl font-semibold tracking-tight">ミッション</h1>
-          <p className="text-indigo-200 text-sm mt-1 font-light">上司と共有するミッションと進捗</p>
+          <h1 className="text-xl font-semibold tracking-tight">{terms.pageTitle}</h1>
+          <p className="text-indigo-200 text-sm mt-1 font-light">{terms.pageSubtitle}</p>
         </div>
       </div>
 
@@ -290,31 +305,43 @@ export default function MissionPage() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
-            新しいミッションを設定
+            {terms.createButton}
           </button>
         )}
 
         {/* Create Form */}
         {showCreateForm && (
           <div className="card p-5 mb-5">
-            <h3 className="font-semibold text-sm text-[#1A1A2E] mb-4">新しいミッションを設定</h3>
+            <h3 className="font-semibold text-sm text-[#1A1A2E] mb-4">{terms.createButton}</h3>
             <div className="space-y-3">
               <div>
-                <label className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase block mb-1.5">ミッション名 *</label>
+                <label className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase block mb-1.5">{terms.titleLabel}</label>
                 <input
                   type="text"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="例: Q3営業戦略の提案書を自力で完成させる"
+                  placeholder={terms.titlePlaceholder}
                   className="w-full text-sm border border-[#E5DCD0] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 focus:border-[#1A1A2E] bg-white transition-all"
                 />
               </div>
+              {needsHypothesis && (
+                <div>
+                  <label className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase block mb-1.5">{terms.hypothesisLabel}</label>
+                  <textarea
+                    value={newHypothesis}
+                    onChange={(e) => setNewHypothesis(e.target.value)}
+                    placeholder={terms.hypothesisPlaceholder ?? ""}
+                    className="w-full text-sm border border-[#E5DCD0] rounded-xl px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 focus:border-[#1A1A2E] bg-white transition-all"
+                    rows={2}
+                  />
+                </div>
+              )}
               <div>
-                <label className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase block mb-1.5">背景・目的</label>
+                <label className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase block mb-1.5">{terms.purposeLabel}</label>
                 <textarea
                   value={newPurpose}
                   onChange={(e) => setNewPurpose(e.target.value)}
-                  placeholder="このミッションを設定する背景や、達成に向けた期待を記入"
+                  placeholder={terms.purposePlaceholder}
                   className="w-full text-sm border border-[#E5DCD0] rounded-xl px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/10 focus:border-[#1A1A2E] bg-white transition-all"
                   rows={3}
                 />
@@ -330,17 +357,17 @@ export default function MissionPage() {
               </div>
               <div className="flex gap-2 justify-end pt-1">
                 <button
-                  onClick={() => { setShowCreateForm(false); setNewTitle(""); setNewPurpose(""); setNewDeadline(""); }}
+                  onClick={() => { setShowCreateForm(false); setNewTitle(""); setNewHypothesis(""); setNewPurpose(""); setNewDeadline(""); }}
                   className="text-xs text-[#8B8489] hover:text-[#5B5560] px-3 py-2 transition-colors"
                 >
                   キャンセル
                 </button>
                 <button
                   onClick={handleCreate}
-                  disabled={creating || !newTitle.trim()}
+                  disabled={creating || !canCreate}
                   className="text-xs bg-[#1A1A2E] text-white rounded-xl px-4 py-2 hover:bg-[#141423] disabled:bg-[#C9BDAE] disabled:text-[#8B8489] transition-colors"
                 >
-                  {creating ? "作成中..." : "ミッションを設定"}
+                  {creating ? "作成中..." : terms.submit}
                 </button>
               </div>
             </div>
@@ -354,8 +381,8 @@ export default function MissionPage() {
                 <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
               </svg>
             </div>
-            <p className="text-[#5B5560] text-sm mb-1">ミッションはまだありません</p>
-            <p className="text-xs text-[#C9BDAE]">上のボタンから自分でミッションを設定できます</p>
+            <p className="text-[#5B5560] text-sm mb-1">{terms.emptyTitle}</p>
+            <p className="text-xs text-[#C9BDAE]">{terms.emptyHint}</p>
           </div>
         ) : missions.length > 0 ? (
           <div className="space-y-6">
@@ -411,12 +438,8 @@ export default function MissionPage() {
 
                         {isExpanded && (
                           <div className="px-4 pb-4 space-y-3 border-t border-[#EFE8DD]">
-                            {mission.purpose && (
-                              <div className="bg-[#F5F0EB] p-3 rounded-xl border border-[#EFE8DD] mt-3">
-                                <p className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase mb-1">背景・目的</p>
-                                <p className="text-sm text-[#2C2C4A] leading-relaxed">{mission.purpose}</p>
-                              </div>
-                            )}
+                            {/* 背景・目的。仮説つきで設定された文は、仮説と残りを分けて出す。 */}
+                            <MissionPurposeView purpose={mission.purpose} purposeLabel={terms.purposeLabel} />
 
                             {mission.reviewMemo && (
                               <div className="bg-[#F5F0EB] p-3 rounded-xl border border-[#EFE8DD]">
@@ -427,7 +450,7 @@ export default function MissionPage() {
 
                             {mission.finalReview && (
                               <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100">
-                                <p className="text-[10px] font-medium text-emerald-600 tracking-wide uppercase mb-1">最終振り返り</p>
+                                <p className="text-[10px] font-medium text-emerald-600 tracking-wide uppercase mb-1">{terms.closedNoteLabel}</p>
                                 <p className="text-sm text-[#2C2C4A] leading-relaxed">{mission.finalReview}</p>
                               </div>
                             )}
@@ -450,14 +473,14 @@ export default function MissionPage() {
                                       onClick={(e) => { e.stopPropagation(); setClosingMission(mission.id); }}
                                       className="text-xs bg-emerald-600 text-white px-3.5 py-2 rounded-xl hover:bg-emerald-700 transition-colors"
                                     >
-                                      完了にする
+                                      {terms.closeButton}
                                     </button>
                                   ) : (
                                     <div className="w-full space-y-2">
                                       <textarea
                                         value={closeReview}
                                         onChange={(e) => setCloseReview(e.target.value)}
-                                        placeholder="振り返りコメント（任意）"
+                                        placeholder={terms.closeNotePlaceholder}
                                         className="w-full text-xs border border-[#E5DCD0] rounded-xl p-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400 bg-white transition-all"
                                         rows={2}
                                         onClick={(e) => e.stopPropagation()}
@@ -471,10 +494,10 @@ export default function MissionPage() {
                                         </button>
                                         <button
                                           onClick={(e) => { e.stopPropagation(); handleStatusChange(mission.id, "完了", closeReview); }}
-                                          disabled={updatingStatus === mission.id}
+                                          disabled={updatingStatus === mission.id || (terms.closeNoteRequired && closeReview.trim() === "")}
                                           className="text-xs bg-emerald-600 text-white rounded-xl px-3 py-1.5 hover:bg-emerald-700 disabled:opacity-50 transition-colors"
                                         >
-                                          {updatingStatus === mission.id ? "更新中..." : "完了にする"}
+                                          {updatingStatus === mission.id ? "更新中..." : terms.closeConfirm}
                                         </button>
                                       </div>
                                     </div>
@@ -667,12 +690,8 @@ export default function MissionPage() {
 
                         {isExpanded && (
                           <div className="px-4 pb-4 space-y-3 border-t border-[#EFE8DD]">
-                            {mission.purpose && (
-                              <div className="bg-[#F5F0EB] p-3 rounded-xl border border-[#EFE8DD] mt-3">
-                                <p className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase mb-1">背景・目的</p>
-                                <p className="text-sm text-[#2C2C4A] leading-relaxed">{mission.purpose}</p>
-                              </div>
-                            )}
+                            {/* 背景・目的。仮説つきで設定された文は、仮説と残りを分けて出す。 */}
+                            <MissionPurposeView purpose={mission.purpose} purposeLabel={terms.purposeLabel} />
 
                             {mission.reviewMemo && (
                               <div className="bg-[#F5F0EB] p-3 rounded-xl border border-[#EFE8DD]">
@@ -683,7 +702,7 @@ export default function MissionPage() {
 
                             {mission.finalReview && (
                               <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100">
-                                <p className="text-[10px] font-medium text-emerald-600 tracking-wide uppercase mb-1">最終振り返り</p>
+                                <p className="text-[10px] font-medium text-emerald-600 tracking-wide uppercase mb-1">{terms.closedNoteLabel}</p>
                                 <p className="text-sm text-[#2C2C4A] leading-relaxed">{mission.finalReview}</p>
                               </div>
                             )}
@@ -706,14 +725,14 @@ export default function MissionPage() {
                                       onClick={(e) => { e.stopPropagation(); setClosingMission(mission.id); }}
                                       className="text-xs bg-emerald-600 text-white px-3.5 py-2 rounded-xl hover:bg-emerald-700 transition-colors"
                                     >
-                                      完了にする
+                                      {terms.closeButton}
                                     </button>
                                   ) : (
                                     <div className="w-full space-y-2">
                                       <textarea
                                         value={closeReview}
                                         onChange={(e) => setCloseReview(e.target.value)}
-                                        placeholder="振り返りコメント（任意）"
+                                        placeholder={terms.closeNotePlaceholder}
                                         className="w-full text-xs border border-[#E5DCD0] rounded-xl p-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400 bg-white transition-all"
                                         rows={2}
                                         onClick={(e) => e.stopPropagation()}
@@ -727,10 +746,10 @@ export default function MissionPage() {
                                         </button>
                                         <button
                                           onClick={(e) => { e.stopPropagation(); handleStatusChange(mission.id, "完了", closeReview); }}
-                                          disabled={updatingStatus === mission.id}
+                                          disabled={updatingStatus === mission.id || (terms.closeNoteRequired && closeReview.trim() === "")}
                                           className="text-xs bg-emerald-600 text-white rounded-xl px-3 py-1.5 hover:bg-emerald-700 disabled:opacity-50 transition-colors"
                                         >
-                                          {updatingStatus === mission.id ? "更新中..." : "完了にする"}
+                                          {updatingStatus === mission.id ? "更新中..." : terms.closeConfirm}
                                         </button>
                                       </div>
                                     </div>
@@ -875,7 +894,7 @@ export default function MissionPage() {
               <section>
                 <h2 className="text-xs font-semibold text-[#5B5560] tracking-wide uppercase mb-3 flex items-center gap-2">
                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
-                  完了 ({completed.length})
+                  {terms.closedSectionTitle} ({completed.length})
                 </h2>
                 <div className="space-y-2">
                   {completed.map((mission) => {
@@ -923,12 +942,8 @@ export default function MissionPage() {
 
                         {isExpanded && (
                           <div className="px-4 pb-4 space-y-3 border-t border-[#EFE8DD]">
-                            {mission.purpose && (
-                              <div className="bg-[#F5F0EB] p-3 rounded-xl border border-[#EFE8DD] mt-3">
-                                <p className="text-[10px] font-medium text-[#8B8489] tracking-wide uppercase mb-1">背景・目的</p>
-                                <p className="text-sm text-[#2C2C4A] leading-relaxed">{mission.purpose}</p>
-                              </div>
-                            )}
+                            {/* 背景・目的。仮説つきで設定された文は、仮説と残りを分けて出す。 */}
+                            <MissionPurposeView purpose={mission.purpose} purposeLabel={terms.purposeLabel} />
 
                             {mission.reviewMemo && (
                               <div className="bg-[#F5F0EB] p-3 rounded-xl border border-[#EFE8DD]">
@@ -939,7 +954,7 @@ export default function MissionPage() {
 
                             {mission.finalReview && (
                               <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100">
-                                <p className="text-[10px] font-medium text-emerald-600 tracking-wide uppercase mb-1">最終振り返り</p>
+                                <p className="text-[10px] font-medium text-emerald-600 tracking-wide uppercase mb-1">{terms.closedNoteLabel}</p>
                                 <p className="text-sm text-[#2C2C4A] leading-relaxed">{mission.finalReview}</p>
                               </div>
                             )}
@@ -962,14 +977,14 @@ export default function MissionPage() {
                                       onClick={(e) => { e.stopPropagation(); setClosingMission(mission.id); }}
                                       className="text-xs bg-emerald-600 text-white px-3.5 py-2 rounded-xl hover:bg-emerald-700 transition-colors"
                                     >
-                                      完了にする
+                                      {terms.closeButton}
                                     </button>
                                   ) : (
                                     <div className="w-full space-y-2">
                                       <textarea
                                         value={closeReview}
                                         onChange={(e) => setCloseReview(e.target.value)}
-                                        placeholder="振り返りコメント（任意）"
+                                        placeholder={terms.closeNotePlaceholder}
                                         className="w-full text-xs border border-[#E5DCD0] rounded-xl p-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400 bg-white transition-all"
                                         rows={2}
                                         onClick={(e) => e.stopPropagation()}
@@ -983,10 +998,10 @@ export default function MissionPage() {
                                         </button>
                                         <button
                                           onClick={(e) => { e.stopPropagation(); handleStatusChange(mission.id, "完了", closeReview); }}
-                                          disabled={updatingStatus === mission.id}
+                                          disabled={updatingStatus === mission.id || (terms.closeNoteRequired && closeReview.trim() === "")}
                                           className="text-xs bg-emerald-600 text-white rounded-xl px-3 py-1.5 hover:bg-emerald-700 disabled:opacity-50 transition-colors"
                                         >
-                                          {updatingStatus === mission.id ? "更新中..." : "完了にする"}
+                                          {updatingStatus === mission.id ? "更新中..." : terms.closeConfirm}
                                         </button>
                                       </div>
                                     </div>

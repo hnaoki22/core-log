@@ -11,6 +11,8 @@ import { DoubleLoopPrompt } from "@/components/features/DoubleLoopPrompt";
 import { useRuminationDetector, BreathingPrompt } from "@/components/features/RuminationTimerIntegration";
 import { VoiceInputButton } from "@/components/features/VoiceInput";
 import { DailyQuestionsBlock } from "@/components/features/DailyQuestionsBlock";
+import { MissionContextCard } from "@/components/features/MissionContextCard";
+import { missionTerms, type MissionContextItem } from "@/lib/mission-context";
 
 type TodayLog = {
   id: string;
@@ -57,6 +59,9 @@ export type InputPageInitialData = {
     axis: string;
     day: string;
   };
+  // 問いの上に出す、本人の進行中のミッション（feature.missionOnInput）。
+  // null = 出さない（スイッチが OFF、または読めなかった）。[] = 未設定（設定先への案内を出す）。
+  initialMissions: MissionContextItem[] | null;
 };
 
 interface Props {
@@ -111,6 +116,14 @@ export default function InputPage({ token, initialData }: Props) {
     day: initialData.initialDailyQuestions.day,
   });
   const [dailyQuestionsEnabled, setDailyQuestionsEnabled] = useState(initialData.initialDailyQuestions.enabled);
+  // 問いごとの答え。問いの欄は step 1 でだけ描画されるため、答えを欄の側で持つと、
+  // 気分の画面（step 2）で「戻る」を押したときに入力欄が空に戻ってしまう。そのため答えは
+  // この親で持つ。朝と夕を分けて持つのは、下の再取得で isMorning が朝→夕に切り替わる
+  // ことがあり、朝の問いへの答えを夕の問いの欄に持ち越さないため。
+  const [dailyAnswers, setDailyAnswers] = useState<{ morning: string[]; evening: string[] }>({
+    morning: [],
+    evening: [],
+  });
 
   // 観の期(KAN のキー)関連 state — SSR で先読みした値を初期値に
   // null なら観の期外、オブジェクトなら観の期参加者
@@ -159,6 +172,10 @@ export default function InputPage({ token, initialData }: Props) {
     };
   }, [useDailyQuestions, token]);
   const useVoice = isOn("tier-e.voiceInput");
+  // 進行中のミッションを問いの上に出す（Mission機能が ON のテナントだけ）。
+  // 呼び名（ミッション／イシュー）は feature.missionLabelIssue で切り替える。
+  const useMissionOnInput = isOn("feature.missionOnInput") && isOn("feature.mission");
+  const missionTermsForInput = missionTerms(isOn("feature.missionLabelIssue"));
 
   const ruminationEveningState = useRuminationDetector(eveningTextareaRef, useRumination && !isMorning);
   const ruminationMorningState = useRuminationDetector(morningTextareaRef, useRumination && isMorning);
@@ -471,6 +488,14 @@ export default function InputPage({ token, initialData }: Props) {
 
         {step === 1 && (
           <div className="space-y-4">
+            {useMissionOnInput && initialData.initialMissions !== null && (
+              <MissionContextCard
+                missions={initialData.initialMissions}
+                terms={missionTermsForInput}
+                missionPageHref={`/p/${token}/mission`}
+              />
+            )}
+
             {!isMorning && todayLog && (
               <div className="bg-[#F2F2F7] border border-indigo-100 p-4 rounded-2xl">
                 <p className="text-[10px] text-[#4D4D6D] font-medium tracking-wide uppercase mb-1">今朝の意図</p>
@@ -487,11 +512,18 @@ export default function InputPage({ token, initialData }: Props) {
                 )}
                 <DailyQuestionsBlock
                   questions={isMorning ? dailyQuestions.morning : dailyQuestions.evening}
-                  onCombinedChange={(combined) => {
-                    if (isMorning) setMorning(combined);
-                    else setEvening(combined);
+                  answers={isMorning ? dailyAnswers.morning : dailyAnswers.evening}
+                  onAnswersChange={(nextAnswers, combined) => {
+                    if (isMorning) {
+                      setDailyAnswers((prev) => ({ ...prev, morning: nextAnswers }));
+                      setMorning(combined);
+                    } else {
+                      setDailyAnswers((prev) => ({ ...prev, evening: nextAnswers }));
+                      setEvening(combined);
+                    }
                   }}
                   onFirstFocus={handleFocus}
+                  voiceEnabled={useVoice}
                 />
               </>
             ) : useStructured ? (

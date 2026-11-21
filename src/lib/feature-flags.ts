@@ -172,11 +172,31 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
   {
     key: "feature.dailyQuestions",
     label: "朝・夕の問い 6 問表示",
-    description: "テナント毎にカスタマイズした朝3問・夕3問を入力画面に表示。各問いに音声入力ボタン付き。reflection-lab で先行検証中。",
+    description: "テナント毎に登録した朝・夕の問い（各スロット最大3問を表示）を、従来型の入力画面に表示。問いは管理画面の「毎日の問い」で編集する。各問いのマイクは音声入力（tier-e.voiceInput）が ON のテナントだけに出る。standalone商品モードのテナントでは表示されない。",
     category: "existing",
     defaultEnabled: false,
     phase1Enabled: false,
     implemented: true,
+  },
+  {
+    key: "feature.missionOnInput",
+    label: "入力画面にミッションを表示",
+    description: "本人の進行中のミッション（名前と、背景・目的の先頭 3 行。続きは開いて読める。仮説つきで設定されたものは、仮説を常に表示）を、従来型の入力画面（朝・夕）の問いの上に表示。1 件も無いときは、ミッション画面への案内を出す。Mission機能（feature.mission）が ON のテナントで使う。standalone商品モードのテナントでは表示されない。",
+    category: "existing",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    implemented: true,
+    dependencies: ["feature.mission"],
+  },
+  {
+    key: "feature.missionLabelIssue",
+    label: "ミッションを「イシュー」と表示",
+    description: "参加者画面で、Mission機能の呼び名を「ミッション」から「イシュー（解くべき問い）」に切り替える（下のタブ、ミッション画面の見出しと設定フォーム、入力画面の表示）。設定フォームに「仮説」の欄（必須）が加わり、「完了にする」は「このイシューを閉じる」（理由の記入が必須）になる。通知メールと、マネージャー・管理者の画面は「ミッション」のまま。",
+    category: "existing",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    implemented: true,
+    dependencies: ["feature.mission"],
   },
 
   // ===== Tier S: Differentiators =====
@@ -704,6 +724,9 @@ export const PRESETS: Preset[] = [
       for (const f of FEATURE_CATALOG) {
         flags[f.key] = f.implemented;
       }
+      // 呼び名の切り替えは機能の追加ではないので、「全機能ON」には含めない
+      // （含めると、プリセットを当てただけで参加者画面の「ミッション」が「イシュー」に変わる）。
+      flags["feature.missionLabelIssue"] = false;
       return flags;
     },
   },

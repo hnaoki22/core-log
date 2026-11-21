@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useFeatures } from "@/lib/use-features";
+import { missionTerms } from "@/lib/mission-context";
 
 interface BadgeCounts {
   feedback?: number;
@@ -55,12 +56,15 @@ export function BottomNav({ active, baseUrl, badges }: BottomNavProps) {
   // フィードバック機能がOFFでも、フィードバックが1件でもあればタブを表示する（HM送信分を閲覧可能にする）
   // 未読数ではなく総数で判定：既読後もタブが消えないようにする
   const hasFeedbacks = (badges?.feedbackTotal ?? 0) > 0;
+  // タブの呼び名（feature.missionLabelIssue が ON のテナントは「イシュー」）。
+  // フラグの読み込みが終わるまでは既定の「ミッション」で出る。
+  const missionTabLabel = missionTerms(isOn("feature.missionLabelIssue")).tab;
 
   const allTabs = [
     { id: "home" as const, label: "ホーム", Icon: HomeIcon, path: "", visible: true },
     { id: "logs" as const, label: "ログ", Icon: LogIcon, path: "logs", visible: true },
     { id: "feedback" as const, label: "FB", Icon: FeedbackIcon, path: "feedback", visible: fbOn || hasFeedbacks },
-    { id: "mission" as const, label: "ミッション", Icon: MissionIcon, path: "mission", visible: missionOn },
+    { id: "mission" as const, label: missionTabLabel, Icon: MissionIcon, path: "mission", visible: missionOn },
   ];
   const tabs = allTabs.filter((t) => t.visible);
 

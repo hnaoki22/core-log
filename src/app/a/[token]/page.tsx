@@ -68,6 +68,13 @@ type TenantInfo = {
   companyName: string;
 };
 
+// テナントの表示名。会社名だけだと、同じ会社の別テナント（社内検証と Reflection Lab など）が
+// 同じ表示になり、選び間違える。テナント名を先に出し、会社名は補足にする
+// （機能設定・毎日の問いのページのテナント名と同じ呼び方になる）。
+function tenantLabel(t: { name: string; companyName?: string | null }): string {
+  return t.companyName && t.companyName !== t.name ? `${t.name}（${t.companyName}）` : t.name;
+}
+
 type AdminData = {
   participants: ParticipantData[];
   managers: ManagerData[];
@@ -463,7 +470,8 @@ export default function AdminDashboard() {
     setAiDraftLoading(true);
     try {
       const targetParticipant = data?.participants.find((p) => p.name === fbTargetName);
-      const res = await fetch("/api/feedback/draft", {
+      // 閲覧中のテナントを渡す。サーバーはそのテナントに保存された AI への指示文を使う。
+      const res = await fetch(`/api/feedback/draft${selectedTenantSlug ? `?tenant=${selectedTenantSlug}` : ""}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -677,7 +685,7 @@ export default function AdminDashboard() {
                 <option value="" className="text-gray-900">全テナント（デフォルト）</option>
                 {data.tenants.map((t) => (
                   <option key={t.slug} value={t.slug} className="text-gray-900">
-                    {t.companyName || t.name}
+                    {tenantLabel(t)}
                   </option>
                 ))}
               </select>
@@ -1193,6 +1201,23 @@ export default function AdminDashboard() {
                   <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">例示管理</h3>
                   <p className="text-xs text-[#8B8489]">各道場の問い・記入欄プレースホルダー (AI 生成可)</p>
                 </Link>
+                {/* 毎日の問い（feature.dailyQuestions の問いの編集）。このページへの入口が
+                    管理画面のどこにも無く、URL を直接入力するしかなかった。フラグを ON に
+                    する前に問いを用意する場所なので、例示管理と同じく常時表示する。
+                    閲覧中のテナントを引き継ぐ（「全テナント」のときは管理者の home テナントが
+                    開く。編集ページ上部の「編集中」とテナント選択で確認・切替できる）。
+                    編集ページの API は管理者（isAdmin）専用なので、閲覧者（observer）には
+                    カードを出さない（出すと、開いても Unauthorized になる入口が増える）。*/}
+                {!isObserver && (
+                  <Link
+                    href={`/a/${token}/features/daily-questions${selectedTenantSlug ? `?tenant=${encodeURIComponent(selectedTenantSlug)}` : ""}`}
+                    className="card p-4 hover:shadow-md transition-shadow"
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-[#F2F2F7] flex items-center justify-center text-[#1A1A2E] mb-2"><IconFile size={18} /></div>
+                    <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">毎日の問い</h3>
+                    <p className="text-xs text-[#8B8489]">入力画面に出す朝・夕の問い（曜日ごと・1行1問）</p>
+                  </Link>
+                )}
               </div>
             </div>
           </>
@@ -1332,7 +1357,9 @@ export default function AdminDashboard() {
               </div>
               <p className="text-xs text-amber-600 font-medium mt-1">対象: {fbTargetName}</p>
               {(() => { const p = data?.participants.find((p) => p.name === fbTargetName); return p?.fbPolicy ? (
-                <p className="text-[10px] text-violet-500 mt-1 bg-violet-50 rounded-md px-2 py-1">FB方針: {p.fbPolicy}</p>
+                // FB方針は複数行・長文になりうる（本人の計画の抜粋＋支援の方向）。改行を残し、
+                // 高さを抑えて中でスクロールさせる（長いとモーダルが画面からはみ出すため）。
+                <p className="text-[10px] text-violet-500 mt-1 bg-violet-50 rounded-md px-2 py-1 max-h-24 overflow-y-auto whitespace-pre-wrap">FB方針: {p.fbPolicy}</p>
               ) : null; })()}
             </div>
             {fbSuccess ? (
@@ -1651,7 +1678,7 @@ export default function AdminDashboard() {
                   <select name="tenantSlug" required defaultValue="" className="input-field text-sm bg-white">
                     <option value="" disabled>選択してください</option>
                     {data.tenants.map((t) => (
-                      <option key={t.slug} value={t.slug}>{t.companyName || t.name}</option>
+                      <option key={t.slug} value={t.slug}>{tenantLabel(t)}</option>
                     ))}
                   </select>
                   <p className="text-[11px] text-[#8B8489] mt-1">「全テナント表示」中のため、追加先を選んでください。</p>
@@ -1661,9 +1688,10 @@ export default function AdminDashboard() {
               {selectedTenantSlug && data?.tenants && (
                 <div className="bg-[#FBF8F4] rounded-lg px-3 py-2.5 text-xs text-[#5B5560]">
                   <span className="font-medium">追加先テナント：</span>
-                  {data.tenants.find((t) => t.slug === selectedTenantSlug)?.companyName ||
-                    data.tenants.find((t) => t.slug === selectedTenantSlug)?.name ||
-                    selectedTenantSlug}
+                  {(() => {
+                    const t = data.tenants.find((t) => t.slug === selectedTenantSlug);
+                    return t ? tenantLabel(t) : selectedTenantSlug;
+                  })()}
                 </div>
               )}
               <div className="flex gap-3 pt-2">
@@ -1925,7 +1953,7 @@ export default function AdminDashboard() {
               <div>
                 <label className="text-xs font-medium text-[#5B5560] block mb-1">FB方針</label>
                 <textarea value={editForm.fbPolicy} onChange={(e) => setEditForm({ ...editForm, fbPolicy: e.target.value })}
-                  className="w-full text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none h-20 resize-none"
+                  className="w-full text-sm border border-[#EFE8DD] rounded-xl px-3 py-2 focus:ring-1 focus:ring-amber-300 focus:border-amber-300 outline-none h-40 resize-y"
                   placeholder="フィードバックの方針を入力" />
               </div>
               <div className="grid grid-cols-2 gap-4">

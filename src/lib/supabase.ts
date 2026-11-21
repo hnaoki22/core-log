@@ -1481,6 +1481,28 @@ export async function getMissionsByParticipant(
   return (data || []).map(rowToMission);
 }
 
+/**
+ * 参加者 ID でミッションを新しい順に返す（入力画面の「進行中のミッション」表示用）。
+ * 氏名で引く getMissionsByParticipant と違い、改名や同名の影響を受けない。
+ * 失敗時は null（記録済み）。呼び出し側が「読めなかった」と「0 件」を区別できるようにする。
+ */
+export async function getMissionsByParticipantId(
+  participantId: string,
+  tenantId: string
+): Promise<MissionEntry[] | null> {
+  const { data, error } = await getClient()
+    .from("missions")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .eq("participant_id", participantId)
+    .order("created_at", { ascending: false });
+  if (error) {
+    logger.error("getMissionsByParticipantId failed", { error: error.message, participantId, tenantId });
+    return null;
+  }
+  return (data || []).map(rowToMission);
+}
+
 export async function getMissionComments(
   missionId: string
 ): Promise<MissionComment[]> {

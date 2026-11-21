@@ -53,25 +53,30 @@ core-log/
 │   │   ├── m/[token]/          # マネージャー UI
 │   │   └── verify/[token]/     # OTP 検証画面
 │   ├── components/features/
-│   │   ├── DailyQuestionsBlock.tsx   # 3問×textarea+マイク（朝/夕で再利用）
+│   │   ├── DailyQuestionsBlock.tsx   # 問いごとの textarea（朝/夕で再利用）。答えは親（InputClient）が持つ。マイクは tier-e.voiceInput が ON のテナントのみ
 │   │   ├── VoiceInput.tsx            # Whisper 録音/送信
 │   │   ├── MoodCandlestick.tsx       # 気分ローソク足（日足・21日・ホーム）
 │   │   ├── MoodTrendLong.tsx         # 気分の長期ビュー（週足＋日々の線・約3ヶ月・ログ画面）
 │   │   ├── ReportHistoryList.tsx     # 過去のAI分析の開閉リスト（レポート画面／ログ画面で共用）
-│   │   └── QuickNoteSheet.tsx        # 途中メモのシート＋「＋ メモ」ボタン（ホーム・standalone のみ）
+│   │   ├── QuickNoteSheet.tsx        # 途中メモのシート＋「＋ メモ」ボタン（ホーム・standalone のみ）
+│   │   ├── MissionContextCard.tsx    # 入力画面の問いの上に、本人の進行中のミッションを出すカード（feature.missionOnInput。表示だけ・API は呼ばない）
+│   │   └── MissionPurposeView.tsx    # ミッション画面の「背景・目的」の表示。仮説つきで保存された文は、仮説と残りを分けて出す（表示だけ）
 │   ├── lib/
 │   │   ├── feature-flags.ts          # FEATURE_CATALOG（§5 で詳述）
 │   │   ├── daily-questions.ts        # メゾ層 store（JST / 7曜日 / legacy flat 後方互換）
+│   │   ├── daily-question-answers.ts # 問いへの答えを「Q1: 問い / A1: 答え」の 1 本の文字列にまとめる（純関数・テスト付き）
 │   │   ├── mood-series.ts            # 気分の週足・日々の中点の集計（純関数・テスト付き）
 │   │   ├── standalone-report.ts      # 21日AIレポート（生成・最新取得・過去一覧 listStandaloneReports）
 │   │   ├── quick-notes.ts            # 途中メモ（quick_notes 表の保存/取得/削除・本人と装置だけ）
+│   │   ├── feedback-draft.ts         # 管理画面「AI下書き」のモデル選択・リクエスト組立て・応答の読み取り（純関数・テスト付き）
+│   │   ├── mission-context.ts        # 入力画面に出すミッションの絞り込み（進行中・最大3件）、呼び名（ミッション／イシュー）の文言表、仮説つきの「背景・目的」のまとめ方と読み方（純関数・テスト付き）
 │   │   ├── supabase.ts               # DB 操作の中心（PostgREST 0 行成功ガード入り）
 │   │   ├── tenant-from-token.ts      # token → tenant_id 解決
 │   │   ├── feature-flags.ts, email.ts, otp.ts, session.ts, logger.ts, ...
 │   └── middleware.ts                 # セキュリティヘッダ / レート制限 / OTP セッション検証
 ├── supabase/migrations/              # 全 DDL（runtime DDL 禁止）
 ├── .claude/skills/core-log-review/   # repo-local skill（§1 参照）
-├── test-utils/, vitest.config.ts     # Vitest テスト基盤
+├── test-utils/, vitest.config.ts     # Vitest テスト基盤（Node 環境・DOM なし。.tsx の部品は react-dom/server での描画テストまで。入力操作のテストは不可）
 ├── next.config.mjs, tailwind.config.ts, tsconfig.json
 └── vercel.json
 ```
@@ -80,6 +85,8 @@ core-log/
 - Next.js 14.2 (App Router) + React 18 + TypeScript strict + TailwindCSS
 - Supabase (PostgreSQL + PostgREST) — project `vnfmbkftbnjruwsdlvtv`、リージョン ap-southeast-2
 - Anthropic Claude API（反芻検知・コンサル分析・将来のミクロ層）/ OpenAI API（Whisper）
+  - モデル指定は 2 系統（2026-11-21）。共通ヘルパー `src/lib/llm.ts` は `ANTHROPIC_MODEL`（既定 `claude-sonnet-4-6`）。`temperature` を送り `content[0]` を読むため、5.x 系モデルへは未移行（指定すると全機能が壊れる）。管理画面の「AI下書き」は `src/lib/feedback-draft.ts` が `ANTHROPIC_MODEL_FEEDBACK`（既定 `claude-sonnet-5-5`）で別管理し、5.x 系の応答（先頭が thinking ブロック、`max_tokens` を thinking と共有）に対応済み。
+  - 「AI下書き」の指示文（`ai_settings.system_prompt`）は、管理画面で閲覧中のテナント（`?tenant=<slug>`）のものを使う。slug 未指定のときは管理者の home テナント。
 - Resend（メール、100通/日制限）
 - デプロイ：Vercel（main への push で auto deploy）
 - ノード要件：`>=20.0.0`（`package.json`）
@@ -151,24 +158,31 @@ PR タイトル例（リポの履歴に合わせる）:
 
 ## 5. 機能フラグ（FEATURE_CATALOG 実数）
 
-`src/lib/feature-flags.ts` の `FEATURE_CATALOG` は **2026-06-10 時点で 52 件 / 12 カテゴリ**（mode カテゴリ + `standalone_mode` を追加。§9 決定で `tier-f.beforeAfter` と `tier-d.heroAssessment` を削除——打合せ文字起こしの「色軸評価」は「4軸評価」の誤変換で、正対象は HERO自己評価と本藤さん確認済み）。
+`src/lib/feature-flags.ts` の `FEATURE_CATALOG` は **2026-11-21 時点で 56 件 / 12 カテゴリ**（下の表はコードを数え直した値。2026-06-10 に mode カテゴリ + `standalone_mode` を追加。§9 決定で `tier-f.beforeAfter` と `tier-d.heroAssessment` を削除——打合せ文字起こしの「色軸評価」は「4軸評価」の誤変換で、正対象は HERO自己評価と本藤さん確認済み）。
 
 **mode カテゴリ（2026-06-10 追加）**: `standalone_mode` = 商品版の動作モード。ON のテナントは①朝夕3画面入力（体調→意図/結果→気分、`evening_energy` 分離保存）②気分ローソク足③分析機能の段階開示（21日+記入10日）④マネージャー/管理者のログ本文閲覧を API レベルで遮断＋投稿通知メール停止⑤未記入フォローアップ。大幸薬品では `applyTenantFlagGuards` が強制 OFF（tier-0 と同じ防御）。サーバー判定は `src/lib/standalone.ts`（`isStandaloneTenant` / `standaloneGuard` / `computeUnlockState` / `computeSkipFollowup`）、21日レポートは `src/lib/standalone-report.ts` + `standalone_reports` テーブル、スキップ記録は `skip_reasons` テーブル（migration: `20260610_standalone_mode_schema.sql`）。途中メモ（ホーム右上「＋」の中身。2026-08-18 定例・太田さん FB）は `src/lib/quick-notes.ts` + `quick_notes` テーブル（migration: `20260819_quick_notes.sql`）+ `/api/standalone/quick-note`。本人と装置だけが読み、AI分析の素材にも入る（管理者・上司向けの読み取り経路を作らないこと）。
 
 | カテゴリ | 件数 | 代表 |
 |---|---:|---|
-| `mode` 動作モード | 1 | **standalone_mode**（商品版。大幸は非表示&強制OFF） |
+| `mode` 動作モード | 2 | **standalone_mode**（商品版。大幸は非表示&強制OFF）, logform_v2（standalone の上に重ねる入力フォーム刷新版） |
 | `core` | 3 | morningInput / eveningInput / logHistory |
-| `existing` | 11 | energyTracking, mission, streak, badges, animations, reminderMail, managerFeedback, csvExport, otpAuth, managerAnalytics, **dailyQuestions** |
+| `existing` | 13 | energyTracking, mission, streak, badges, animations, reminderMail, managerFeedback, csvExport, otpAuth, managerAnalytics, **dailyQuestions**, **missionOnInput**, **missionLabelIssue** |
 | `tier-0` 観の期(KAN のキー) | 10 | kanNoKi / weeklyMirror / bodyPrompt / silenceObservation / peerComparison(.tenant/.crossTenant/.industry/.global) / transitionSignal（reflection-lab 限定・大幸薬品は非表示&強制OFF） |
 | `tier-s` Differentiators | 4 | ruminationDetection, doubleLoopPrompt, weeklyConceptualization, structuredInput |
 | `tier-a` Manager Safety Net | 5 | oneOnOneBriefing, burnoutScore, consultantSpotlight, psychSafetyMonitor, managerSelfReflection |
 | `tier-b` Cultural Engine | 4 | aar, knowledgeLibrary, cultureScore, peerReflection |
 | `tier-c` Competency Trap Escape | 3 | unlearnChallenge, identityTracking, outsightTask |
 | `tier-d` PsyCap | 2 | efficacyBooster, hopeDesign（heroAssessment＝4軸自己評価は 2026-06-10 §9 決定で削除） |
-| `tier-e` UX | 4 | microRitualOptimizer, ruminationTimer, calendarBlock, voiceInput |
+| `tier-e` UX | 5 | microRitualOptimizer, ruminationTimer, calendarBlock, voiceInput, selfInsightNote |
 | `tier-f` ROI/Evidence | 2 | growthRoi, clientReport（beforeAfter は 2026-06-10 §9 決定で削除） |
 | `tier-g` Business Model | 3 | multiTenant, pitchGenerator, consultIntervention |
+
+**ミッションを入力画面に出す 2 つのフラグ（2026-11-21 追加。どちらも既定 OFF・`feature.mission` に依存）**:
+- `feature.missionOnInput` = 本人の進行中のミッションを、従来型の入力画面（`InputClient`）の問いの上に出す。読み取りはサーバー（`/p/[token]/input` の `page.tsx`）が `getMissionsByParticipantId`（参加者 ID で引く。氏名では引かない）で行い、`selectActiveMissions`（進行中・新しい順・最大 3 件）を通して `MissionContextCard` に渡す。`initialMissions` は **`null` = 出さない（スイッチ OFF／読めなかった）、`[]` = 未設定（ミッション画面への案内を出す）**。失敗を `[]` にしないこと（設定済みの人に「設定すると表示されます」と出る）。standalone のテナントは `StandaloneInputClient` に分岐するので出ない。
+- `feature.missionLabelIssue` = 参加者画面での呼び名を「ミッション」から「イシュー（解くべき問い）」に切り替える。文言は `src/lib/mission-context.ts` の `missionTerms()` に集約（下のタブ・`/p/[token]/mission` の見出しと設定フォーム・入力画面のカード）。**OFF のときの文言は、元から画面にあった文言と一字一句同じ**（テストで固定）。通知メール（`mission_created` / `mission_comment`）と、マネージャー・管理者の画面は切り替えていない。「フル」プリセットには含めない（呼び名の切り替えは機能の追加ではないため）。ON のテナントでは、文言のほかに次の 2 点が変わる。
+  - **設定フォームに「仮説」の欄（必須）が加わる**。保存先は増やしていない。仮説と「目指す状態・行動」を `composeIssuePurpose()` で見出しつきの 1 本（`【仮説】…` / `【目指す状態と、これからの行動】…`）にまとめ、既存の `missions.purpose` に保存する（`daily-question-answers.ts` と同じ考え方）。読む側は `parseIssuePurpose()` で分ける：入力画面のカードは仮説を折りたたまずに出し、ミッション画面は `MissionPurposeView` で 2 つの枠に分ける。先頭が見出しで始まらない文（従来の登録、マネージャー画面で書いた文）は分けずにそのまま出す。**マネージャー・管理者の画面には、見出しつきの文がそのまま見える**（そこで編集すると見出しも編集対象になる）。必須の判定は画面側だけ（API は従来どおり）。
+  - **「完了にする」が「このイシューを閉じる」になり、理由の記入が必須になる**（`closeNoteRequired`）。DB の値は従来どおり status=`完了`・`final_review` に理由。仮説は確かめると変わるので、書き直すのではなく「理由を書いて閉じ、新しく設定する」運用（前の問い・仮説と、変えた理由が残る）。
+- 参加者画面にはミッションの名前・内容を書き直す欄が無い（閉じて作り直すか、マネージャー画面の「ミッション管理」→「編集」）。上の運用のため、書き直す欄は意図して足していない。AI下書きにミッションは渡していない。
 
 保存形式: テナント毎に `ai_settings.value` 行（`tenant_id`, `key='feature_flags'`, `value=JSON`）。flat shape（`{flagKey: bool}`）が現行、legacy nested shape（`{default: {...}}`）は読み取り側で互換維持。
 
@@ -182,7 +196,7 @@ PR タイトル例（リポの履歴に合わせる）:
 3. 飾りフラグ（UI に出るがコードに繋がっていない）禁止
 4. **新しいカテゴリ（`tier-*` 等）を追加する場合は、同一 PR で `src/app/a/[token]/features/page.tsx` の `FlagCategory` 型 / `CATEGORY_META` / `CATEGORY_ORDER` を 1:1 で更新する。** 未更新だと features ページのグルーピングで `grouped[未知カテゴリ]` が undefined となり `undefined.push` で白画面クラッシュする（2026-06-02 / PR #30 の事故）。グルーピングは `(grouped[cat] ??= []).push(f)` で動的初期化し、未知カテゴリでも落ちない構造を保つこと。
 
-参考：core-log-engineer SKILL.md は「660 行・28 機能・7 ティア」と古い数値を持っている。**現状の真実は 53 機能・11 カテゴリ**。スキル本文の数値より、このリポの `src/lib/feature-flags.ts` を信用する。
+参考：core-log-engineer SKILL.md は「660 行・28 機能・7 ティア」と古い数値を持っている。**現状の真実は 56 機能・12 カテゴリ（2026-11-21）**。スキル本文の数値より、このリポの `src/lib/feature-flags.ts` を信用する。
 
 ---
 
@@ -207,8 +221,11 @@ PR タイトル例（リポの履歴に合わせる）:
 - 主要ファイル:
   - `src/lib/daily-questions.ts` — store / 60s キャッシュ / parseWeekly
   - `src/app/api/features/daily-questions/route.ts` — GET `?token=` → `{enabled, day, axis, morning[], evening[]}`
-  - `src/components/features/DailyQuestionsBlock.tsx` — 3 問の textarea + Whisper マイク
-  - `src/app/p/[token]/input/InputClient.tsx:407` — 「今日の軸 ── X」ヘッダ、`isMorning` で朝/夕切替
+  - `src/components/features/DailyQuestionsBlock.tsx` — 問いごとの textarea。Whisper マイクは `voiceEnabled`（= `tier-e.voiceInput` が ON）のときだけ表示。答えは親（InputClient の `dailyAnswers`）が持つ（step 2 から「戻る」で戻っても入力が残るようにするため）
+  - `src/lib/daily-question-answers.ts` — 答えを `Q1: 問い\nA1: 答え` の形で 1 本にまとめ、既存の `morning_intent` / `evening_insight` に保存する。どの問いにも答えが無いときは空文字（未記入のまま「次へ」に進めない）
+  - `src/app/p/[token]/input/InputClient.tsx` — 「今日の軸 ── X」ヘッダ（軸が空の曜日は出さない）、`isMorning` で朝/夕切替
+  - `src/app/a/[token]/features/daily-questions/page.tsx` + `src/app/api/admin/daily-questions/route.ts` — 管理画面での編集・保存（1 行 1 問）。保存済みの空の軸は空のまま読み込む。入口は管理画面トップ「参加者向け例示」の「毎日の問い」カード（閲覧中のテナントを `?tenant=` で引き継ぐ。`?tenant=` なしで開くと管理者の home テナントが編集対象になるので、ページ上部の「編集中」を確認する）
+- 問いの欄が出るのは従来型の入力画面（`InputClient`）だけ。`standalone_mode` が ON のテナントは `StandaloneInputClient` に分岐するため、フラグが ON でも問いの欄は出ない（2026-11-21 コード確認）。`tier-s.structuredInput` と同時に ON にしないこと（画面は問いの欄を出すが、「次へ」の判定と保存は構造化入力の欄を見るため、記入を完了できない）。
 
 42 問の文章は Cowork mode 由来の叩き台で、書籍 v2.5 体系・三慧・10 理論との整合は本藤さんが書き直す前提。**Claude Code 側で文言を勝手に書き換えない**（vocabulary-guard 必発火領域）。
 
