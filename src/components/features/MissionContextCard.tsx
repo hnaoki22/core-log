@@ -90,7 +90,8 @@ export function MissionContextCard({ missions, terms, missionPageHref }: Props) 
                   onClick={() => setExpanded((prev) => ({ ...prev, [m.id]: !open }))}
                   className="mt-1 text-[11px] font-medium text-[#1A1A2E] underline underline-offset-2"
                 >
-                  {open ? "閉じる" : "続きを見る"}
+                  {/* 「閉じる」はイシューを閉じる操作（ミッション画面）の言葉なので、ここでは使わない。 */}
+                  {open ? "折りたたむ" : "続きを見る"}
                 </button>
               )}
             </div>
