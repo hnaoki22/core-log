@@ -5,11 +5,19 @@
 // - 初期値はサーバー（page.tsx）が読んだ本人の設計図。未作成のときは空の欄から書ける。
 // - 保存は PUT /api/coaching-profile（confirm=true）。確定済みの設計図を直したときも、確定のまま保存する。
 // - 運営が置いた傾向は、「使う／使わない」だけを選べる（文は書き換えられない）。
-// - 文言は coaching-profile.ts の COACHING_TERMS。
+// - 先頭に、いまのイシュー（ミッション）と仮説を出す（BlueprintIssueCard。サーバーが読んで渡す）。
+//   設計図とイシューは別々に保存しているので、ここではイシューを直せない（「イシュー」のページへのリンクを出す）。
+// - 欄は 2 つのまとまりで見せる：イシューに向けた行動（これからの行動、期待する結果と確かめ方）と、
+//   自分の行動の変え方（成長課題、毎朝の一文、止まりそうな場面、夕方に自分へ聞く問い）。
+//   見せ方だけの区切りで、保存する欄は変えていない。
+// - 保存していない変更があるあいだは、ページを離れる前に確かめる（useLeaveGuard）。
+// - 下のタブは「ホーム」を選んだ表示にする（入口がホームにあるため。「イシュー」のページの中の扱いにしない）。
+// - 文言は coaching-profile.ts の COACHING_TERMS と、mission-context.ts の MissionTerms。
 
 import Link from "next/link";
 import { useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
+import { BlueprintIssueCard } from "@/components/features/BlueprintIssueCard";
 import { CoachOptInCard } from "@/components/features/CoachOptInCard";
 import { COACH_TERMS } from "@/lib/coach-reply";
 import {
@@ -17,9 +25,13 @@ import {
   EVENING_QUESTION_MAX,
   HEADLINE_MAX,
   LONG_TEXT_MAX,
+  sameFields,
   type CoachingProfile,
+  type CoachingProfileFields,
   type CoachingTendency,
 } from "@/lib/coaching-profile";
+import { missionTerms, type CurrentIssue } from "@/lib/mission-context";
+import { useLeaveGuard } from "@/lib/use-leave-guard";
 
 /**
  * AIコーチの欄（feature.coachReply）に渡す値。サーバー（page.tsx）が決める。
@@ -29,23 +41,48 @@ import {
  */
 export type BlueprintCoachProps = { optIn: boolean | null; loadFailed: boolean } | null;
 
+/**
+ * 先頭に出す、いまのイシュー（ミッション）。サーバー（page.tsx）が決める。
+ * - null・未指定 = ミッション機能を出していない環境（枠を出さず、欄の見出しもイシューを前提にしない）。
+ * - view: null    = 読めなかった（枠を出さない。「まだ設定されていません」とは出さない）。
+ * - useIssueLabel = 呼び名（feature.missionLabelIssue が ON なら「イシュー」）。
+ */
+export type BlueprintIssueProps = { useIssueLabel: boolean; view: CurrentIssue | null } | null;
+
 interface Props {
   token: string;
   initialProfile: CoachingProfile | null;
   loadFailed: boolean;
   coach?: BlueprintCoachProps;
+  issue?: BlueprintIssueProps;
 }
 
 type LongFieldKey = "growthTheme" | "actions" | "expected" | "stallPoints";
+type LongField = { key: LongFieldKey; label: string; help?: string };
 
-const LONG_FIELDS: Array<{ key: LongFieldKey; label: string; help?: string }> = [
-  { key: "growthTheme", label: COACHING_TERMS.growthThemeLabel },
+// 1 つ目のまとまり：いまのイシューに向けた行動。
+const ACTION_FIELDS: LongField[] = [
   { key: "actions", label: COACHING_TERMS.actionsLabel, help: COACHING_TERMS.actionsHelp },
   { key: "expected", label: COACHING_TERMS.expectedLabel },
-  { key: "stallPoints", label: COACHING_TERMS.stallPointsLabel },
 ];
+// 2 つ目のまとまり：自分の行動の変え方（このあいだに、毎朝の一文と、夕方に自分へ聞く問いをはさむ）。
+const GROWTH_FIELD: LongField = { key: "growthTheme", label: COACHING_TERMS.growthThemeLabel };
+const STALL_FIELD: LongField = { key: "stallPoints", label: COACHING_TERMS.stallPointsLabel };
 
-export default function BlueprintClient({ token, initialProfile, loadFailed, coach = null }: Props) {
+/** 欄の中身を、保存済みの内容と比べられる形にそろえる（設計図がまだ無いときは、空の欄）。 */
+function fieldsOf(p: CoachingProfile | null): CoachingProfileFields {
+  return {
+    headline: p?.headline ?? "",
+    growthTheme: p?.growthTheme ?? "",
+    actions: p?.actions ?? "",
+    expected: p?.expected ?? "",
+    stallPoints: p?.stallPoints ?? "",
+    eveningQuestion: p?.eveningQuestion ?? "",
+    tendencies: p?.tendencies ?? [],
+  };
+}
+
+export default function BlueprintClient({ token, initialProfile, loadFailed, coach = null, issue = null }: Props) {
   const [status, setStatus] = useState<"none" | "draft" | "confirmed">(
     initialProfile ? initialProfile.status : "none"
   );
@@ -60,6 +97,17 @@ export default function BlueprintClient({ token, initialProfile, loadFailed, coa
   const [tendencies, setTendencies] = useState<CoachingTendency[]>(initialProfile?.tendencies ?? []);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+
+  // 保存済みの内容（最初はサーバーが読んだもの。保存に成功するたびに入れ替える）。
+  // いまの欄と違うあいだは、保存していない変更がある。ページを離れる前に確かめる。
+  const [saved, setSaved] = useState<CoachingProfileFields>(() => fieldsOf(initialProfile));
+  const dirty =
+    !loadFailed && !sameFields(saved, { headline, ...longValues, eveningQuestion, tendencies });
+  useLeaveGuard(dirty, COACHING_TERMS.leaveConfirm);
+
+  // 先頭の枠と、1 つ目のまとまりの見出し。いまのイシューを出している環境では、呼び名に合わせる。
+  const issueTerms = issue ? missionTerms(issue.useIssueLabel) : null;
+  const actionsGroupHeading = issueTerms ? issueTerms.blueprintActionsHeading : COACHING_TERMS.actionsGroupHeading;
 
   const save = async () => {
     if (saving) return;
@@ -103,6 +151,7 @@ export default function BlueprintClient({ token, initialProfile, loadFailed, coa
       });
       setEveningQuestion(p.eveningQuestion);
       setTendencies(p.tendencies);
+      setSaved(fieldsOf(p));
       setMessage({ kind: "ok", text: COACHING_TERMS.savedMessage });
     } catch {
       setMessage({ kind: "error", text: COACHING_TERMS.saveFailed });
@@ -113,6 +162,24 @@ export default function BlueprintClient({ token, initialProfile, loadFailed, coa
 
   const inputClass =
     "w-full rounded-xl border border-[#E5DCD0] bg-white px-3 py-2.5 text-sm text-[#1A1A2E] leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#1A1A2E]/20";
+
+  // 長い文の欄（成長課題、これからの行動、期待する結果と確かめ方、止まりそうな場面）。
+  const renderLongField = (f: LongField) => (
+    <div key={f.key}>
+      <label htmlFor={`bp-${f.key}`} className="block text-xs font-medium text-[#1A1A2E] mb-1">
+        {f.label}
+      </label>
+      {f.help && <p className="text-[11px] text-[#8B8489] mb-1.5 leading-relaxed">{f.help}</p>}
+      <textarea
+        id={`bp-${f.key}`}
+        value={longValues[f.key]}
+        onChange={(e) => setLongValues((prev) => ({ ...prev, [f.key]: e.target.value }))}
+        maxLength={LONG_TEXT_MAX}
+        rows={4}
+        className={inputClass}
+      />
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-[#F5F0EB] pb-24">
@@ -150,7 +217,23 @@ export default function BlueprintClient({ token, initialProfile, loadFailed, coa
               </div>
             )}
 
+            {/* いまのイシュー（ミッション）と仮説。ミッション機能を出していない環境と、読めなかったときは出さない。 */}
+            {issue && issue.view && issueTerms && (
+              <BlueprintIssueCard issue={issue.view} terms={issueTerms} missionPageHref={`/p/${token}/mission`} />
+            )}
+
+            {/* 1 つ目のまとまり：いまのイシューに向けた行動 */}
             <div className="bg-white border border-[#EFE8DD] p-4 rounded-2xl space-y-4">
+              <h2 className="text-sm font-semibold text-[#1A1A2E]">{actionsGroupHeading}</h2>
+              {ACTION_FIELDS.map(renderLongField)}
+            </div>
+
+            {/* 2 つ目のまとまり：自分の行動の変え方 */}
+            <div className="bg-white border border-[#EFE8DD] p-4 rounded-2xl space-y-4">
+              <h2 className="text-sm font-semibold text-[#1A1A2E]">{COACHING_TERMS.selfGroupHeading}</h2>
+
+              {renderLongField(GROWTH_FIELD)}
+
               <div>
                 <label htmlFor="bp-headline" className="block text-xs font-medium text-[#1A1A2E] mb-1">
                   {COACHING_TERMS.headlineLabel} *
@@ -166,22 +249,7 @@ export default function BlueprintClient({ token, initialProfile, loadFailed, coa
                 />
               </div>
 
-              {LONG_FIELDS.map((f) => (
-                <div key={f.key}>
-                  <label htmlFor={`bp-${f.key}`} className="block text-xs font-medium text-[#1A1A2E] mb-1">
-                    {f.label}
-                  </label>
-                  {f.help && <p className="text-[11px] text-[#8B8489] mb-1.5 leading-relaxed">{f.help}</p>}
-                  <textarea
-                    id={`bp-${f.key}`}
-                    value={longValues[f.key]}
-                    onChange={(e) => setLongValues((prev) => ({ ...prev, [f.key]: e.target.value }))}
-                    maxLength={LONG_TEXT_MAX}
-                    rows={4}
-                    className={inputClass}
-                  />
-                </div>
-              ))}
+              {renderLongField(STALL_FIELD)}
 
               <div>
                 <label htmlFor="bp-evening-question" className="block text-xs font-medium text-[#1A1A2E] mb-1">
@@ -280,7 +348,7 @@ export default function BlueprintClient({ token, initialProfile, loadFailed, coa
         )}
       </div>
 
-      <BottomNav active="mission" baseUrl={`/p/${token}`} />
+      <BottomNav active="home" baseUrl={`/p/${token}`} />
     </div>
   );
 }

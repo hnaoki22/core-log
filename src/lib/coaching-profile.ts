@@ -257,12 +257,22 @@ export const COACHING_TERMS = {
   saveFailed: "保存できませんでした。時間をおいて、もう一度お試しください。",
   notice:
     "この設計図は、朝夕のリマインドメールと記入画面に表示されます。あなたと、このプログラムの運営の担当者が読めます。ほかの参加者の画面には表示されません。",
+  // 欄のまとまりの見出し。1 つ目（これからの行動、期待する結果と確かめ方）の見出しは、いまの 1 件を
+  // 出している環境では mission-context.ts の blueprintActionsHeading（「このイシューに向けた行動」）を使う。
+  // ミッション機能を出していない環境では、下の actionsGroupHeading を使う。
+  actionsGroupHeading: "これからの行動と、期待する結果",
+  selfGroupHeading: "自分の行動の変え方",
+  // 保存していない変更があるときに、ページを離れる前に確かめる文
+  leaveConfirm: "保存していない変更があります。このページを離れると、直した分は消えます。離れますか？",
+  // 新しいイシュー（ミッション）を設定した直後の案内（「イシュー」のページ）のボタン
+  reviewNoticeLink: "設計図を開く",
+  reviewNoticeDismiss: "あとで",
   // 入力画面の枠
   inputCardHeading: "成長課題",
   inputCardDraft: "設計図を確認すると、ここに「毎朝の一文」が表示されます。",
   inputCardLinkDraft: "設計図を確認する",
   inputCardLinkConfirmed: "設計図を開く",
-  // ホームと「イシュー」のページに置く入口
+  // ホームに置く入口
   entryTitle: "設計図",
   entryLead: "毎朝の一文、成長課題、これからの行動を開く",
   // 夕方の問いの欄

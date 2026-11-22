@@ -5,10 +5,12 @@ import {
   MAX_MISSIONS_ON_INPUT,
   composeIssuePurpose,
   formatMissionDeadline,
+  formatOtherActiveCount,
   isActiveMissionStatus,
   isLongPurpose,
   missionTerms,
   parseIssuePurpose,
+  pickCurrentIssue,
   selectActiveMissions,
 } from "./mission-context";
 
@@ -337,5 +339,92 @@ describe("parseIssuePurpose", () => {
   it("uses the headings exported for the form", () => {
     expect(ISSUE_HYPOTHESIS_HEADING).toBe("【仮説】");
     expect(ISSUE_PLAN_HEADING).toBe("【目指す状態と、これからの行動】");
+  });
+});
+
+// 設計図のページの先頭に出す「いまの 1 件」。テストの文言は合成データ（実在の記入は使わない）。
+describe("pickCurrentIssue", () => {
+  const structured = composeIssuePurpose("仮説の文", "計画の文");
+
+  it("returns no current issue for null / undefined / empty input, or when nothing is active", () => {
+    for (const input of [null, undefined, []]) {
+      expect(pickCurrentIssue(input)).toEqual({ current: null, otherActiveCount: 0 });
+    }
+    expect(pickCurrentIssue([{ id: "1", title: "閉じた問い", status: "完了" }])).toEqual({
+      current: null,
+      otherActiveCount: 0,
+    });
+  });
+
+  it("picks the first active one in the order given (the caller passes newest first)", () => {
+    const out = pickCurrentIssue([
+      { id: "new-closed", title: "閉じた新しい問い", status: "完了", purpose: structured },
+      { id: "new-active", title: "新しい問い", status: "進行中", purpose: structured },
+      { id: "old-active", title: "前の問い", status: "進行中", purpose: null },
+    ]);
+    expect(out.current).toEqual({ id: "new-active", title: "新しい問い", hypothesis: "仮説の文" });
+    expect(out.otherActiveCount).toBe(1);
+  });
+
+  it("is the same one that the reminder mail and the AI coach use (selectActiveMissions(…, 1) + parseIssuePurpose)", () => {
+    const missions = [
+      { id: "a", title: "", status: "進行中", purpose: structured },
+      { id: "b", title: "問いB", status: "未着手", purpose: structured },
+      { id: "c", title: "問いC", status: null, purpose: structured },
+      { id: "d", title: "問いD", status: "in_progress", purpose: "見出しのない文" },
+    ];
+    const first = selectActiveMissions(missions, 1)[0];
+    const parts = parseIssuePurpose(first.purpose);
+    const out = pickCurrentIssue(missions);
+    expect(out.current?.id).toBe(first.id);
+    expect(out.current?.title).toBe(first.title);
+    expect(out.current?.hypothesis).toBe(parts.structured ? parts.hypothesis : null);
+    expect(out.otherActiveCount).toBe(1);
+  });
+
+  it("leaves the hypothesis null for a text without the headings, or with no purpose", () => {
+    expect(pickCurrentIssue([{ id: "1", title: "問い", status: "進行中", purpose: "従来の背景・目的" }]).current).toEqual({
+      id: "1",
+      title: "問い",
+      hypothesis: null,
+    });
+    expect(pickCurrentIssue([{ id: "1", title: "問い", status: "進行中" }]).current?.hypothesis).toBeNull();
+  });
+
+  it("counts every other active one, not only the three shown on the input screen", () => {
+    const many = Array.from({ length: 6 }, (_, i) => ({ id: String(i), title: `問い${i}`, status: "進行中" }));
+    expect(pickCurrentIssue(many).otherActiveCount).toBe(5);
+    expect(MAX_MISSIONS_ON_INPUT).toBeLessThan(6);
+  });
+});
+
+describe("formatOtherActiveCount", () => {
+  it("puts the count into the wording for both labels", () => {
+    expect(formatOtherActiveCount(missionTerms(true).blueprintOthers, 2)).toBe("ほかに進行中のイシューが2件あります。");
+    expect(formatOtherActiveCount(missionTerms(false).blueprintOthers, 1)).toBe(
+      "ほかに進行中のミッションが1件あります。"
+    );
+  });
+});
+
+describe("missionTerms：設計図のページと、設定した直後の案内", () => {
+  it("names the group of actions after the issue when the label flag is on", () => {
+    const t = missionTerms(true);
+    expect(t.blueprintHeading).toBe("いまのイシュー（解くべき問い）");
+    expect(t.blueprintActionsHeading).toBe("このイシューに向けた行動");
+    expect(t.blueprintLink).toBe("イシューを見直す");
+    expect(t.createdNotice).toContain("設計図");
+    expect(t.createdNotice).toContain(t.blueprintActionsHeading);
+  });
+
+  it("uses the mission wording when the label flag is off", () => {
+    const t = missionTerms(false);
+    expect(t.blueprintHeading).toBe("進行中のミッション");
+    expect(t.blueprintActionsHeading).toBe("このミッションに向けた行動");
+    expect(t.blueprintLink).toBe("ミッションを見直す");
+    expect(t.createdNotice).toContain(t.blueprintActionsHeading);
+    for (const value of [t.blueprintHeading, t.blueprintOthers, t.blueprintLink, t.blueprintActionsHeading, t.createdNotice]) {
+      expect(value).not.toContain("イシュー");
+    }
   });
 });

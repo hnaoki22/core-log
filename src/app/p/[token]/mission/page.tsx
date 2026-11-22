@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useFeatures } from "@/lib/use-features";
 import { missionTerms, composeIssuePurpose } from "@/lib/mission-context";
 import { MissionPurposeView } from "@/components/features/MissionPurposeView";
-import { BlueprintEntryLink } from "@/components/features/BlueprintEntryLink";
+import { BlueprintReviewNotice } from "@/components/features/BlueprintReviewNotice";
 
 type Mission = {
   id: string;
@@ -65,6 +65,11 @@ export default function MissionPage() {
   // 仮説の欄を出すテナントでは、仮説を書かないと設定できない。
   const needsHypothesis = terms.hypothesisLabel !== null;
   const canCreate = newTitle.trim() !== "" && (!needsHypothesis || newHypothesis.trim() !== "");
+  // 新しく設定した直後に出す、設計図の見直しの案内（feature.coachingProfile）。設計図とイシューは
+  // 別々に保存していて、イシューを新しく設定しても設計図の中身は変わらないため。
+  // 出すのは、設計図を出している環境だけ（商品モードのテナントには出さない）。「あとで」か再読み込みで消える。
+  const [showBlueprintNotice, setShowBlueprintNotice] = useState(false);
+  const blueprintOn = isOn("feature.coachingProfile") && !isOn("standalone_mode");
 
   useEffect(() => {
     async function fetchMissions() {
@@ -213,6 +218,8 @@ export default function MissionPage() {
         setNewPurpose("");
         setNewDeadline("");
         setShowCreateForm(false);
+        // 設定できたので、設計図の見直しを案内する（出すかどうかは、描画のときに blueprintOn で決める）。
+        setShowBlueprintNotice(true);
       }
     } catch {
       // silently fail
@@ -297,12 +304,14 @@ export default function MissionPage() {
       </div>
 
       <div className="max-w-md mx-auto px-5 pt-5 animate-fade-up relative z-10">
-        {/* 設計図への入口（feature.coachingProfile）。商品モードのテナントには出さない
-            （設計図は、従来型の入力画面とそのメールに出すもの）。 */}
-        {isOn("feature.coachingProfile") && !isOn("standalone_mode") && (
-          <div className="mb-5">
-            <BlueprintEntryLink href={`/p/${token}/blueprint`} />
-          </div>
+        {/* 新しく設定した直後だけ出す、設計図の見直しの案内（feature.coachingProfile）。
+            設計図への入口は、このページには常設しない（設計図は、ホーム・入力画面・朝のメールから開く）。 */}
+        {blueprintOn && showBlueprintNotice && (
+          <BlueprintReviewNotice
+            text={terms.createdNotice}
+            href={`/p/${token}/blueprint`}
+            onDismiss={() => setShowBlueprintNotice(false)}
+          />
         )}
 
         {/* New Mission Button */}

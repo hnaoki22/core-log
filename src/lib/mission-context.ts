@@ -1,6 +1,7 @@
 // 入力画面の「進行中のミッション」表示（feature.missionOnInput）と、
 // ミッションの呼び名の切り替え（feature.missionLabelIssue）で使う純関数。
 // 呼び名を切り替えたテナントの設定フォームにある「仮説」の、保存用のまとめ方と読み方もここに置く。
+// 設計図のページの先頭に出す「いまの 1 件」の選び方（pickCurrentIssue）もここに置く。
 // DB にも React にも依存しない（テスト: mission-context.test.ts）。
 
 export type MissionContextItem = {
@@ -144,6 +145,39 @@ export function parseIssuePurpose(purpose: string | null | undefined): IssuePurp
   };
 }
 
+// ── いまの 1 件 ──────────────────────────────────────────────────────
+// 朝のリマインドメール（api/cron/remind）と AIコーチの返信（api/coach-reply）は、
+// 進行中のうち、いちばん新しい 1 件と、その仮説を使う（selectActiveMissions(…, 1) の先頭と、
+// parseIssuePurpose の仮説）。設計図のページ（feature.coachingProfile）の先頭にも、同じ 1 件を出す。
+// pickCurrentIssue は、その選び方に「ほかに進行中のものの件数」を足したもの（同じ 1 件になることを
+// テストで固定している）。呼び出し側は、新しい順で渡す。
+
+export type CurrentIssue = {
+  /** 進行中の 1 件目。無ければ null。仮説は、見出しつきで保存された文のときだけ入る。 */
+  current: { id: string; title: string; hypothesis: string | null } | null;
+  /** ほかに進行中のものの件数。 */
+  otherActiveCount: number;
+};
+
+/** 進行中の件数を数えるときの上限（1 人が持つ件数として、十分に大きい値）。 */
+const ACTIVE_COUNT_LIMIT = 200;
+
+export function pickCurrentIssue(missions: readonly MissionLike[] | null | undefined): CurrentIssue {
+  const active = selectActiveMissions(missions, ACTIVE_COUNT_LIMIT);
+  const first = active[0];
+  if (!first) return { current: null, otherActiveCount: 0 };
+  const parts = parseIssuePurpose(first.purpose);
+  return {
+    current: { id: first.id, title: first.title, hypothesis: parts.structured ? parts.hypothesis : null },
+    otherActiveCount: active.length - 1,
+  };
+}
+
+/** 「ほかに進行中の…が{n}件あります。」の {n} を、件数に置き換える。 */
+export function formatOtherActiveCount(template: string, count: number): string {
+  return template.replace("{n}", String(count));
+}
+
 /** 参加者画面でミッション機能を何と呼ぶか。 */
 export type MissionTerms = {
   /** 下のタブ。幅が狭いので 5 文字以内。 */
@@ -174,6 +208,17 @@ export type MissionTerms = {
   closedNoteLabel: string;
   closedStatusLabel: string;
   closedSectionTitle: string;
+  /**
+   * 設計図のページ（feature.coachingProfile）の先頭に出す、いまの 1 件の枠（見出し／ほかにも進行中の
+   * ものがあるときの 1 行。{n} は件数／この画面へのリンク）。
+   */
+  blueprintHeading: string;
+  blueprintOthers: string;
+  blueprintLink: string;
+  /** 設計図の「これからの行動」「期待する結果と、確かめ方」をまとめる見出し。 */
+  blueprintActionsHeading: string;
+  /** 新しく設定した直後に出す、設計図の見直しの案内（設計図を出している環境だけ）。 */
+  createdNotice: string;
 };
 
 // 既定の呼び名。ミッション画面とタブに元から書かれていた文言と一字一句同じにしてある
@@ -202,6 +247,11 @@ const MISSION_TERMS: MissionTerms = {
   closedNoteLabel: "最終振り返り",
   closedStatusLabel: "完了",
   closedSectionTitle: "完了",
+  blueprintHeading: "進行中のミッション",
+  blueprintOthers: "ほかに進行中のミッションが{n}件あります。",
+  blueprintLink: "ミッションを見直す",
+  blueprintActionsHeading: "このミッションに向けた行動",
+  createdNotice: "新しいミッションを設定しました。設計図（このミッションに向けた行動）も見直してください。",
 };
 
 // feature.missionLabelIssue が ON のテナントの呼び名。
@@ -234,6 +284,11 @@ const ISSUE_TERMS: MissionTerms = {
   closedNoteLabel: "閉じた理由",
   closedStatusLabel: "終了",
   closedSectionTitle: "閉じたイシュー",
+  blueprintHeading: "いまのイシュー（解くべき問い）",
+  blueprintOthers: "ほかに進行中のイシューが{n}件あります。",
+  blueprintLink: "イシューを見直す",
+  blueprintActionsHeading: "このイシューに向けた行動",
+  createdNotice: "新しいイシューを設定しました。設計図（このイシューに向けた行動）も見直してください。",
 };
 
 /** useIssueLabel = feature.missionLabelIssue が ON か。 */
