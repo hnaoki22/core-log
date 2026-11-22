@@ -7,6 +7,7 @@ import { logger } from "./logger";
 import { escapeHtml } from "./sanitize";
 import { MORNING_CLOSE_HOUR_JST } from "./date-utils";
 import { buildQuestionReminderEmail } from "./reminder-mail-question";
+import { buildReminderPersonal, type CoachingProfile } from "./coaching-profile";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const FROM_EMAIL = process.env.REMIND_FROM_EMAIL || "CORE Log <noreply@resend.dev>";
@@ -117,6 +118,15 @@ interface SendEmailOptions {
    * 未指定・空のときは、従来のリマインドメールを送る。
    */
   questions?: readonly string[];
+  /**
+   * 設計図（feature.coachingProfile）が ON の環境の、その人の分。
+   * 問いを載せたメールにだけ載る（確認済みの人は本人の文、確認前の人は確認のお願い）。
+   * 未指定のときは、全員共通の文だけになる。
+   */
+  personal?: {
+    profile: CoachingProfile | null;
+    issue: { label: string; title: string; hypothesisLabel: string; hypothesis: string | null } | null;
+  };
 }
 
 function buildMorningEmail(name: string, token: string) {
@@ -405,6 +415,14 @@ export async function sendReminderEmail(options: SendEmailOptions): Promise<bool
         url: `${APP_BASE_URL}/p/${token}/input`,
         questions,
         morningCloseHour: MORNING_CLOSE_HOUR_JST,
+        personal: options.personal
+          ? buildReminderPersonal({
+              type,
+              profile: options.personal.profile,
+              issue: options.personal.issue,
+              profileUrl: `${APP_BASE_URL}/p/${token}/blueprint`,
+            })
+          : null,
       });
     } catch (err) {
       logger.error("Reminder: question mail build failed; falling back to the default mail", {

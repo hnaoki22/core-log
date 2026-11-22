@@ -12,6 +12,8 @@ import { useRuminationDetector, BreathingPrompt } from "@/components/features/Ru
 import { VoiceInputButton } from "@/components/features/VoiceInput";
 import { DailyQuestionsBlock } from "@/components/features/DailyQuestionsBlock";
 import { MissionContextCard } from "@/components/features/MissionContextCard";
+import { CoachingProfileCard } from "@/components/features/CoachingProfileCard";
+import type { CoachingProfileCardData } from "@/lib/coaching-profile";
 import { missionTerms, type MissionContextItem } from "@/lib/mission-context";
 import { entryTerms, entrySubheading } from "@/lib/entry-terms";
 import { answersOnly } from "@/lib/daily-question-answers";
@@ -58,9 +60,14 @@ export type InputPageInitialData = {
     enabled: boolean;
     morning: string[];
     evening: string[];
+    // 夕方の問いのうち、後ろから何問が「あなたの問い」（設計図）か。未指定・0 = 全員共通の問いだけ。
+    eveningPersonalCount?: number;
     axis: string;
     day: string;
   };
+  // 問いの上に出す、本人の設計図の「毎朝の一文」（feature.coachingProfile）。
+  // null・未指定 = 出さない（スイッチが OFF、または読めなかった）。
+  initialCoachingProfile?: CoachingProfileCardData | null;
   // 問いの上に出す、本人の進行中のミッション（feature.missionOnInput）。
   // null = 出さない（スイッチが OFF、または読めなかった）。[] = 未設定（設定先への案内を出す）。
   initialMissions: MissionContextItem[] | null;
@@ -114,9 +121,16 @@ export default function InputPage({ token, initialData }: Props) {
   });
   // デイリークエスチョンも SSR で先読みした値を初期値に。
   // これがないと「シンプル入力 → 質問群に切替」のフリッカーが残る。
-  const [dailyQuestions, setDailyQuestions] = useState<{ morning: string[]; evening: string[]; axis: string; day: string }>({
+  const [dailyQuestions, setDailyQuestions] = useState<{
+    morning: string[];
+    evening: string[];
+    eveningPersonalCount: number;
+    axis: string;
+    day: string;
+  }>({
     morning: initialData.initialDailyQuestions.morning,
     evening: initialData.initialDailyQuestions.evening,
+    eveningPersonalCount: initialData.initialDailyQuestions.eveningPersonalCount ?? 0,
     axis: initialData.initialDailyQuestions.axis,
     day: initialData.initialDailyQuestions.day,
   });
@@ -166,8 +180,12 @@ export default function InputPage({ token, initialData }: Props) {
         const evening: string[] = Array.isArray(data.evening) ? data.evening.filter((s: unknown) => typeof s === "string") : [];
         const axis: string = typeof data.axis === "string" ? data.axis : "";
         const day: string = typeof data.day === "string" ? data.day : "";
+        const eveningPersonalCount: number =
+          typeof data.eveningPersonalCount === "number" && data.eveningPersonalCount > 0
+            ? Math.min(data.eveningPersonalCount, evening.length)
+            : 0;
         if (morning.length > 0 || evening.length > 0) {
-          setDailyQuestions({ morning, evening, axis, day });
+          setDailyQuestions({ morning, evening, eveningPersonalCount, axis, day });
           setDailyQuestionsEnabled(true);
         }
       })
@@ -514,6 +532,13 @@ export default function InputPage({ token, initialData }: Props) {
               />
             )}
 
+            {isOn("feature.coachingProfile") && initialData.initialCoachingProfile != null && (
+              <CoachingProfileCard
+                data={initialData.initialCoachingProfile}
+                profilePageHref={`/p/${token}/blueprint`}
+              />
+            )}
+
             {!isMorning && todayLog && (
               <div className="bg-[#F2F2F7] border border-indigo-100 p-4 rounded-2xl">
                 <p className="text-[10px] text-[#4D4D6D] font-medium tracking-wide uppercase mb-1">{terms.morningRecapLabel}</p>
@@ -548,6 +573,7 @@ export default function InputPage({ token, initialData }: Props) {
                   }}
                   onFirstFocus={handleFocus}
                   voiceEnabled={useVoice}
+                  personalCount={isMorning ? 0 : dailyQuestions.eveningPersonalCount}
                 />
               </>
             ) : useStructured ? (

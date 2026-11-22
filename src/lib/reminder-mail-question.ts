@@ -8,6 +8,7 @@
 // どの環境にこのメールを送るかは、定時処理（api/cron/remind）が entry-question-env.ts で決める。
 
 import { escapeHtml } from "./sanitize";
+import { COACHING_TERMS, type ReminderPersonal } from "./coaching-profile";
 
 export type QuestionReminderType = "morning" | "evening" | "evening_no_morning";
 
@@ -21,21 +22,59 @@ export type QuestionReminderInput = {
   questions: readonly string[];
   /** 朝の記入の締め切りの時刻（date-utils の MORNING_CLOSE_HOUR_JST）。 */
   morningCloseHour: number;
+  /**
+   * その人の分（設計図。feature.coachingProfile が ON の環境だけ）。
+   * 未指定のとき、または中身が空のときは、全員共通の文だけになる（従来と同じ HTML）。
+   */
+  personal?: ReminderPersonal | null;
 };
 
 export const QUESTION_REMINDER_SUBJECT_MORNING = "【CORE Log】今日の行動の記入をお願いします";
 export const QUESTION_REMINDER_SUBJECT_EVENING = "【CORE Log】本日の振り返りの記入をお願いします";
 
-function questionsHtml(questions: readonly string[]): string {
-  const numbered = questions.length > 1;
-  return questions
-    .map((q, i) => {
-      const text = escapeHtml(q);
-      const body = numbered ? `${i + 1}. ${text}` : text;
-      const gap = i === questions.length - 1 ? "0" : "0 0 12px";
-      return `<p style="margin: ${gap}; font-weight: bold; line-height: 1.7;">${body}</p>`;
-    })
-    .join("\n          ");
+function questionsHtml(questions: readonly string[], personalQuestion: string | null): string {
+  // 「あなたの問い」があるときは、全員共通の問いの続きの番号で、見出しをつけて最後に載せる。
+  // 無いときの HTML は、従来と同じ。
+  const total = questions.length + (personalQuestion ? 1 : 0);
+  const numbered = total > 1;
+  const parts = questions.map((q, i) => {
+    const text = escapeHtml(q);
+    const body = numbered ? `${i + 1}. ${text}` : text;
+    const gap = i === total - 1 ? "0" : "0 0 12px";
+    return `<p style="margin: ${gap}; font-weight: bold; line-height: 1.7;">${body}</p>`;
+  });
+  if (personalQuestion) {
+    parts.push(
+      `<p style="margin: 0 0 4px; font-size: 12px; color: #888;">${escapeHtml(COACHING_TERMS.personalQuestionCaption)}</p>`
+    );
+    parts.push(
+      `<p style="margin: 0; font-weight: bold; line-height: 1.7;">${total}. ${escapeHtml(personalQuestion)}</p>`
+    );
+  }
+  return parts.join("\n          ");
+}
+
+/** 「あなたの設計図から」の枠（朝。確認済みの人だけ）と、確認のお願い（朝。確認前の人）。無ければ ""。 */
+function personalBlockHtml(personal: ReminderPersonal | null | undefined): string {
+  if (!personal) return "";
+  if (personal.lines.length > 0) {
+    const rows = personal.lines
+      .map(
+        (l) =>
+          `<p style="margin: 0 0 8px; line-height: 1.7;"><span style="color: #888; font-size: 12px;">${escapeHtml(l.label)}</span><br>${escapeHtml(l.value)}</p>`
+      )
+      .join("\n          ");
+    return `
+        <div style="border: 1px solid #E5DCD0; border-radius: 8px; padding: 14px 20px 6px; margin: 16px 0;">
+          <p style="margin: 0 0 8px; font-size: 12px; color: #888;">${escapeHtml(COACHING_TERMS.mailLinesHeading)}</p>
+          ${rows}
+        </div>`;
+  }
+  if (personal.confirmPrompt) {
+    return `
+        <p style="font-size: 13px; line-height: 1.7;">${escapeHtml(COACHING_TERMS.mailConfirmPrompt)} <a href="${escapeHtml(personal.profileUrl)}" style="color: #1A1A2E;">${escapeHtml(COACHING_TERMS.mailConfirmLink)}</a></p>`;
+  }
+  return "";
 }
 
 /**
@@ -70,8 +109,8 @@ export function buildQuestionReminderEmail(input: QuestionReminderInput): { subj
         <p>${safeName}さん、${greeting}</p>
         <p>${lead}</p>
         <div style="background: #F5F0EB; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
-          ${questionsHtml(input.questions)}
-        </div>${closedNote}
+          ${questionsHtml(input.questions, input.personal?.personalQuestion ?? null)}
+        </div>${personalBlockHtml(input.personal)}${closedNote}
         <div style="text-align: center; margin: 24px 0;">
           <a href="${safeUrl}" style="display: inline-block; background: ${buttonColor}; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: bold; font-size: 16px;">
             記入する →

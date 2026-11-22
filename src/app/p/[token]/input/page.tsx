@@ -14,6 +14,8 @@ import { getFlagsForTenant } from "@/lib/feature-flags";
 import { getKanNoKiPhase } from "@/lib/kan-no-ki";
 import { getTodayQuestionsForTenant, getTodayDayKey, getWeeklyForTenant } from "@/lib/daily-questions";
 import { isEntryQuestionEnv } from "@/lib/entry-terms";
+import { toCardData, withPersonalEveningQuestion, type CoachingProfileCardData } from "@/lib/coaching-profile";
+import { getCoachingProfile } from "@/lib/coaching-profile-store";
 import InputClient, { type InputPageInitialData } from "./InputClient";
 import StandaloneInputClient, { type PrevDayRecord } from "./StandaloneInputClient";
 import { gaugesToRaws } from "@/lib/condition-gauges";
@@ -200,10 +202,27 @@ export default async function InputPageServer({
   const dailyQuestionsFlagOn = flagMap["feature.dailyQuestions"] === true;
   const dailyQuestionsHasData =
     dailyQ != null && ((dailyQ.morning?.length ?? 0) > 0 || (dailyQ.evening?.length ?? 0) > 0);
+
+  // 設計図（feature.coachingProfile）。スイッチが ON のテナントだけ読む。
+  // 読めなかったとき（null）は枠を出さず、夕方の「あなたの問い」も足さない
+  // （失敗を「まだ無い」と扱うと、確定済みの人に「設計図を確認してください」と出てしまう）。
+  // 失敗は getCoachingProfile が記録済みで、記入のフローは止めない。
+  let initialCoachingProfile: CoachingProfileCardData | null = null;
+  let eveningWithPersonal = { questions: dailyQ?.evening ?? [], personalCount: 0 };
+  if (participant.tenantId && flagMap["feature.coachingProfile"] === true) {
+    const profileRead = await getCoachingProfile(participant.id, participant.tenantId);
+    if (profileRead.ok) {
+      initialCoachingProfile = toCardData(profileRead.profile);
+      eveningWithPersonal = withPersonalEveningQuestion(dailyQ?.evening ?? [], profileRead.profile);
+    }
+  }
+
   const initialDailyQuestions = {
     enabled: dailyQuestionsFlagOn && dailyQuestionsHasData,
     morning: dailyQ?.morning ?? [],
-    evening: dailyQ?.evening ?? [],
+    evening: eveningWithPersonal.questions,
+    // 夕方の問いのうち、後ろから何問が「あなたの問い」（設計図）か。0 = 全員共通の問いだけ。
+    eveningPersonalCount: eveningWithPersonal.personalCount,
     axis: dailyQ?.axis ?? "",
     day: getTodayDayKey(),
   };
@@ -247,6 +266,7 @@ export default async function InputPageServer({
     initialDailyQuestions,
     initialMissions,
     initialEntryQuestionEnv,
+    initialCoachingProfile,
   };
 
   const tDone = Date.now();
