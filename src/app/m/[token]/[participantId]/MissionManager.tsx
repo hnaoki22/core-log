@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { formatCommentTime, missionCommentsUrl } from "@/lib/mission-comments";
 
 type Mission = {
   id: string;
@@ -64,7 +65,8 @@ export default function MissionManager({ token, participantName, initialMissions
   const fetchComments = useCallback(async (missionId: string) => {
     setLoadingComments((prev) => ({ ...prev, [missionId]: true }));
     try {
-      const res = await fetch(`/api/mission/comments?missionId=${missionId}`);
+      // コメントを読む入口は、トークンが必須（付けないと 401 になり、一覧が出ない）。
+      const res = await fetch(missionCommentsUrl(missionId, token));
       if (res.ok) {
         const data = await res.json();
         setComments((prev) => ({ ...prev, [missionId]: data.comments }));
@@ -74,7 +76,7 @@ export default function MissionManager({ token, participantName, initialMissions
     } finally {
       setLoadingComments((prev) => ({ ...prev, [missionId]: false }));
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     if (expandedMission && !comments[expandedMission]) {
@@ -253,12 +255,6 @@ export default function MissionManager({ token, participantName, initialMissions
     if (!dateStr) return "";
     const d = new Date(dateStr);
     return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
-  };
-
-  const formatCommentTime = (isoStr: string) => {
-    const d = new Date(isoStr);
-    const jst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
-    return `${jst.getMonth() + 1}/${jst.getDate()} ${jst.getHours()}:${String(jst.getMinutes()).padStart(2, "0")}`;
   };
 
   const activeMissions = missions.filter((m) => m.status !== "完了" && m.status !== "completed");
