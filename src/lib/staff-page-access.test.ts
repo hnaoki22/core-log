@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canUseAdminSurface, decideStaffParticipantView } from "./staff-page-access";
+import { canUseAdminSurface, decideStaffParticipantView, managerParticipantPagePath } from "./staff-page-access";
 
 // 運営・上司のページを、開いた人が読んでよいかの決まり（合成データ。実在の環境・人物は使わない）。
 
@@ -109,5 +109,23 @@ describe("decideStaffParticipantView：管理画面の側のページ（admin）
       .toEqual({ ok: false });
     expect(decideStaffParticipantView({ surface: "admin", viewer: MANAGER_IN_A, participantTenantId: null }))
       .toEqual({ ok: false });
+  });
+});
+
+describe("managerParticipantPagePath", () => {
+  it("上司の側の、参加者 1 人のページのパスを返す。氏名は URL に入れられる形にする", () => {
+    expect(managerParticipantPagePath("tok-admin", "参加 一郎")).toBe(`/m/tok-admin/${encodeURIComponent("参加 一郎")}`);
+    expect(managerParticipantPagePath("tok-admin", "参加（合成）")).toBe(`/m/tok-admin/${encodeURIComponent("参加（合成）")}`);
+  });
+
+  it("氏名に / や ? が入っていても、パスの区切りにならない", () => {
+    const path = managerParticipantPagePath("tok-admin", "a/b?c#d");
+    expect(path.split("/").length).toBe(4);
+    expect(path).not.toContain("?");
+    expect(path).not.toContain("#");
+  });
+
+  it("トークンに使われる文字（英数字・_・-）は、そのまま入る", () => {
+    expect(managerParticipantPagePath("mgr_Abc-123", "x")).toBe("/m/mgr_Abc-123/x");
   });
 });

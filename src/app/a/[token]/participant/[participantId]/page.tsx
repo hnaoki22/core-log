@@ -5,11 +5,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getLogsByParticipant, getMissionsByParticipant, getParticipantByNameCrossTenant, getFeedbackByParticipant, NotionLogEntry } from "@/lib/supabase";
 import { getManagerByToken } from "@/lib/participant-db";
-import { decideStaffParticipantView } from "@/lib/staff-page-access";
+import { decideStaffParticipantView, managerParticipantPagePath } from "@/lib/staff-page-access";
 import { isStandaloneTenant } from "@/lib/standalone";
+import { isFeatureEnabled } from "@/lib/feature-flags";
+import { missionTerms } from "@/lib/mission-context";
 import { formatTimeJST, formatFullDateTimeJST } from "@/lib/date-utils";
 import { hasMorning, hasEvening, getDayStatus, computeParticipantStats } from "@/lib/stats";
 import { EnergyGlyph } from "@/components/EnergyGlyph";
+import { AdminIssueList } from "@/components/admin/AdminIssueList";
 
 type Params = {
   params: {
@@ -53,6 +56,8 @@ export default async function AdminParticipantPage({ params }: Params) {
   let missions: any[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let feedbacks: any[] = [];
+  // イシュー（ミッション）の欄の呼び名。参加者の側の環境のスイッチで決める。読めないときは、従来の呼び名。
+  let useIssueLabel = false;
 
   try {
     // standalone §7-1: 管理者の個別ログ閲覧ページもサーバー側で遮断
@@ -81,11 +86,13 @@ export default async function AdminParticipantPage({ params }: Params) {
     logs = fetchedLogs;
     missions = fetchedMissions;
     feedbacks = fetchedFeedbacks;
+    useIssueLabel = await isFeatureEnabled("feature.missionLabelIssue", tenantId);
   } catch (e) {
     console.error("Failed to fetch data:", e);
   }
 
   const formatTime = formatTimeJST;
+  const issueTerms = missionTerms(useIssueLabel);
 
   // Stats — use the same completion logic as the dashboard
   const todayJST = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" });
@@ -149,35 +156,13 @@ export default async function AdminParticipantPage({ params }: Params) {
           </div>
         </section>
 
-        {/* Active Missions */}
-        {missions.length > 0 && (
-          <section className="card overflow-hidden">
-            <div className="px-5 py-4 border-b border-[#EFE8DD]">
-              <h2 className="text-xs font-semibold text-[#5B5560] tracking-wide uppercase">
-                ミッション
-              </h2>
-            </div>
-            <div className="divide-y divide-[#EFE8DD]">
-              {missions.map((m: { id: string; title?: string; status?: string; content?: string }) => (
-                <div key={m.id} className="p-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-medium text-[#1A1A2E]">
-                      {m.title || "（タイトルなし）"}
-                    </span>
-                    {m.status && (
-                      <span className="text-[10px] font-medium bg-indigo-50 text-[#1A1A2E] px-1.5 py-0.5 rounded-md">
-                        {m.status}
-                      </span>
-                    )}
-                  </div>
-                  {m.content && (
-                    <p className="text-xs text-[#8B8489] leading-relaxed">{m.content}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
+        {/* イシュー（ミッション）：題・状態・背景と目的（仮説）。コメントは、リンク先のページで読む・書く */}
+        <AdminIssueList
+          missions={missions}
+          heading={issueTerms.pageTitle}
+          purposeLabel={issueTerms.purposeLabel}
+          commentsHref={managerParticipantPagePath(token, participantName)}
+        />
 
         {/* HM Feedback History (from feedback table) */}
         {feedbacks.length > 0 && (
