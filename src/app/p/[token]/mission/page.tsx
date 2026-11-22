@@ -5,8 +5,9 @@ import { BottomNav } from "@/components/BottomNav";
 import { useState, useEffect, useCallback } from "react";
 import { useFeatures } from "@/lib/use-features";
 import { missionTerms, composeIssuePurpose } from "@/lib/mission-context";
-import { MissionPurposeView } from "@/components/features/MissionPurposeView";
+import { IssueEditableBody, type SavedMissionText } from "@/components/features/IssueEditableBody";
 import { BlueprintReviewNotice } from "@/components/features/BlueprintReviewNotice";
+import { formatCommentTime, missionCommentsUrl } from "@/lib/mission-comments";
 
 type Mission = {
   id: string;
@@ -70,6 +71,19 @@ export default function MissionPage() {
   // 出すのは、設計図を出している環境だけ（商品モードのテナントには出さない）。「あとで」か再読み込みで消える。
   const [showBlueprintNotice, setShowBlueprintNotice] = useState(false);
   const blueprintOn = isOn("feature.coachingProfile") && !isOn("standalone_mode");
+  // 「直す」のフォーム（IssueEditableBody。terms.edit がある環境だけ）に、保存していない変更があるか。
+  // 開けるカードは 1 つだけなので、値も 1 つで足りる。カードを閉じる・ほかのカードを開くと、
+  // フォームが外れて入力が消えるので、その前に確かめる。
+  const [editDirty, setEditDirty] = useState(false);
+  const toggleExpanded = (missionId: string) => {
+    if (editDirty && terms.edit && !window.confirm(terms.edit.leaveConfirm)) return;
+    setEditDirty(false);
+    setExpandedMission((prev) => (prev === missionId ? null : missionId));
+  };
+  // 直した文を保存できたときに、一覧の表示を合わせる（題は、カードの見出しにも出ている）。
+  const handleMissionSaved = (missionId: string, next: SavedMissionText) => {
+    setMissions((prev) => prev.map((m) => (m.id === missionId ? { ...m, ...next } : m)));
+  };
 
   useEffect(() => {
     async function fetchMissions() {
@@ -86,7 +100,7 @@ export default function MissionPage() {
 
           for (const mission of data.missions) {
             try {
-              const commentsRes = await fetch(`/api/mission/comments?missionId=${mission.id}`);
+              const commentsRes = await fetch(missionCommentsUrl(mission.id, token));
               if (commentsRes.ok) {
                 const commentsData = await commentsRes.json();
                 const hasManagerComment = commentsData.comments?.some(
@@ -118,7 +132,8 @@ export default function MissionPage() {
   const fetchComments = useCallback(async (missionId: string) => {
     setLoadingComments((prev) => ({ ...prev, [missionId]: true }));
     try {
-      const res = await fetch(`/api/mission/comments?missionId=${missionId}`);
+      // コメントを読む入口は、トークンが必須（付けないと 401 になり、一覧が出ない）。
+      const res = await fetch(missionCommentsUrl(missionId, token));
       if (res.ok) {
         const data = await res.json();
         setComments((prev) => ({ ...prev, [missionId]: data.comments }));
@@ -128,7 +143,7 @@ export default function MissionPage() {
     } finally {
       setLoadingComments((prev) => ({ ...prev, [missionId]: false }));
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     if (expandedMission && !comments[expandedMission]) {
@@ -256,12 +271,6 @@ export default function MissionPage() {
     if (!dateStr) return "";
     const d = new Date(dateStr);
     return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
-  };
-
-  const formatCommentTime = (isoStr: string) => {
-    const d = new Date(isoStr);
-    const jst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
-    return `${jst.getMonth() + 1}/${jst.getDate()} ${jst.getHours()}:${String(jst.getMinutes()).padStart(2, "0")}`;
   };
 
   const getStatusStyle = (status: string) => {
@@ -420,7 +429,7 @@ export default function MissionPage() {
                       <div key={mission.id} className="card overflow-hidden">
                         <div
                           className="p-4 cursor-pointer hover:bg-[#FBF8F4] transition-colors"
-                          onClick={() => setExpandedMission(isExpanded ? null : mission.id)}
+                          onClick={() => toggleExpanded(mission.id)}
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
@@ -456,8 +465,15 @@ export default function MissionPage() {
 
                         {isExpanded && (
                           <div className="px-4 pb-4 space-y-3 border-t border-[#EFE8DD]">
-                            {/* 背景・目的。仮説つきで設定された文は、仮説と残りを分けて出す。 */}
-                            <MissionPurposeView purpose={mission.purpose} purposeLabel={terms.purposeLabel} />
+                            {/* 背景・目的。仮説つきで設定された文は、仮説と残りを分けて出す。
+                                terms.edit がある環境では、本人が直す操作（「直す」「直した履歴」）も出す。 */}
+                            <IssueEditableBody
+                              token={token}
+                              mission={mission}
+                              terms={terms}
+                              onSaved={(next) => handleMissionSaved(mission.id, next)}
+                              onDirtyChange={setEditDirty}
+                            />
 
                             {mission.reviewMemo && (
                               <div className="bg-[#F5F0EB] p-3 rounded-xl border border-[#EFE8DD]">
@@ -672,7 +688,7 @@ export default function MissionPage() {
                       <div key={mission.id} className="card overflow-hidden">
                         <div
                           className="p-4 cursor-pointer hover:bg-[#FBF8F4] transition-colors"
-                          onClick={() => setExpandedMission(isExpanded ? null : mission.id)}
+                          onClick={() => toggleExpanded(mission.id)}
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
@@ -708,8 +724,15 @@ export default function MissionPage() {
 
                         {isExpanded && (
                           <div className="px-4 pb-4 space-y-3 border-t border-[#EFE8DD]">
-                            {/* 背景・目的。仮説つきで設定された文は、仮説と残りを分けて出す。 */}
-                            <MissionPurposeView purpose={mission.purpose} purposeLabel={terms.purposeLabel} />
+                            {/* 背景・目的。仮説つきで設定された文は、仮説と残りを分けて出す。
+                                terms.edit がある環境では、本人が直す操作（「直す」「直した履歴」）も出す。 */}
+                            <IssueEditableBody
+                              token={token}
+                              mission={mission}
+                              terms={terms}
+                              onSaved={(next) => handleMissionSaved(mission.id, next)}
+                              onDirtyChange={setEditDirty}
+                            />
 
                             {mission.reviewMemo && (
                               <div className="bg-[#F5F0EB] p-3 rounded-xl border border-[#EFE8DD]">
@@ -924,7 +947,7 @@ export default function MissionPage() {
                       <div key={mission.id} className="card overflow-hidden">
                         <div
                           className="p-4 cursor-pointer hover:bg-[#FBF8F4] transition-colors"
-                          onClick={() => setExpandedMission(isExpanded ? null : mission.id)}
+                          onClick={() => toggleExpanded(mission.id)}
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
@@ -960,8 +983,15 @@ export default function MissionPage() {
 
                         {isExpanded && (
                           <div className="px-4 pb-4 space-y-3 border-t border-[#EFE8DD]">
-                            {/* 背景・目的。仮説つきで設定された文は、仮説と残りを分けて出す。 */}
-                            <MissionPurposeView purpose={mission.purpose} purposeLabel={terms.purposeLabel} />
+                            {/* 背景・目的。仮説つきで設定された文は、仮説と残りを分けて出す。
+                                terms.edit がある環境では、本人が直す操作（「直す」「直した履歴」）も出す。 */}
+                            <IssueEditableBody
+                              token={token}
+                              mission={mission}
+                              terms={terms}
+                              onSaved={(next) => handleMissionSaved(mission.id, next)}
+                              onDirtyChange={setEditDirty}
+                            />
 
                             {mission.reviewMemo && (
                               <div className="bg-[#F5F0EB] p-3 rounded-xl border border-[#EFE8DD]">

@@ -1,10 +1,26 @@
-// GET /api/mission/comments?missionId=xxx - Get comments for a mission
+// GET /api/mission/comments?missionId=xxx&token=xxx - Get comments for a mission（トークンが必須）
 // POST /api/mission/comments - Add a comment to a mission
+//
+// だれが読み書きできるか（どの操作も同じ決まり）：
+// - 参加者：自分のイシューだけ。
+// - 上司・閲覧者：自分の環境（テナント）のイシューだけ。
+// - 管理者（is_admin）：どの環境のイシューでも（イシューの設定・編集＝/api/mission と同じ決まり。
+//   管理者は、ほかの環境の参加者の画面を開ける。Trap 3：読み書きは、イシューの側の環境で行う）。
 
 import { NextRequest, NextResponse } from "next/server";
-import { addMissionComment, getMissionComments, getMissionById, updateMissionComment, deleteMissionComment } from "@/lib/supabase";
+import { addMissionComment, getMissionComments, getMissionById, getMissionCommentMeta, updateMissionComment, deleteMissionComment } from "@/lib/supabase";
 import { getManagerByToken, getParticipantByToken, getParticipantByName, getManagerById } from "@/lib/participant-db";
 import { sendNotificationEmail } from "@/lib/email";
+
+// コメントを直す・消すときに、どの環境のコメントとして扱うか。
+// 管理者（is_admin）のときは、コメントが付いているイシューの環境を引いて使う（ほかの環境の
+// 参加者のイシューに書いた、自分のコメントを扱えるように）。それ以外は、呼んだ人の環境のまま。
+// コメントが見つからないときは、呼んだ人の環境を返す（このあとの更新・削除が、何も変えずに失敗する）。
+async function commentScopeTenant(commentId: string, callerTenantId: string, isAdmin: boolean): Promise<string> {
+  if (!isAdmin) return callerTenantId;
+  const meta = await getMissionCommentMeta(commentId);
+  return meta?.tenantId ?? callerTenantId;
+}
 
 export async function GET(request: NextRequest) {
   const missionId = request.nextUrl.searchParams.get("missionId");
@@ -25,9 +41,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     // Verify mission belongs to caller's tenant (and to the participant if
-    // the caller is one) before exposing its comments.
+    // the caller is one) before exposing its comments. 管理者（is_admin）は、
+    // ほかの環境のイシューのコメントも読める（/api/mission と同じ決まり）。
     const mission = await getMissionById(missionId);
-    if (!mission || mission.tenantId !== tenantId) {
+    if (!mission || (!manager?.isAdmin && mission.tenantId !== tenantId)) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     if (participant && mission.participantName !== participant.name) {
@@ -68,17 +85,20 @@ export async function POST(request: NextRequest) {
     // Verify the mission belongs to caller's tenant; for participant authors
     // also enforce that they own the mission they are commenting on.
     const targetMission = await getMissionById(missionId);
-    if (!targetMission || targetMission.tenantId !== tenantId) {
+    if (!targetMission || (!manager?.isAdmin && targetMission.tenantId !== tenantId)) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     if (participant && targetMission.participantName !== participant.name) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+    // Trap 3: 以降の読み書きは、イシューの側の環境（target）で行う。管理者が、ほかの環境の
+    // 参加者のイシューにコメントするとき、管理者の所属する環境を使うと、何も書かれない。
+    const missionTenantId = targetMission.tenantId;
 
     const authorName = manager?.name || participant?.name || "";
     const authorRole: "manager" | "participant" = manager ? "manager" : "participant";
 
-    const success = await addMissionComment(missionId, authorName, authorRole, comment, tenantId);
+    const success = await addMissionComment(missionId, authorName, authorRole, comment, missionTenantId);
 
     if (!success) {
       return NextResponse.json({ error: "Failed to add comment" }, { status: 500 });
@@ -89,7 +109,7 @@ export async function POST(request: NextRequest) {
       if (manager) {
         // Manager commented — notify participant
         if (targetMission) {
-          const targetParticipant = await getParticipantByName(targetMission.participantName, tenantId);
+          const targetParticipant = await getParticipantByName(targetMission.participantName, missionTenantId);
           if (targetParticipant?.email && !targetParticipant.email.includes("example.com")) {
             await sendNotificationEmail({
               to: targetParticipant.email,
@@ -152,7 +172,10 @@ export async function PATCH(request: NextRequest) {
 
     // updateMissionComment enforces tenant scope and that the caller is the
     // original author. Returns false on any mismatch (treated as 403).
-    const success = await updateMissionComment(commentId, newBody.trim(), tenantId, authorName);
+    // 管理者（is_admin）は、ほかの環境のイシューに自分が書いたコメントも直せる
+    // （環境は、コメントの側から引く。書いた本人であることの確認は、そのまま）。
+    const scopeTenantId = await commentScopeTenant(commentId, tenantId, manager?.isAdmin === true);
+    const success = await updateMissionComment(commentId, newBody.trim(), scopeTenantId, authorName);
     if (!success) {
       return NextResponse.json({ error: "Forbidden or not found" }, { status: 403 });
     }
@@ -188,7 +211,9 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const success = await deleteMissionComment(commentId, tenantId, authorName);
+    // 管理者（is_admin）は、ほかの環境のイシューに自分が書いたコメントも消せる（PATCH と同じ決まり）。
+    const scopeTenantId = await commentScopeTenant(commentId, tenantId, manager?.isAdmin === true);
+    const success = await deleteMissionComment(commentId, scopeTenantId, authorName);
     if (!success) {
       return NextResponse.json({ error: "Forbidden or not found" }, { status: 403 });
     }

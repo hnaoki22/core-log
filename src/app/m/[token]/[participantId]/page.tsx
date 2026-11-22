@@ -2,8 +2,10 @@
 // Shows individual participant's log entries + full mission management
 
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { getLogsByParticipant, getMissionsByParticipant, getParticipantByNameCrossTenant, NotionLogEntry } from "@/lib/supabase";
 import { getManagerByToken } from "@/lib/participant-db";
+import { decideStaffParticipantView } from "@/lib/staff-page-access";
 import { isStandaloneTenant } from "@/lib/standalone";
 import { formatTimeJST, formatFullDateTimeJST } from "@/lib/date-utils";
 import CommentForm from "./CommentForm";
@@ -31,26 +33,30 @@ export default async function ParticipantDetailPage({ params }: Params) {
   const { token, participantId } = params;
   const participantName = decodeURIComponent(participantId);
 
+  // 読む前に、開いた人（URL のトークン）を確かめる。決まりは src/lib/staff-page-access.ts。
+  // ここを通るまで、記入・イシューを読まない。notFound() は、下の try の中で呼ばない
+  // （catch に入って、確かめないまま先へ進んでしまう）。
+  const viewer = await getManagerByToken(token);
+  if (!viewer) notFound();
+  // Resolve the participant's own tenantId (handles cross-tenant views by admins).
+  // When the lookup fails, only the viewer's own tenant is read.
+  const participant = await getParticipantByNameCrossTenant(participantName);
+  const access = decideStaffParticipantView({
+    surface: "manager",
+    viewer,
+    participantTenantId: participant?.tenantId ?? null,
+  });
+  if (!access.ok) notFound();
+  const tenantId = access.tenantId;
+
   let logs: NotionLogEntry[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let missions: any[] = [];
 
   try {
-    // Resolve the participant's own tenantId first (handles cross-tenant views).
-    // Fallback to the manager's tenantId if participant lookup fails.
-    const participant = await getParticipantByNameCrossTenant(participantName);
-    let tenantId: string | null = null;
-
-    if (participant?.tenantId) {
-      tenantId = participant.tenantId;
-    } else {
-      const manager = await getManagerByToken(token);
-      tenantId = manager?.tenantId ?? null;
-    }
-
     // standalone §7-1: マネージャーの個別ログ閲覧ページはサーバー側で遮断
     // （UI 非表示だけでは不可。本文を一切取得しない）
-    if (tenantId && (await isStandaloneTenant(tenantId))) {
+    if (await isStandaloneTenant(tenantId)) {
       return (
         <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
           <div className="max-w-md mx-auto text-center">
@@ -67,14 +73,12 @@ export default async function ParticipantDetailPage({ params }: Params) {
       );
     }
 
-    if (tenantId) {
-      const [fetchedLogs, fetchedMissions] = await Promise.all([
-        getLogsByParticipant(participantName, tenantId),
-        getMissionsByParticipant(participantName, tenantId),
-      ]);
-      logs = fetchedLogs;
-      missions = fetchedMissions;
-    }
+    const [fetchedLogs, fetchedMissions] = await Promise.all([
+      getLogsByParticipant(participantName, tenantId),
+      getMissionsByParticipant(participantName, tenantId),
+    ]);
+    logs = fetchedLogs;
+    missions = fetchedMissions;
   } catch (e) {
     console.error("Failed to fetch data:", e);
   }
