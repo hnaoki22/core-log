@@ -10,6 +10,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
+import { CoachOptInCard } from "@/components/features/CoachOptInCard";
+import { COACH_TERMS } from "@/lib/coach-reply";
 import {
   COACHING_TERMS,
   EVENING_QUESTION_MAX,
@@ -19,10 +21,19 @@ import {
   type CoachingTendency,
 } from "@/lib/coaching-profile";
 
+/**
+ * AIコーチの欄（feature.coachReply）に渡す値。サーバー（page.tsx）が決める。
+ * - null・未指定 = 欄を出さない（スイッチが OFF、商品モード、アプリ全体で止めている）。
+ * - optIn: null  = 設計図の行が、まだ無い。
+ * - loadFailed   = いまの設定を読めなかった（ボタンを出さない）。
+ */
+export type BlueprintCoachProps = { optIn: boolean | null; loadFailed: boolean } | null;
+
 interface Props {
   token: string;
   initialProfile: CoachingProfile | null;
   loadFailed: boolean;
+  coach?: BlueprintCoachProps;
 }
 
 type LongFieldKey = "growthTheme" | "actions" | "expected" | "stallPoints";
@@ -34,7 +45,7 @@ const LONG_FIELDS: Array<{ key: LongFieldKey; label: string; help?: string }> = 
   { key: "stallPoints", label: COACHING_TERMS.stallPointsLabel },
 ];
 
-export default function BlueprintClient({ token, initialProfile, loadFailed }: Props) {
+export default function BlueprintClient({ token, initialProfile, loadFailed, coach = null }: Props) {
   const [status, setStatus] = useState<"none" | "draft" | "confirmed">(
     initialProfile ? initialProfile.status : "none"
   );
@@ -191,7 +202,12 @@ export default function BlueprintClient({ token, initialProfile, loadFailed }: P
             {tendencies.length > 0 && (
               <div className="bg-white border border-[#EFE8DD] p-4 rounded-2xl">
                 <p className="text-xs font-medium text-[#1A1A2E] mb-1">{COACHING_TERMS.tendenciesLabel}</p>
-                <p className="text-[11px] text-[#8B8489] mb-3 leading-relaxed">{COACHING_TERMS.tendenciesHelp}</p>
+                <p className="text-[11px] text-[#8B8489] mb-3 leading-relaxed">
+                  {COACHING_TERMS.tendenciesHelp}
+                  {/* 「使う」にすると何が起きるか。AIコーチの返信を出している環境でだけ、傾向を材料に使う
+                      （それ以外の環境では、選んだ内容を保存するだけなので、この一文は出さない）。 */}
+                  {coach ? COACH_TERMS.tendenciesNote : null}
+                </p>
                 <div className="space-y-3">
                   {tendencies.map((t, i) => (
                     <div key={i} className="min-w-0">
@@ -243,6 +259,17 @@ export default function BlueprintClient({ token, initialProfile, loadFailed }: P
             >
               {saving ? "保存中..." : status === "confirmed" ? COACHING_TERMS.saveButton : COACHING_TERMS.confirmButton}
             </button>
+
+            {/* AIコーチの説明と、受け取る・受け取らない（feature.coachReply）。上の「確定」「保存」とは別に、
+                押したときに保存する。設計図の行ができる（確定する）と、選べるようになる。 */}
+            {coach && (
+              <CoachOptInCard
+                token={token}
+                hasProfile={status !== "none"}
+                initialOptIn={coach.optIn}
+                loadFailed={coach.loadFailed}
+              />
+            )}
 
             <div className="text-center">
               <Link href={`/p/${token}/input`} className="text-xs font-medium text-[#1A1A2E] underline underline-offset-2">

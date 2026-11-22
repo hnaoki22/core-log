@@ -207,6 +207,16 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     phase1Enabled: false,
     implemented: true,
   },
+  {
+    key: "feature.coachReply",
+    label: "AIコーチの返信",
+    description: "夕方の記入のあとに、AIコーチがその日のうちに短い問いかけを返す。設計図を確定していて、受け取りを切っていない人にだけ返す。その日の記入と、確認済みの設計図を、外部のAIに送る。このスイッチを ON にしただけでは動かない。環境の設定（届け方＝すぐ届ける／運営が確認してから届ける、と開始日）を置いてから動く。商品モードの環境と、観の期の記入には返さない。",
+    category: "existing",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    implemented: true,
+    dependencies: ["feature.coachingProfile"],
+  },
 
   // ===== Tier S: Differentiators =====
   {
@@ -736,6 +746,9 @@ export const PRESETS: Preset[] = [
       // 呼び名の切り替えは機能の追加ではないので、「全機能ON」には含めない
       // （含めると、プリセットを当てただけで参加者画面の「ミッション」が「イシュー」に変わる）。
       flags["feature.missionLabelIssue"] = false;
+      // AIコーチの返信は、記入を外部のAIに送る。プリセットを当てただけで ON にならないよう、
+      // 「全機能ON」には含めない（ON にするときは、スイッチを個別に入れる）。
+      flags["feature.coachReply"] = false;
       return flags;
     },
   },
