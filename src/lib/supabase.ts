@@ -513,7 +513,16 @@ export async function createMorningEntry(
   return data.id;
 }
 
+/**
+ * 夕方の記入で、その日の行を更新する。
+ *
+ * owner（テナント ID と参加者 ID）は、必ずトークンから引いた値を渡す。行の ID（pageId）は画面から
+ * 届く値なので、それだけで更新すると、ほかの人の行の ID を送れば、その行を書き換えられてしまう。
+ * 行の ID に加えて、持ち主（tenant_id と participant_id）でも絞る。持ち主が違う行は 0 行の更新になり、
+ * false を返す（0 行の更新を成功にしない）。
+ */
 export async function updateEveningEntry(
+  owner: { tenantId: string; participantId: string },
   pageId: string,
   eveningInsight: string,
   energy: string | null,
@@ -532,6 +541,11 @@ export async function updateEveningEntry(
     logformVersion?: number | null;
   }
 ): Promise<boolean> {
+  // 持ち主が分からないまま更新しない（絞り込みの無い更新や、.eq(col, undefined) を走らせない）。
+  if (!owner || !owner.tenantId || !owner.participantId) {
+    logger.error("updateEveningEntry: owner is missing; update refused", { pageId });
+    return false;
+  }
   const now = new Date();
   const sanitized = sanitizeDurationSec(eveningDurationSec);
   const updateData: Record<string, unknown> = {
@@ -565,13 +579,20 @@ export async function updateEveningEntry(
     .from("logs")
     .update(updateData)
     .eq("id", pageId)
+    .eq("tenant_id", owner.tenantId)
+    .eq("participant_id", owner.participantId)
     .select("id");
   if (error) {
     logger.error("Update failed", { error: error.message, pageId });
     return false;
   }
   if (!updated || updated.length === 0) {
-    logger.warn("Update matched 0 rows", { pageId });
+    // 行が無い、または、行の持ち主が、トークンの参加者と違う。記入の文は残さない。
+    logger.warn("Update matched 0 rows (no such row, or the row belongs to someone else)", {
+      pageId,
+      tenantId: owner.tenantId,
+      participantId: owner.participantId,
+    });
     return false;
   }
   return true;

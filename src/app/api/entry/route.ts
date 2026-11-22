@@ -205,7 +205,10 @@ export async function POST(request: NextRequest) {
       const sanitizedEveningState = logformV2 && body.eveningState
         ? sanitizeInput(String(body.eveningState))
         : null;
+      // 行の ID（pageId）は画面から届く値。持ち主（トークンから引いたテナント ID と参加者 ID）でも絞って更新する
+      // （ほかの人の行の ID を送っても、書き換えられないように）。
       const success = await updateEveningEntry(
+        { tenantId, participantId },
         pageId, sanitizedEveningInsight, standalone ? null : energy,
         typeof eveningDurationSec === "number" ? eveningDurationSec : null,
         sanitizedBodyCheckE && sanitizedBodyCheckE.length > 0 ? sanitizedBodyCheckE : null,
