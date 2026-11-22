@@ -12,6 +12,7 @@ import { logger } from "@/lib/logger";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { DEFAULT_TENANT_ID } from "@/lib/supabase";
 import { acquireCronLock, releaseCronLock } from "@/lib/cron-lock";
+import { getReminderQuestionsForTenant } from "@/lib/entry-question-env";
 
 // Vercel Cron secret for authentication
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -83,6 +84,8 @@ export async function GET(request: NextRequest) {
 
   // Get all tenants and iterate through each
   const results: { name: string; email: string; sent: boolean; skipped?: string }[] = [];
+  // 問いを載せたメール（reminder-mail-question.ts）で送った環境の数。実行の記録に残す。
+  let questionMailTenants = 0;
   try {
     const tenants = await getAllTenants();
 
@@ -98,6 +101,22 @@ export async function GET(request: NextRequest) {
       const activeParticipants = participants.filter(
         (p) => p.email && p.email !== "" && !p.email.includes("example.com") && p.emailEnabled !== false
       );
+
+      // 「朝・夕の問い」を出している従来型の環境では、その回（朝／夕）の問いをメールに載せる。
+      // 問いを出していない環境・商品モードの環境・読めなかったときは空の配列になり、
+      // 従来のリマインドメールを送る（entry-question-env.ts）。
+      const slotQuestions =
+        activeParticipants.length > 0
+          ? await getReminderQuestionsForTenant(tenant.id, type === "morning" ? "morning" : "evening")
+          : [];
+      if (slotQuestions.length > 0) {
+        questionMailTenants++;
+        logger.info("Reminder: using the question mail for this tenant", {
+          tenantId: tenant.id,
+          type,
+          questions: slotQuestions.length,
+        });
+      }
 
       for (const p of activeParticipants) {
         try {
@@ -135,6 +154,7 @@ export async function GET(request: NextRequest) {
             participantName: p.name.split(" ")[0], // Use family name only
             token: p.token,
             type: reminderType,
+            questions: slotQuestions,
           });
 
           results.push({ name: p.name, email: p.email, sent });
@@ -153,7 +173,7 @@ export async function GET(request: NextRequest) {
     await releaseCronLock(lock.lockId, "success", {
       participantsProcessed: results.length,
       emailsSent: sentCount,
-      detail: { lockMethod: lock.method, jstHour },
+      detail: { lockMethod: lock.method, jstHour, questionMailTenants },
     });
 
     return NextResponse.json({

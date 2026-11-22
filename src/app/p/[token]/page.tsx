@@ -26,6 +26,7 @@ import { computeParticipantStats } from "@/lib/stats";
 import { getTodayJST, calculateWeekNum } from "@/lib/date-utils";
 import { isStandaloneTenant, computeUnlockState } from "@/lib/standalone";
 import { getQuickNotesForDate } from "@/lib/quick-notes";
+import { resolveEntryQuestionEnv } from "@/lib/entry-question-env";
 import ParticipantHomeClient, { type ParticipantHomeInitialData } from "./ParticipantHomeClient";
 
 // Avoid Next.js trying to cache this — data is per-token and changes on each
@@ -80,6 +81,10 @@ export default async function ParticipantHome({
     ? (await getQuickNotesForDate(participant.id, tenantId, todayJST)) ?? []
     : [];
 
+  // 朝・夕の記入の呼び名を切り替えるか（entry-terms.ts）。「朝・夕の問い」を出している
+  // 従来型の環境だけ true。商品モードの環境は読みに行かず false。読めなかったときも false（元の文言）。
+  const entryQuestionEnv = standaloneOn ? false : await resolveEntryQuestionEnv(tenantId);
+
   const initialData: ParticipantHomeInitialData = {
     participant: {
       id: participant.id,
@@ -103,6 +108,7 @@ export default async function ParticipantHome({
     })),
     standalone,
     quickNotes,
+    entryQuestionEnv,
     badges: {
       feedback: unreadCount,
       feedbackTotal: feedbacks.length,

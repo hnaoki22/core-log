@@ -12,7 +12,8 @@ import { computeInertiaNudge } from "@/lib/inertia-nudge";
 import { getTodayJST, getCurrentHourJST, isGracePeriod, calculateWeekNum, MORNING_CLOSE_HOUR_JST } from "@/lib/date-utils";
 import { getFlagsForTenant } from "@/lib/feature-flags";
 import { getKanNoKiPhase } from "@/lib/kan-no-ki";
-import { getTodayQuestionsForTenant, getTodayDayKey } from "@/lib/daily-questions";
+import { getTodayQuestionsForTenant, getTodayDayKey, getWeeklyForTenant } from "@/lib/daily-questions";
+import { isEntryQuestionEnv } from "@/lib/entry-terms";
 import InputClient, { type InputPageInitialData } from "./InputClient";
 import StandaloneInputClient, { type PrevDayRecord } from "./StandaloneInputClient";
 import { gaugesToRaws } from "@/lib/condition-gauges";
@@ -207,6 +208,15 @@ export default async function InputPageServer({
     day: getTodayDayKey(),
   };
 
+  // 朝・夕の記入の呼び名を切り替えるか（entry-terms.ts）。スイッチが ON で、問いが 1 つ以上
+  // 登録されている環境だけ true。曜日ごとではなく環境ごとに決める（曜日で呼び名が変わらないように）。
+  // 問いの登録は、上の getTodayQuestionsForTenant が読んだ直後なので、ここはキャッシュから返る。
+  // 読めなかったときは null になり、元の文言のままになる（失敗は daily-questions.ts が記録済み）。
+  const weeklyQuestions = dailyQuestionsFlagOn
+    ? await getWeeklyForTenant(participant.tenantId).catch(() => null)
+    : null;
+  const initialEntryQuestionEnv = isEntryQuestionEnv(flagMap, weeklyQuestions);
+
   // 入力画面の問いの上に出す「進行中のミッション」（feature.missionOnInput）。
   // スイッチが ON のテナントだけ読む（OFF のテナントでは問い合わせ自体を行わない）。
   // 読めなかったとき（null）はカードを出さない。0 件（[]）のときは設定先への案内を出すので、
@@ -236,6 +246,7 @@ export default async function InputPageServer({
     initialKanNoKiPhase,
     initialDailyQuestions,
     initialMissions,
+    initialEntryQuestionEnv,
   };
 
   const tDone = Date.now();

@@ -7,6 +7,8 @@ import { ReportHistoryList, type ReportHistoryItem, type ReportNote } from "@/co
 import type { QuickNoteItem } from "@/components/features/QuickNoteSheet";
 import { formatDateTimeJST, formatTimeJST } from "@/lib/date-utils";
 import { useFeatures } from "@/lib/use-features";
+import { entryTerms } from "@/lib/entry-terms";
+import { answersOnly } from "@/lib/daily-question-answers";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 
@@ -76,6 +78,9 @@ export type LogsInitialData = {
   standaloneUnlocked?: boolean;
   // 途中メモ（standalone のみ）: 日付 → その日のメモ（書いた順）。各日の展開行と CSV の列に使う
   quickNotesByDate?: Record<string, QuickNoteItem[]>;
+  // 「朝・夕の問い」を出している従来型の環境か（entry-terms.ts の isEntryQuestionEnv）。
+  // true のとき、朝の記入の見出し（一覧と CSV）を「今日の行動」にする。未指定・false は元の文言。
+  entryQuestionEnv?: boolean;
 };
 
 // standalone のログ一覧は最新N件だけ見せ、残りは折りたたむ
@@ -100,6 +105,15 @@ export default function LogsClient({ token, initialData }: Props) {
   // 途中メモ（standalone のみ・サーバー初期値。一覧の再取得では変わらない）
   const notesByDate = initialData.quickNotesByDate ?? {};
   const notesFor = (date: string): QuickNoteItem[] => notesByDate[date] ?? [];
+  // 朝の記入の見出し（entry-terms.ts）。「朝・夕の問い」を出している環境だけ「今日の行動」になる。
+  const entryQuestionEnv = initialData.entryQuestionEnv === true;
+  const terms = entryTerms(entryQuestionEnv);
+  // 問いへの答えは「Q1: 問い / A1: 答え」の形で保存されている。問いを出している環境では、
+  // 1 行に切り詰める一覧には答えを出し、開いた行では改行を保って問いと答えを分けて見せる。
+  // 問いを出していない環境の表示は変えない（クラス名も元のまま）。
+  const preview = (text: string | null | undefined): string =>
+    (entryQuestionEnv ? answersOnly(text) : text) || "";
+  const entryTextClass = `text-sm text-[#2C2C4A] leading-relaxed${entryQuestionEnv ? " whitespace-pre-line" : ""}`;
   const { isOn } = useFeatures();
   const notesEnabled = isOn("tier-e.selfInsightNote");
   const [reports, setReports] = useState<ReportHistoryItem[] | null>(null); // null=未取得
@@ -196,7 +210,7 @@ export default function LogsClient({ token, initialData }: Props) {
   // are intentionally excluded — this is the participant's own export.
   const handleDownloadCsv = () => {
     // standalone のみ末尾に「途中メモ」列（時刻つき・複数は「 ／ 」区切り）。従来テナントの列構成は不変。
-    const headers = ["日付", "曜日", "朝の意図", "本日の振り返り", "エネルギー", "ステータス", ...(sa ? ["途中メモ"] : [])];
+    const headers = ["日付", "曜日", terms.logMorningLabel, "本日の振り返り", "エネルギー", "ステータス", ...(sa ? ["途中メモ"] : [])];
     const rows = [...logs]
       // Oldest → newest reads naturally in a spreadsheet.
       .sort((a, b) => a.date.localeCompare(b.date))
@@ -350,7 +364,7 @@ export default function LogsClient({ token, initialData }: Props) {
 
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-[#1A1A2E] font-medium truncate leading-tight">
-                        {log.morningIntent || "(未記入)"}
+                        {preview(log.morningIntent) || "(未記入)"}
                       </p>
                       <div className="flex items-center gap-2 mt-1.5">
                         <span className="text-[11px] text-[#8B8489]">{formatDateTime(log.datetime, log.date)} ({log.dayOfWeek})</span>
@@ -379,12 +393,12 @@ export default function LogsClient({ token, initialData }: Props) {
                     <div className="border-t border-[#EFE8DD] p-4 bg-[#FBF8F4] space-y-3">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <p className="text-[10px] font-medium text-[#1A1A2E] tracking-wide uppercase">朝の意図</p>
+                          <p className="text-[10px] font-medium text-[#1A1A2E] tracking-wide uppercase">{terms.logMorningLabel}</p>
                           {log.morningTime && (
                             <span className="text-[10px] text-[#C9BDAE]">{formatTime(log.morningTime)}</span>
                           )}
                         </div>
-                        <p className="text-sm text-[#2C2C4A] leading-relaxed">{log.morningIntent || "(未記入)"}</p>
+                        <p className={entryTextClass}>{log.morningIntent || "(未記入)"}</p>
                       </div>
 
                       {log.eveningInsight && (
@@ -395,7 +409,7 @@ export default function LogsClient({ token, initialData }: Props) {
                               <span className="text-[10px] text-[#C9BDAE]">{formatTime(log.eveningTime)}</span>
                             )}
                           </div>
-                          <p className="text-sm text-[#2C2C4A] leading-relaxed">{log.eveningInsight}</p>
+                          <p className={entryTextClass}>{log.eveningInsight}</p>
                         </div>
                       )}
 
