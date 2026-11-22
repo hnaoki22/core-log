@@ -13,6 +13,8 @@ import { VoiceInputButton } from "@/components/features/VoiceInput";
 import { DailyQuestionsBlock } from "@/components/features/DailyQuestionsBlock";
 import { MissionContextCard } from "@/components/features/MissionContextCard";
 import { missionTerms, type MissionContextItem } from "@/lib/mission-context";
+import { entryTerms, entrySubheading } from "@/lib/entry-terms";
+import { answersOnly } from "@/lib/daily-question-answers";
 
 type TodayLog = {
   id: string;
@@ -62,6 +64,9 @@ export type InputPageInitialData = {
   // 問いの上に出す、本人の進行中のミッション（feature.missionOnInput）。
   // null = 出さない（スイッチが OFF、または読めなかった）。[] = 未設定（設定先への案内を出す）。
   initialMissions: MissionContextItem[] | null;
+  // 「朝・夕の問い」を出している従来型の環境か（entry-terms.ts の isEntryQuestionEnv）。
+  // true のとき、朝の記入の呼び名を「今日の行動」などに切り替える。未指定・false は元の文言。
+  initialEntryQuestionEnv?: boolean;
 };
 
 interface Props {
@@ -176,6 +181,10 @@ export default function InputPage({ token, initialData }: Props) {
   // 呼び名（ミッション／イシュー）は feature.missionLabelIssue で切り替える。
   const useMissionOnInput = isOn("feature.missionOnInput") && isOn("feature.mission");
   const missionTermsForInput = missionTerms(isOn("feature.missionLabelIssue"));
+  // 朝・夕の記入の呼び名（entry-terms.ts）。「朝・夕の問い」を出している環境では、朝の記入を
+  // 「今日の行動」と呼ぶ。サーバーが決めた値をそのまま使う（開いている間に呼び名が変わらないように）。
+  const entryQuestionEnv = initialData.initialEntryQuestionEnv === true;
+  const terms = entryTerms(entryQuestionEnv);
 
   const ruminationEveningState = useRuminationDetector(eveningTextareaRef, useRumination && !isMorning);
   const ruminationMorningState = useRuminationDetector(morningTextareaRef, useRumination && isMorning);
@@ -262,7 +271,7 @@ export default function InputPage({ token, initialData }: Props) {
             </svg>
           </div>
           <h2 className="text-xl font-semibold text-[#1A1A2E] mb-2">今日の記入は完了済みです</h2>
-          <p className="text-[#5B5560] text-sm mb-8">朝の意図と本日の振り返りが記入されています</p>
+          <p className="text-[#5B5560] text-sm mb-8">{terms.alreadyCompleted}</p>
           <button
             onClick={() => router.push(`/p/${token}`)}
             className="btn-primary w-full py-3.5 text-sm"
@@ -406,11 +415,11 @@ export default function InputPage({ token, initialData }: Props) {
           </div>
           <h2 className="text-xl font-semibold text-[#1A1A2E] mb-2">記入完了</h2>
           <p className="text-[#5B5560] text-sm mb-4">
-            {isMorning ? "今日の意図が設定されました" : "今日の振り返りが記録されました"}
+            {isMorning ? terms.morningDone : terms.eveningDone}
           </p>
           {durationLabel && (
             <p className="text-[#8B8489] text-xs mb-8 font-light">
-              {isMorning ? "朝の意図" : "本日の振り返り"}を <span className="text-[#1A1A2E] font-medium">{durationLabel}</span> で書きました
+              {isMorning ? terms.morningEntryName : terms.eveningEntryName}を <span className="text-[#1A1A2E] font-medium">{durationLabel}</span> で書きました
             </p>
           )}
           {!durationLabel && <div className="mb-8" />}
@@ -424,6 +433,13 @@ export default function InputPage({ token, initialData }: Props) {
       </div>
     );
   }
+
+  // この回（朝／夕）に問いを出しているか。下の「問いの欄を出すか」の判定と同じ値を使う。
+  const questionsShown =
+    dailyQuestionsEnabled &&
+    (isMorning ? dailyQuestions.morning.length : dailyQuestions.evening.length) > 0;
+  // 小見出しは、問いを出している回には出さない（問いそのものが促しになるため）。
+  const subheading = entrySubheading(isMorning, questionsShown);
 
   return (
     <div className="min-h-screen bg-[#F5F0EB] pb-32">
@@ -439,11 +455,13 @@ export default function InputPage({ token, initialData }: Props) {
             戻る
           </button>
           <h1 className="text-xl font-semibold tracking-tight">
-            {isMorning ? "朝の意図設定" : "本日の振り返り"}
+            {isMorning ? terms.morningHeading : terms.eveningHeading}
           </h1>
-          <p className="text-indigo-200 text-sm mt-1.5 font-light">
-            {isMorning ? "今日、ひとつだけ意識するとしたら？" : "今日やってみてどうでしたか？"}
-          </p>
+          {subheading !== null && (
+            <p className="text-indigo-200 text-sm mt-1.5 font-light">
+              {subheading}
+            </p>
+          )}
           <div className="flex items-center gap-3 mt-3 text-xs text-indigo-300">
             <span>{displayDate}</span>
             <span className="text-indigo-400/50">|</span>
@@ -498,12 +516,18 @@ export default function InputPage({ token, initialData }: Props) {
 
             {!isMorning && todayLog && (
               <div className="bg-[#F2F2F7] border border-indigo-100 p-4 rounded-2xl">
-                <p className="text-[10px] text-[#4D4D6D] font-medium tracking-wide uppercase mb-1">今朝の意図</p>
-                <p className="text-sm text-[#1A1A2E] leading-relaxed">{todayLog.morningIntent}</p>
+                <p className="text-[10px] text-[#4D4D6D] font-medium tracking-wide uppercase mb-1">{terms.morningRecapLabel}</p>
+                {/* 問いへの答えは「Q1: 問い / A1: 答え」の形で保存されている。問いを出している環境の
+                    再掲では、答えだけを見せる（その形でない文は、元の文のまま出る）。 */}
+                {entryQuestionEnv ? (
+                  <p className="text-sm text-[#1A1A2E] leading-relaxed whitespace-pre-line">{answersOnly(todayLog.morningIntent)}</p>
+                ) : (
+                  <p className="text-sm text-[#1A1A2E] leading-relaxed">{todayLog.morningIntent}</p>
+                )}
               </div>
             )}
 
-            {dailyQuestionsEnabled && (isMorning ? dailyQuestions.morning.length : dailyQuestions.evening.length) > 0 ? (
+            {questionsShown ? (
               <>
                 {dailyQuestions.axis && (
                   <p className="text-xs text-[#8B8489] mb-3 tracking-wide">

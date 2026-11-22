@@ -3,6 +3,8 @@
 import { getTodayJST, getCurrentHourJST, formatDateTimeJST } from "@/lib/date-utils";
 import { BottomNav } from "@/components/BottomNav";
 import { useFeatures } from "@/lib/use-features";
+import { entryTerms } from "@/lib/entry-terms";
+import { answersOnly } from "@/lib/daily-question-answers";
 import { MoodCandlestick } from "@/components/features/MoodCandlestick";
 import { QuickNoteSheet, QuickNoteButton, type QuickNoteItem } from "@/components/features/QuickNoteSheet";
 import { EnergyGlyph, EnergyDot, ENERGY_COLORS } from "@/components/EnergyGlyph";
@@ -72,6 +74,10 @@ export type ParticipantHomeInitialData = {
   // 途中メモ（standalone のみ・今日の分）。ホーム右上「＋」の中身（2026-08-18 太田さん FB）。
   // 従来テナントでは undefined/[]。
   quickNotes?: QuickNoteItem[];
+  // 「朝・夕の問い」を出している従来型の環境か（entry-terms.ts の isEntryQuestionEnv）。
+  // true のとき、「今日の状態」の 2 行目を「今日の行動の記入からスタート」などに切り替える。
+  // 未指定・false は元の文言（商品モードの環境は常に false）。
+  entryQuestionEnv?: boolean;
 };
 
 interface Props {
@@ -177,15 +183,19 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
     return "お疲れさまです";
   };
 
+  // 朝・夕の記入の呼び名（entry-terms.ts）。「朝・夕の問い」を出している環境だけ切り替わる。
+  const entryQuestionEnv = initialData.entryQuestionEnv === true;
+  const terms = entryTerms(entryQuestionEnv);
+
   const getTodayStatus = () => {
     const today = getTodayJST();
     const todayLog = logs.find((log) => log.date === today);
 
     if (!todayLog || todayLog.status === "empty") {
-      return { text: "今日の記入を始めましょう", sub: "朝の意図設定からスタート", href: `/p/${token}/input` };
+      return { text: "今日の記入を始めましょう", sub: terms.homeStartSub, href: `/p/${token}/input` };
     }
     if (todayLog.status === "morning_only") {
-      return { text: "本日の振り返りがまだです", sub: "1日の気づきを記録しましょう", href: `/p/${token}/input` };
+      return { text: "本日の振り返りがまだです", sub: terms.homeEveningPendingSub, href: `/p/${token}/input` };
     }
     return { text: "今日の記入が完了しました", sub: "素晴らしい一日でしたね", href: null };
   };
@@ -645,7 +655,9 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
                       {log.dayNum}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-[#1A1A2E] truncate leading-tight">{log.morningIntent || "（未記入）"}</p>
+                      {/* 問いへの答えは「Q1: 問い / A1: 答え」の形で保存されている。1 行に切り詰めるこの一覧では、
+                          問いを出している環境だけ、答えを出す（そのままだと、どの日も問いの文で始まり、書いた内容が見えない）。 */}
+                      <p className="text-sm text-[#1A1A2E] truncate leading-tight">{(entryQuestionEnv ? answersOnly(log.morningIntent) : log.morningIntent) || "（未記入）"}</p>
                       <p className="text-[11px] text-[#8B8489] mt-1">
                         {formatDateTime(log.datetime, log.date)} ({log.dayOfWeek})
                       </p>

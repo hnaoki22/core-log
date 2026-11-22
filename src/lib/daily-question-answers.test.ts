@@ -3,6 +3,8 @@ import {
   normalizeAnswers,
   hasAnyAnswer,
   combineQuestionAnswers,
+  parseQuestionAnswers,
+  answersOnly,
 } from "./daily-question-answers";
 
 // テストの文言は合成データ（実在の記入・実在の人物の記述は使わない）。
@@ -109,5 +111,77 @@ describe("combineQuestionAnswers", () => {
 
   it("問いが 0 件なら空文字を返す", () => {
     expect(combineQuestionAnswers([], ["a"])).toBe("");
+  });
+});
+
+describe("parseQuestionAnswers", () => {
+  it("まとめた文字列を、問いと答えの組に戻す", () => {
+    const combined = combineQuestionAnswers(Q_EVENING, ["資料を見せた", "順番を変える"]);
+    expect(parseQuestionAnswers(combined)).toEqual([
+      { question: "今日やってみたことは何ですか。", answer: "資料を見せた" },
+      { question: "明日は何を変えますか。", answer: "順番を変える" },
+    ]);
+  });
+
+  it("答えの途中の改行と空行は、答えの中に残す", () => {
+    const combined = combineQuestionAnswers(Q_EVENING, ["1行目\n\n3行目", "次の答え"]);
+    expect(parseQuestionAnswers(combined)).toEqual([
+      { question: "今日やってみたことは何ですか。", answer: "1行目\n\n3行目" },
+      { question: "明日は何を変えますか。", answer: "次の答え" },
+    ]);
+  });
+
+  it("答えていない問いは、空の答えとして読む", () => {
+    expect(parseQuestionAnswers(combineQuestionAnswers(Q_EVENING, ["", "順番を変える"]))).toEqual([
+      { question: "今日やってみたことは何ですか。", answer: "" },
+      { question: "明日は何を変えますか。", answer: "順番を変える" },
+    ]);
+  });
+
+  it("保存のときに末尾の空白が取られた形（最後が「A2:」）も読める", () => {
+    const stored = combineQuestionAnswers(Q_EVENING, ["資料を見せた", ""]).trim();
+    expect(stored.endsWith("A2:")).toBe(true);
+    expect(parseQuestionAnswers(stored)).toEqual([
+      { question: "今日やってみたことは何ですか。", answer: "資料を見せた" },
+      { question: "明日は何を変えますか。", answer: "" },
+    ]);
+  });
+
+  it("改行が CRLF でも読める", () => {
+    expect(parseQuestionAnswers("Q1: 問い\r\nA1: 答え")).toEqual([{ question: "問い", answer: "答え" }]);
+  });
+
+  it("問いと答えの形でない文字列は null", () => {
+    expect(parseQuestionAnswers("会議で最初に発言する")).toBeNull();
+    expect(parseQuestionAnswers("Q1: 問いだけで、答えの行が無い")).toBeNull();
+    expect(parseQuestionAnswers("A1: 答えだけ")).toBeNull();
+    expect(parseQuestionAnswers("")).toBeNull();
+    expect(parseQuestionAnswers(null)).toBeNull();
+    expect(parseQuestionAnswers(undefined)).toBeNull();
+  });
+});
+
+describe("answersOnly", () => {
+  it("問いが 1 つなら、その答えだけを返す", () => {
+    expect(answersOnly(combineQuestionAnswers(Q_MORNING, ["会議で最初に発言する"]))).toBe(
+      "会議で最初に発言する"
+    );
+  });
+
+  it("答えが複数なら、空行でつなぐ（答えていない問いは飛ばす）", () => {
+    expect(answersOnly(combineQuestionAnswers(Q_EVENING, ["資料を見せた", "順番を変える"]))).toBe(
+      "資料を見せた\n\n順番を変える"
+    );
+    expect(answersOnly(combineQuestionAnswers(Q_EVENING, ["", "順番を変える"]))).toBe("順番を変える");
+  });
+
+  it("問いと答えの形でない文字列は、元の文のまま返す", () => {
+    expect(answersOnly("会議で最初に発言する")).toBe("会議で最初に発言する");
+    expect(answersOnly("1行目\n2行目")).toBe("1行目\n2行目");
+  });
+
+  it("文字列以外は空文字", () => {
+    expect(answersOnly(null)).toBe("");
+    expect(answersOnly(undefined)).toBe("");
   });
 });

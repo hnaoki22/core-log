@@ -13,6 +13,8 @@ import { logger } from "@/lib/logger";
 import { resolvePhaseMode, triggerBodyPromptIfNeeded } from "@/lib/kan-no-ki";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { sanitizeConditionGauges, sanitizeCarriedOver } from "@/lib/condition-gauges";
+import { morningClosedMessage } from "@/lib/entry-terms";
+import { resolveEntryQuestionEnv } from "@/lib/entry-question-env";
 
 // standalone §5: 復帰日の未記入フォローアップ。
 // その日最初のエントリ作成（morning / evening_only）後にのみ判定する。
@@ -91,8 +93,12 @@ export async function POST(request: NextRequest) {
       // 深夜0:00〜1:59はグレースピリオド（前日扱い）なので朝の記入は不可
       const hour = getCurrentHourJST();
       if (hour >= MORNING_CLOSE_HOUR_JST || isGracePeriod()) {
+        // 文言は環境で変わる（entry-terms.ts）。「朝・夕の問い」を出している従来型の環境では
+        // 「朝の記入」、それ以外は元の文言（「朝の意図設定」）。商品モードの環境は読みに行かない。
+        // 締め切りを過ぎたときだけ通る分岐なので、ふだんの保存の経路には読み取りを足していない。
+        const questionEnv = standalone ? false : await resolveEntryQuestionEnv(tenantId);
         return NextResponse.json(
-          { error: `朝の意図設定は${MORNING_CLOSE_HOUR_JST}:00までです。本日の振り返りをご記入ください。`, morningClosed: true },
+          { error: morningClosedMessage(questionEnv, MORNING_CLOSE_HOUR_JST), morningClosed: true },
           { status: 403 }
         );
       }

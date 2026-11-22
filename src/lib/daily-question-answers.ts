@@ -51,3 +51,52 @@ export function combineQuestionAnswers(
     .map((q, i) => `Q${i + 1}: ${q}\nA${i + 1}: ${slots[i].trim()}`)
     .join("\n\n");
 }
+
+export type QuestionAnswer = { question: string; answer: string };
+
+/**
+ * combineQuestionAnswers でまとめた文字列を、問いと答えの組に戻す。
+ * その形でない文字列（自由記入の文など）は null を返す（呼び出し側は元の文のまま扱う）。
+ *
+ * 保存のときに前後の空白が取られるので、最後の答えが空だと末尾が「A2:」（空白なし）になる。
+ * その形も読めるようにしてある。
+ */
+export function parseQuestionAnswers(text: string | null | undefined): QuestionAnswer[] | null {
+  if (typeof text !== "string") return null;
+  const s = text.replace(/\r\n?/g, "\n").trim();
+  if (!s.startsWith("Q1: ")) return null;
+
+  const out: QuestionAnswer[] = [];
+  let pos = 0;
+  for (let n = 1; pos < s.length; n++) {
+    const questionHead = `Q${n}: `;
+    if (!s.startsWith(questionHead, pos)) return null;
+    const answerMarker = `\nA${n}:`;
+    const answerAt = s.indexOf(answerMarker, pos + questionHead.length);
+    if (answerAt === -1) return null;
+    const question = s.slice(pos + questionHead.length, answerAt).trim();
+
+    const answerStart = answerAt + answerMarker.length;
+    const nextMarker = `\n\nQ${n + 1}: `;
+    const nextAt = s.indexOf(nextMarker, answerStart);
+    const answer = (nextAt === -1 ? s.slice(answerStart) : s.slice(answerStart, nextAt)).trim();
+    out.push({ question, answer });
+
+    if (nextAt === -1) break;
+    pos = nextAt + 2; // 空行（"\n\n"）の次、「Q{n+1}: 」の先頭へ
+  }
+  return out.length > 0 ? out : null;
+}
+
+/**
+ * 問いと答えの形でまとめた文字列から、答えだけを取り出す（答えが複数なら空行でつなぐ）。
+ * 夕方の画面に朝の記入を再掲するときに使う（問いの文を繰り返さず、書いた内容だけを見せる）。
+ * その形でない文字列・答えが 1 つも無い文字列は、元の文のまま返す。
+ */
+export function answersOnly(text: string | null | undefined): string {
+  if (typeof text !== "string") return "";
+  const pairs = parseQuestionAnswers(text);
+  if (!pairs) return text;
+  const answers = pairs.map((p) => p.answer).filter((a) => a !== "");
+  return answers.length > 0 ? answers.join("\n\n") : text;
+}

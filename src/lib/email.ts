@@ -6,6 +6,7 @@ import { getParticipantByEmail } from "./participant-db";
 import { logger } from "./logger";
 import { escapeHtml } from "./sanitize";
 import { MORNING_CLOSE_HOUR_JST } from "./date-utils";
+import { buildQuestionReminderEmail } from "./reminder-mail-question";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const FROM_EMAIL = process.env.REMIND_FROM_EMAIL || "CORE Log <noreply@resend.dev>";
@@ -110,6 +111,12 @@ interface SendEmailOptions {
   participantName: string;
   token: string;
   type: ReminderType;
+  /**
+   * 「朝・夕の問い」を出している環境の、その回（朝／夕）の問い。
+   * 1 件以上あるときは、問いを載せたメール（reminder-mail-question.ts）を送る。
+   * 未指定・空のときは、従来のリマインドメールを送る。
+   */
+  questions?: readonly string[];
 }
 
 function buildMorningEmail(name: string, token: string) {
@@ -384,13 +391,37 @@ export async function sendReminderEmail(options: SendEmailOptions): Promise<bool
   }
 
   const { to, participantName, token, type } = options;
-  let emailContent;
-  if (type === "morning") {
-    emailContent = buildMorningEmail(participantName, token);
-  } else if (type === "evening_no_morning") {
-    emailContent = buildEveningNoMorningEmail(participantName, token);
-  } else {
-    emailContent = buildEveningEmail(participantName, token);
+  const questions = (options.questions ?? []).filter(
+    (q): q is string => typeof q === "string" && q.trim() !== ""
+  );
+  let emailContent: { subject: string; html: string } | null = null;
+  if (questions.length > 0) {
+    // 問いを出している環境：その回の問いをそのまま載せる（画面の問いと別のことを頼まない）。
+    // 組み立てに失敗したときは、下の従来のメールで送る（リマインドそのものは止めない）。
+    try {
+      emailContent = buildQuestionReminderEmail({
+        type,
+        name: participantName,
+        url: `${APP_BASE_URL}/p/${token}/input`,
+        questions,
+        morningCloseHour: MORNING_CLOSE_HOUR_JST,
+      });
+    } catch (err) {
+      logger.error("Reminder: question mail build failed; falling back to the default mail", {
+        type,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      emailContent = null;
+    }
+  }
+  if (!emailContent) {
+    if (type === "morning") {
+      emailContent = buildMorningEmail(participantName, token);
+    } else if (type === "evening_no_morning") {
+      emailContent = buildEveningNoMorningEmail(participantName, token);
+    } else {
+      emailContent = buildEveningEmail(participantName, token);
+    }
   }
 
   return sendWithRetry(

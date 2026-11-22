@@ -10,6 +10,7 @@ import { getParticipantWithLogsByToken, getUnreadFeedbackCount, getFeedbackByPar
 import { isStandaloneTenant, computeUnlockState } from "@/lib/standalone";
 import { getTodayJST } from "@/lib/date-utils";
 import { getQuickNotesInRange, groupQuickNotesByDate } from "@/lib/quick-notes";
+import { resolveEntryQuestionEnv } from "@/lib/entry-question-env";
 import LogsClient, { type LogsInitialData } from "./LogsClient";
 
 export const dynamic = "force-dynamic";
@@ -59,6 +60,10 @@ export default async function LogsPageServer({
     quickNotesByDate = groupQuickNotesByDate(notes ?? []);
   }
 
+  // 朝の記入の見出しを切り替えるか（entry-terms.ts）。「朝・夕の問い」を出している従来型の
+  // 環境だけ true。商品モードの環境は読みに行かず false。読めなかったときも false（元の文言）。
+  const entryQuestionEnv = standaloneCandle ? false : await resolveEntryQuestionEnv(tenantId);
+
   const initialData: LogsInitialData = {
     logs: result.logs.map((l) => ({
       id: l.id,
@@ -87,6 +92,7 @@ export default async function LogsPageServer({
     standaloneCandle,
     standaloneUnlocked,
     quickNotesByDate,
+    entryQuestionEnv,
   };
 
   console.log(
