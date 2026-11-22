@@ -6,13 +6,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isBusinessDay, getJSTDateString, getJSTHour } from "@/lib/calendar";
 import { sendReminderEmail, type ReminderType } from "@/lib/email";
-import { hasLoggedToday, getAllTenants } from "@/lib/supabase";
+import { hasLoggedToday, getAllTenants, getMissionsByParticipantId } from "@/lib/supabase";
 import { getAllParticipants } from "@/lib/participant-db";
 import { logger } from "@/lib/logger";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { DEFAULT_TENANT_ID } from "@/lib/supabase";
 import { acquireCronLock, releaseCronLock } from "@/lib/cron-lock";
 import { getReminderQuestionsForTenant } from "@/lib/entry-question-env";
+import { isUsableProfile, type CoachingProfile } from "@/lib/coaching-profile";
+import { getCoachingProfilesForTenant } from "@/lib/coaching-profile-store";
+import { ISSUE_HYPOTHESIS_LABEL, missionTerms, parseIssuePurpose, selectActiveMissions } from "@/lib/mission-context";
 
 // Vercel Cron secret for authentication
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -118,6 +121,19 @@ export async function GET(request: NextRequest) {
         });
       }
 
+      // 設計図（feature.coachingProfile）が ON の環境では、問いを載せたメールに、その人の分を足す
+      // （確認済みの人は本人の文、確認前の人は確認のお願い）。問いを出していない環境のメールは変えない。
+      // 読めなかったとき（null）は、その人の分を載せずに送る（失敗は store が記録済み）。
+      let profiles: Map<string, CoachingProfile> | null = null;
+      // イシュー（ミッション）の呼び名。null = イシューはメールに載せない（Mission 機能が OFF の環境）。
+      let issueLabel: string | null = null;
+      if (slotQuestions.length > 0 && (await isFeatureEnabled("feature.coachingProfile", tenant.id))) {
+        profiles = await getCoachingProfilesForTenant(tenant.id);
+        if (profiles && (await isFeatureEnabled("feature.mission", tenant.id))) {
+          issueLabel = missionTerms(await isFeatureEnabled("feature.missionLabelIssue", tenant.id)).tab;
+        }
+      }
+
       for (const p of activeParticipants) {
         try {
           // Check startDate: skip if today is before participant's start date
@@ -149,12 +165,39 @@ export async function GET(request: NextRequest) {
             reminderType = "evening_no_morning";
           }
 
+          // その人の分（設計図）。朝のメールには、確認済みの人だけ、進行中のイシューの 1 件目も載せる。
+          let personal:
+            | {
+                profile: CoachingProfile | null;
+                issue: { label: string; title: string; hypothesisLabel: string; hypothesis: string | null } | null;
+              }
+            | undefined;
+          if (profiles) {
+            const profile = profiles.get(p.id) ?? null;
+            let issue: { label: string; title: string; hypothesisLabel: string; hypothesis: string | null } | null = null;
+            if (reminderType === "morning" && issueLabel && isUsableProfile(profile)) {
+              const missions = await getMissionsByParticipantId(p.id, tenant.id);
+              const first = selectActiveMissions(missions, 1)[0];
+              if (first) {
+                const parts = parseIssuePurpose(first.purpose);
+                issue = {
+                  label: issueLabel,
+                  title: first.title,
+                  hypothesisLabel: ISSUE_HYPOTHESIS_LABEL,
+                  hypothesis: parts.structured ? parts.hypothesis : null,
+                };
+              }
+            }
+            personal = { profile, issue };
+          }
+
           const sent = await sendReminderEmail({
             to: p.email,
             participantName: p.name.split(" ")[0], // Use family name only
             token: p.token,
             type: reminderType,
             questions: slotQuestions,
+            personal,
           });
 
           results.push({ name: p.name, email: p.email, sent });

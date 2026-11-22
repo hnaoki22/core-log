@@ -61,7 +61,8 @@ core-log/
 │   │   ├── ReportHistoryList.tsx     # 過去のAI分析の開閉リスト（レポート画面／ログ画面で共用）
 │   │   ├── QuickNoteSheet.tsx        # 途中メモのシート＋「＋ メモ」ボタン（ホーム・standalone のみ）
 │   │   ├── MissionContextCard.tsx    # 入力画面の問いの上に、本人の進行中のミッションを出すカード（feature.missionOnInput。表示だけ・API は呼ばない）
-│   │   └── MissionPurposeView.tsx    # ミッション画面の「背景・目的」の表示。仮説つきで保存された文は、仮説と残りを分けて出す（表示だけ）
+│   │   ├── MissionPurposeView.tsx    # ミッション画面の「背景・目的」の表示。仮説つきで保存された文は、仮説と残りを分けて出す（表示だけ）
+│   │   └── CoachingProfileCard.tsx   # 入力画面の問いの上に、本人の設計図の「毎朝の一文」を出す枠（feature.coachingProfile。確認済みのときだけ本人の文を出す。表示だけ・API は呼ばない）
 │   ├── components/admin/
 │   │   ├── AdminDirectory.tsx        # 管理画面「環境とユーザー」の欄（環境の一覧／環境ごとのユーザーと「画面を開く」「URLをコピー」。管理者にだけ出す。表示だけ・API は呼ばない）
 │   │   └── EnvironmentBanner.tsx     # 管理画面のヘッダーの「表示中の環境」の帯（本番は赤・テスト用は緑。表示だけ）
@@ -77,6 +78,8 @@ core-log/
 │   │   ├── quick-notes.ts            # 途中メモ（quick_notes 表の保存/取得/削除・本人と装置だけ）
 │   │   ├── feedback-draft.ts         # 管理画面「AI下書き」のモデル選択・リクエスト組立て・応答の読み取り（純関数・テスト付き）
 │   │   ├── mission-context.ts        # 入力画面に出すミッションの絞り込み（進行中・最大3件）、呼び名（ミッション／イシュー）の文言表、仮説つきの「背景・目的」のまとめ方と読み方（純関数・テスト付き）
+│   │   ├── coaching-profile.ts       # 設計図の決まり：欄の上限、確定の条件、メールと夕方の「あなたの問い」に使ってよいか、履歴、画面とメールの言葉（純関数・テスト付き。§5 参照）
+│   │   ├── coaching-profile-store.ts # 設計図の読み書き（coaching_profiles 表。本人の分だけ。読めなかったことと、まだ無いことを分けて返す。サーバー側だけ）
 │   │   ├── admin-directory.ts        # 「環境とユーザー」の決まり：環境の用途の呼び名、ユーザーの種別、ログイン用のパス、一覧の並べ方、トークンをだれに返すか（純関数・テスト付き）
 │   │   ├── admin-directory-store.ts  # 「環境とユーザー」の読み取り（tenants / participants / managers。logs は読まない。サーバー側だけ）
 │   │   ├── supabase.ts               # DB 操作の中心（PostgREST 0 行成功ガード入り）
@@ -176,7 +179,7 @@ PR タイトル例（リポの履歴に合わせる）:
 
 ## 5. 機能フラグ（FEATURE_CATALOG 実数）
 
-`src/lib/feature-flags.ts` の `FEATURE_CATALOG` は **2026-11-21 時点で 56 件 / 12 カテゴリ**（下の表はコードを数え直した値。2026-06-10 に mode カテゴリ + `standalone_mode` を追加。§9 決定で `tier-f.beforeAfter` と `tier-d.heroAssessment` を削除——打合せ文字起こしの「色軸評価」は「4軸評価」の誤変換で、正対象は HERO自己評価と本藤さん確認済み）。
+`src/lib/feature-flags.ts` の `FEATURE_CATALOG` は **2026-11-22 時点で 57 件 / 12 カテゴリ**（下の表はコードを数え直した値。2026-06-10 に mode カテゴリ + `standalone_mode` を追加。§9 決定で `tier-f.beforeAfter` と `tier-d.heroAssessment` を削除——打合せ文字起こしの「色軸評価」は「4軸評価」の誤変換で、正対象は HERO自己評価と本藤さん確認済み）。
 
 **mode カテゴリ（2026-06-10 追加）**: `standalone_mode` = 商品版の動作モード。ON のテナントは①朝夕3画面入力（体調→意図/結果→気分、`evening_energy` 分離保存）②気分ローソク足③分析機能の段階開示（21日+記入10日）④マネージャー/管理者のログ本文閲覧を API レベルで遮断＋投稿通知メール停止⑤未記入フォローアップ。大幸薬品では `applyTenantFlagGuards` が強制 OFF（tier-0 と同じ防御）。サーバー判定は `src/lib/standalone.ts`（`isStandaloneTenant` / `standaloneGuard` / `computeUnlockState` / `computeSkipFollowup`）、21日レポートは `src/lib/standalone-report.ts` + `standalone_reports` テーブル、スキップ記録は `skip_reasons` テーブル（migration: `20260610_standalone_mode_schema.sql`）。途中メモ（ホーム右上「＋」の中身。2026-08-18 定例・太田さん FB）は `src/lib/quick-notes.ts` + `quick_notes` テーブル（migration: `20260819_quick_notes.sql`）+ `/api/standalone/quick-note`。本人と装置だけが読み、AI分析の素材にも入る（管理者・上司向けの読み取り経路を作らないこと）。
 
@@ -184,7 +187,7 @@ PR タイトル例（リポの履歴に合わせる）:
 |---|---:|---|
 | `mode` 動作モード | 2 | **standalone_mode**（商品版。大幸は非表示&強制OFF）, logform_v2（standalone の上に重ねる入力フォーム刷新版） |
 | `core` | 3 | morningInput / eveningInput / logHistory |
-| `existing` | 13 | energyTracking, mission, streak, badges, animations, reminderMail, managerFeedback, csvExport, otpAuth, managerAnalytics, **dailyQuestions**, **missionOnInput**, **missionLabelIssue** |
+| `existing` | 14 | energyTracking, mission, streak, badges, animations, reminderMail, managerFeedback, csvExport, otpAuth, managerAnalytics, **dailyQuestions**, **missionOnInput**, **missionLabelIssue**, **coachingProfile** |
 | `tier-0` 観の期(KAN のキー) | 10 | kanNoKi / weeklyMirror / bodyPrompt / silenceObservation / peerComparison(.tenant/.crossTenant/.industry/.global) / transitionSignal（reflection-lab 限定・大幸薬品は非表示&強制OFF） |
 | `tier-s` Differentiators | 4 | ruminationDetection, doubleLoopPrompt, weeklyConceptualization, structuredInput |
 | `tier-a` Manager Safety Net | 5 | oneOnOneBriefing, burnoutScore, consultantSpotlight, psychSafetyMonitor, managerSelfReflection |
@@ -201,6 +204,14 @@ PR タイトル例（リポの履歴に合わせる）:
   - **設定フォームに「仮説」の欄（必須）が加わる**。保存先は増やしていない。仮説と「目指す状態・行動」を `composeIssuePurpose()` で見出しつきの 1 本（`【仮説】…` / `【目指す状態と、これからの行動】…`）にまとめ、既存の `missions.purpose` に保存する（`daily-question-answers.ts` と同じ考え方）。読む側は `parseIssuePurpose()` で分ける：入力画面のカードは仮説を折りたたまずに出し、ミッション画面は `MissionPurposeView` で 2 つの枠に分ける。先頭が見出しで始まらない文（従来の登録、マネージャー画面で書いた文）は分けずにそのまま出す。**マネージャー・管理者の画面には、見出しつきの文がそのまま見える**（そこで編集すると見出しも編集対象になる）。必須の判定は画面側だけ（API は従来どおり）。
   - **「完了にする」が「このイシューを閉じる」になり、理由の記入が必須になる**（`closeNoteRequired`）。DB の値は従来どおり status=`完了`・`final_review` に理由。仮説は確かめると変わるので、書き直すのではなく「理由を書いて閉じ、新しく設定する」運用（前の問い・仮説と、変えた理由が残る）。
 - 参加者画面にはミッションの名前・内容を書き直す欄が無い（閉じて作り直すか、マネージャー画面の「ミッション管理」→「編集」）。上の運用のため、書き直す欄は意図して足していない。AI下書きにミッションは渡していない。
+
+**設計図（`feature.coachingProfile`。2026-11-22 追加。既定 OFF）**: 設計図 = 本人が自分で確認した、毎朝の一文・成長課題・これからの行動・期待する結果・止まりそうな場面・夕方に自分へ聞く問い。保存先は `coaching_profiles` 表（migration `20261122_coaching_profiles_and_coach_replies.sql`。1 人 1 行。RLS deny_all + service_role）。決まりは `src/lib/coaching-profile.ts`、読み書きは `src/lib/coaching-profile-store.ts`、本人の API は `/api/coaching-profile`、ページは `/p/[token]/blueprint`。
+- **状態は `draft`（確認前）/ `confirmed`（確認済み）。運営が下書きを置き、本人が確かめて確定する。確認前の内容は、メールにも、夕方の「あなたの問い」にも使わない**（`isUsableProfile()`）。本人が確かめていない文を、本人の言葉として毎日見せないため。確定には「毎朝の一文」だけが必須。
+- **入力画面**（従来型の `InputClient` だけ）：問いの上に `CoachingProfileCard`。確認済みなら毎朝の一文（成長課題と行動は開いて読む）、確認前・未作成なら設計図のページへの案内。`initialCoachingProfile` は **`null` = 出さない（スイッチ OFF／読めなかった）**。読めなかったことを「まだ無い」と扱わないこと（確定済みの人に「確認してください」と出る）。
+- **夕方の「あなたの問い」**：全員共通の夕方の問いの後ろに 1 つ足す（`withPersonalEveningQuestion()`。本人が決めた問い、無ければ毎朝の一文を入れた定型の問い）。入力画面のサーバー側（`page.tsx`）と `/api/features/daily-questions` が同じ関数で足す。答えは従来と同じ「Q3: 問い / A3: 答え」で保存され、欄は増えない。共通の問いが無い日には足さない。
+- **リマインドメール**：問いを載せたメール（§6）にだけ、その人の分を足す（`buildReminderPersonal()`）。朝・確認済み＝「あなたの設計図から」（進行中のイシューの 1 件目、仮説、毎朝の一文）／朝・確認前＝確認のお願いと設計図へのリンク／夕方・確認済み＝「あなたの問い」。スイッチが OFF の環境と、その人の分が空のときの HTML は、従来と同じ（`reminder-mail-question.test.ts` で固定）。
+- 運営が置いた「傾向」（`tendencies`）は、本人が「使う／使わない」だけを選べる（文は書き換えられない。`mergeTendencyChoices()`）。直したときは、直す前の内容を `history` に残す。
+- 同じ migration で `coach_replies` 表（AIコーチの返信）も用意した。**読み書きするコードはまだ無い**（次の変更で入れる）。
 
 保存形式: テナント毎に `ai_settings.value` 行（`tenant_id`, `key='feature_flags'`, `value=JSON`）。flat shape（`{flagKey: bool}`）が現行、legacy nested shape（`{default: {...}}`）は読み取り側で互換維持。
 
@@ -288,6 +299,10 @@ PR タイトル例（リポの履歴に合わせる）:
     - トークンは、その人の画面を開ける値。`GET /api/admin` は、閲覧者（observer）には参加者・マネージャーのトークンを空文字で返す（本人の行だけは返す。`tokenForViewer()`）。`GET /api/admin/directory` は管理者以外に 403。新しく作る API・画面でも、トークンやログイン用のパスを返す・出すのは管理者にだけにする。
     - 画面の出し分けは、応答の `viewerIsAdmin`（サーバーの `is_admin` と同じ値）で決める。`viewerRole` の文字列だけで「管理者」と判断しない。
     - `POST /api/admin/members` は、管理者以外に 403、`?tenant=<slug>` がなければ 400、知らない slug も 400。**指定がないときに管理者の所属テナントへ黙って追加する動きに戻さないこと**（全環境を表示したまま追加した人が、意図しない環境に入り、どこに入ったのかが画面で分からなかった）。
+13. **設計図（`coaching_profiles`）の確認前の内容を、本人の言葉として使わない。**（2026-11-22）
+    - メール、夕方の「あなたの問い」、今後の AI の材料に使えるのは、`isUsableProfile()` が true の設計図（確認済みで、毎朝の一文がある）だけ。運営の下書き・運営の見立て（傾向）は、本人が確定・選択するまで使わない。
+    - 設計図の読み書きは、トークンから引いた参加者 ID とテナント ID だけで行う（リクエスト本文の ID・氏名で行を選ばない）。
+    - AI に本人の材料を渡す機能を足すときは、本人が設計図の画面で見られるものだけを渡す。
 
 ---
 

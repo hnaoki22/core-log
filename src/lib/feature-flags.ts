@@ -198,6 +198,15 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     implemented: true,
     dependencies: ["feature.mission"],
   },
+  {
+    key: "feature.coachingProfile",
+    label: "設計図（成長課題と行動）",
+    description: "本人が確認した設計図（毎朝の一文、成長課題、これからの行動、夕方に自分へ聞く問い）を、従来型の入力画面と、問いを載せたリマインドメールに出す。確認前の内容は、メールにも夕方の問いにも使わない。商品モードの入力画面には出ない。",
+    category: "existing",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    implemented: true,
+  },
 
   // ===== Tier S: Differentiators =====
   {

@@ -24,6 +24,7 @@
 import { useRef, useState } from "react";
 import { VoiceInputButton } from "./VoiceInput";
 import { combineQuestionAnswers, normalizeAnswers } from "@/lib/daily-question-answers";
+import { COACHING_TERMS } from "@/lib/coaching-profile";
 
 interface Props {
   questions: string[];
@@ -42,6 +43,12 @@ interface Props {
    * free-text textarea in InputClient uses.
    */
   voiceEnabled: boolean;
+  /**
+   * How many questions at the end of `questions` are the participant's own
+   * (設計図の「あなたの問い」). They get a small caption. Default 0 = none,
+   * which renders exactly as before.
+   */
+  personalCount?: number;
 }
 
 export function DailyQuestionsBlock({
@@ -50,6 +57,7 @@ export function DailyQuestionsBlock({
   onAnswersChange,
   onFirstFocus,
   voiceEnabled,
+  personalCount = 0,
 }: Props) {
   const [focused, setFocused] = useState(false);
 
@@ -91,6 +99,9 @@ export function DailyQuestionsBlock({
     <div className="space-y-6">
       {questions.map((q, i) => (
         <div key={i} className="space-y-2">
+          {i >= questions.length - personalCount && (
+            <p className="text-[10px] text-[#8B8489] font-medium tracking-wide">{COACHING_TERMS.personalQuestionCaption}</p>
+          )}
           <label
             htmlFor={`daily-q-${i}`}
             className="block text-sm font-medium text-[#1A1A2E] leading-relaxed"

@@ -92,3 +92,103 @@ describe("buildQuestionReminderEmail（安全のための変換）", () => {
     expect(mail.html).not.toContain("<i>名</i>");
   });
 });
+
+// 設計図（feature.coachingProfile）の、その人の分。合成データ。
+describe("buildQuestionReminderEmail（その人の分）", () => {
+  const PROFILE_URL = "https://example.test/p/tok_synthetic/blueprint";
+
+  it("その人の分が無いとき・中身が空のときは、従来と同じ HTML", () => {
+    const base = build("evening", Q_EVENING);
+    const withNull = buildQuestionReminderEmail({
+      type: "evening",
+      name: "見本",
+      url: URL,
+      questions: Q_EVENING,
+      morningCloseHour: 14,
+      personal: null,
+    });
+    const withEmpty = buildQuestionReminderEmail({
+      type: "evening",
+      name: "見本",
+      url: URL,
+      questions: Q_EVENING,
+      morningCloseHour: 14,
+      personal: { lines: [], personalQuestion: null, confirmPrompt: false, profileUrl: PROFILE_URL },
+    });
+    expect(withNull.html).toBe(base.html);
+    expect(withEmpty.html).toBe(base.html);
+  });
+
+  it("朝・確認済み：問いの下に「あなたの設計図から」の行を載せる（HTML は無害化）", () => {
+    const mail = buildQuestionReminderEmail({
+      type: "morning",
+      name: "見本",
+      url: URL,
+      questions: Q_MORNING,
+      morningCloseHour: 14,
+      personal: {
+        lines: [
+          { label: "イシュー", value: "なぜ<b>打合せ</b>が長引くのか" },
+          { label: "毎朝の一文", value: "最初に相手の困りごとを一つ聞く" },
+        ],
+        personalQuestion: null,
+        confirmPrompt: false,
+        profileUrl: PROFILE_URL,
+      },
+    });
+    expect(mail.html).toContain("あなたの設計図から");
+    expect(mail.html).toContain("最初に相手の困りごとを一つ聞く");
+    expect(mail.html).toContain("なぜ&lt;b&gt;打合せ&lt;/b&gt;が長引くのか");
+    expect(mail.html).not.toContain("<b>打合せ</b>");
+    expect(mail.html).not.toContain("設計図を確認する");
+    // 全員共通の問いは 1 つのままなので、番号はつかない
+    expect(mail.html).not.toContain("1. 今日は、どの場面で");
+  });
+
+  it("朝・確認前：本人の文は載せず、確認のお願いと設計図へのリンクを載せる", () => {
+    const mail = buildQuestionReminderEmail({
+      type: "morning",
+      name: "見本",
+      url: URL,
+      questions: Q_MORNING,
+      morningCloseHour: 14,
+      personal: { lines: [], personalQuestion: null, confirmPrompt: true, profileUrl: PROFILE_URL },
+    });
+    expect(mail.html).toContain("設計図を確認すると、ここにあなたの「毎朝の一文」が載ります。");
+    expect(mail.html).toContain(`href="${PROFILE_URL}"`);
+    expect(mail.html).not.toContain("あなたの設計図から");
+  });
+
+  it("夕方・確認済み：全員共通の問いの続きの番号で「あなたの問い」を載せる", () => {
+    const mail = buildQuestionReminderEmail({
+      type: "evening",
+      name: "見本",
+      url: URL,
+      questions: Q_EVENING,
+      morningCloseHour: 14,
+      personal: {
+        lines: [],
+        personalQuestion: "今日、最初に質問しましたか。",
+        confirmPrompt: false,
+        profileUrl: PROFILE_URL,
+      },
+    });
+    expect(mail.html).toContain("1. 今日は何をして、何が起きましたか。");
+    expect(mail.html).toContain("2. 次に何を変えますか。");
+    expect(mail.html).toContain("あなたの問い");
+    expect(mail.html).toContain("3. 今日、最初に質問しましたか。");
+  });
+
+  it("全員共通の問いが 1 つでも、「あなたの問い」があれば番号をつける", () => {
+    const mail = buildQuestionReminderEmail({
+      type: "evening",
+      name: "見本",
+      url: URL,
+      questions: ["今日は何をしましたか。"],
+      morningCloseHour: 14,
+      personal: { lines: [], personalQuestion: "最初に質問しましたか。", confirmPrompt: false, profileUrl: PROFILE_URL },
+    });
+    expect(mail.html).toContain("1. 今日は何をしましたか。");
+    expect(mail.html).toContain("2. 最初に質問しましたか。");
+  });
+});
