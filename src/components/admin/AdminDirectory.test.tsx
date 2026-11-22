@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { AdminDirectory } from "./AdminDirectory";
 import { EnvironmentBanner } from "./EnvironmentBanner";
-import type { DirectoryEnvironment, DirectoryUser } from "@/lib/admin-directory";
+import { DIRECTORY_OTP_NOTE, type DirectoryEnvironment, type DirectoryUser } from "@/lib/admin-directory";
 
 // テストのデータは合成（実在の環境・人物・トークンは使わない）。
 const PROD: DirectoryEnvironment = {
@@ -103,7 +103,7 @@ describe("AdminDirectory（描画）", () => {
     expect(html).not.toContain("試験 一郎");
   });
 
-  it("1 人ずつ「画面を開く」と「URLをコピー」を出す。開く先は、その人のログイン用のパス", () => {
+  it("確認コードが OFF の環境では、1 人ずつ「画面を開く」と「URLをコピー」を出す。開く先は、その人のログイン用のパス", () => {
     const html = render("test");
     expect(html).toContain('href="/p/tok-p1"');
     expect(html).toContain('href="/m/tok-m1"');
@@ -112,6 +112,26 @@ describe("AdminDirectory（描画）", () => {
     expect((html.match(/URLをコピー/g) ?? []).length).toBe(4);
     expect(html).toContain('target="_blank"');
     expect(html).toContain('rel="noopener noreferrer"');
+    expect(html).not.toContain(DIRECTORY_OTP_NOTE);
+  });
+
+  it("確認コードが ON の環境では、「画面を開く」を出さない（開く先のパスも HTML に入れない）。「URLをコピー」は出す", () => {
+    // 開いた先で求められるコードは、本人のアドレスに届く。管理者には使えず、押し進めると本人にメールが届く。
+    const html = render("prod");
+    expect(html).toContain("本番 太郎");
+    expect(html).not.toMatch(/>画面を開く<\/a>/);
+    expect(html).not.toContain('target="_blank"');
+    expect(html).not.toContain("tok-p9");
+    expect(html).not.toContain("tok-o1");
+    expect((html.match(/URLをコピー/g) ?? []).length).toBe(2);
+  });
+
+  it("確認コードが ON の環境では、出していない理由と、参加者の記入などを読む場所を、ユーザーの一覧の上に出す", () => {
+    const html = render("prod");
+    expect(html).toContain(DIRECTORY_OTP_NOTE);
+    expect(html.indexOf(DIRECTORY_OTP_NOTE)).toBeLessThan(html.indexOf("本番 太郎"));
+    // 閉じているあいだ（全環境の表示）は、説明も出さない
+    expect(render()).not.toContain(DIRECTORY_OTP_NOTE);
   });
 
   it("ログイン用の URL の文字列は、画面に見える文字としては出さない", () => {

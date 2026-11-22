@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
+  DIRECTORY_OTP_NOTE,
   PURPOSE_LABEL_MAX,
   USER_KIND_LABEL,
   buildLoginPath,
+  canOpenUserScreen,
   countUsersByEnvironment,
   environmentLabel,
   formatEnvironmentCounts,
@@ -140,6 +142,27 @@ describe("managerKind / buildLoginPath", () => {
       admin: "管理者",
       observer: "閲覧者",
     });
+  });
+});
+
+describe("canOpenUserScreen（「画面を開く」を出してよい環境か）", () => {
+  it("確認コードが ON の環境では、出さない", () => {
+    expect(canOpenUserScreen(env({ id: "e1", slug: "one", otpEnabled: true }))).toBe(false);
+  });
+
+  it("確認コードが OFF の環境では、出す", () => {
+    expect(canOpenUserScreen(env({ id: "e1", slug: "one", otpEnabled: false }))).toBe(true);
+  });
+
+  it("ON と分かっているときだけ、出さない（値が無いときは、これまでどおり出す）", () => {
+    expect(canOpenUserScreen({})).toBe(true);
+    expect(canOpenUserScreen({ otpEnabled: null })).toBe(true);
+  });
+
+  it("説明には、出していない理由（コードは本人のアドレスに届く）と、読む場所を書く", () => {
+    expect(DIRECTORY_OTP_NOTE).toContain("確認コード");
+    expect(DIRECTORY_OTP_NOTE).toContain("本人のメールアドレス");
+    expect(DIRECTORY_OTP_NOTE).toContain("参加者一覧");
   });
 });
 

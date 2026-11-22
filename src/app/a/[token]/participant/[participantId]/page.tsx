@@ -1,18 +1,34 @@
 // Admin — Individual Participant Log View
-// Shows full log history for a single participant (read-only from admin perspective)
+// 管理画面の、参加者 1 人のページ（読むだけ）。その人の設計図・イシュー・日ごとの記入を、1 か所で読む。
+// - 記入は、1 日＝1 枚（AdminDayLogList）。その日の AIコーチの返信と上司コメントを、その日の記入の下に並べる。
+// - HM フィードバックは、このページでは読まない・出さない（管理画面トップの「FB履歴」で読む。
+//   HM フィードバックは、日ではなく、人と期間に付けて feedback 表に保存している）。
+// - 設計図（AdminBlueprintCard）と AIコーチの返信を読めるのは、記入を読める人と同じ範囲
+//   （このページを開ける人＝管理者と、その環境の閲覧者。2026-11-23 の決定）。
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getLogsByParticipant, getMissionsByParticipant, getParticipantByNameCrossTenant, getFeedbackByParticipant, NotionLogEntry } from "@/lib/supabase";
+import { getLogsByParticipant, getMissionsByParticipant, getParticipantByNameCrossTenant, getTenantById, NotionLogEntry } from "@/lib/supabase";
 import { getManagerByToken } from "@/lib/participant-db";
 import { decideStaffParticipantView, managerParticipantPagePath } from "@/lib/staff-page-access";
 import { isStandaloneTenant } from "@/lib/standalone";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { missionTerms } from "@/lib/mission-context";
-import { formatTimeJST, formatFullDateTimeJST } from "@/lib/date-utils";
+import { formatTimeJST } from "@/lib/date-utils";
 import { hasMorning, hasEvening, getDayStatus, computeParticipantStats } from "@/lib/stats";
-import { EnergyGlyph } from "@/components/EnergyGlyph";
+import { entryTerms } from "@/lib/entry-terms";
+import { resolveEntryQuestionEnv } from "@/lib/entry-question-env";
+import { getCoachingProfile } from "@/lib/coaching-profile-store";
+import type { CoachingProfile } from "@/lib/coaching-profile";
+import { getCoachActivation, listCoachRepliesForParticipant } from "@/lib/coach-reply-store";
+import type { CoachReply } from "@/lib/coach-reply";
+import { ADMIN_DAY_LOG_TERMS, buildAdminDayLogViews } from "@/lib/admin-day-log";
 import { AdminIssueList } from "@/components/admin/AdminIssueList";
+import { AdminBlueprintCard } from "@/components/admin/AdminBlueprintCard";
+import { AdminDayLogList } from "@/components/admin/AdminDayLogList";
+
+/** 1 人の返信を読む件数の上限（新しい順）。記入の一覧に結ぶだけなので、古い分は出なくてよい。 */
+const COACH_REPLY_READ_LIMIT = 200;
 
 type Params = {
   params: {
@@ -21,21 +37,12 @@ type Params = {
   };
 };
 
-// energy 状態は EnergyGlyph（線画フェイス）で表示する
-
-const energyLabel: Record<string, string> = {
-  excellent: "絶好調",
-  good: "良い",
-  okay: "まあまあ",
-  low: "低調",
-};
-
 export default async function AdminParticipantPage({ params }: Params) {
   const { token, participantId } = params;
   const participantName = decodeURIComponent(participantId);
 
   // 読む前に、開いた人（URL のトークン）を確かめる。決まりは src/lib/staff-page-access.ts。
-  // ここを通るまで、記入・イシュー・フィードバックを読まない。notFound() は、下の try の中で
+  // ここを通るまで、記入・イシュー・設計図・AIコーチの返信を読まない。notFound() は、下の try の中で
   // 呼ばない（catch に入って、確かめないまま先へ進んでしまう）。
   const viewer = await getManagerByToken(token);
   if (!viewer) notFound();
@@ -54,10 +61,21 @@ export default async function AdminParticipantPage({ params }: Params) {
   let logs: NotionLogEntry[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let missions: any[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let feedbacks: any[] = [];
   // イシュー（ミッション）の欄の呼び名。参加者の側の環境のスイッチで決める。読めないときは、従来の呼び名。
   let useIssueLabel = false;
+  // 朝・夕の記入の呼び名。「朝・夕の問い」を出している環境かどうかで決める。読めないときは、従来の呼び名。
+  let questionEnv = false;
+  // 設計図。null = 欄を出さない（スイッチが OFF、または、参加者を特定できなかった）。
+  // 読めなかったときは loadFailed（「まだ無い」と見せない）。
+  let blueprint: { profile: CoachingProfile | null; loadFailed: boolean } | null = null;
+  // AIコーチの返信。その環境で動いているときだけ読む（動いていない環境では、読まない・出さない）。
+  let coachReplies: CoachReply[] | null = null;
+  // 動いているかどうか、または、返信そのものを読めなかったとき true（「返信が無い」と見せず、その旨を出す）。
+  let coachLoadFailed = false;
+  // 「AIコーチの確認」のページへのリンクに使う、環境の slug。分からないときは、リンクを出さない。
+  let tenantSlug: string | null = null;
+  // 下の読み取りの途中で例外が出たとき true（読めた分だけを出し、表示が欠けているかもしれない旨を出す）。
+  let loadFailed = false;
 
   try {
     // standalone §7-1: 管理者の個別ログ閲覧ページもサーバー側で遮断
@@ -78,21 +96,60 @@ export default async function AdminParticipantPage({ params }: Params) {
       );
     }
 
-    const [fetchedLogs, fetchedMissions, fetchedFeedbacks] = await Promise.all([
+    const [fetchedLogs, fetchedMissions] = await Promise.all([
       getLogsByParticipant(participantName, tenantId),
       getMissionsByParticipant(participantName, tenantId),
-      getFeedbackByParticipant(participantName, tenantId),
     ]);
     logs = fetchedLogs;
     missions = fetchedMissions;
-    feedbacks = fetchedFeedbacks;
     useIssueLabel = await isFeatureEnabled("feature.missionLabelIssue", tenantId);
+    questionEnv = await resolveEntryQuestionEnv(tenantId);
+
+    // 設計図と AIコーチの返信は、参加者の ID で読む。参加者を特定できて、その人の環境が、
+    // ここで読む環境（tenantId）と同じときだけ読む（読み取りも、環境と参加者の両方で絞っている）。
+    const participantId = participant?.id && participant.tenantId === tenantId ? participant.id : null;
+    if (participantId) {
+      if (await isFeatureEnabled("feature.coachingProfile", tenantId)) {
+        const read = await getCoachingProfile(participantId, tenantId);
+        blueprint = read.ok ? { profile: read.profile, loadFailed: false } : { profile: null, loadFailed: true };
+      }
+      const activation = await getCoachActivation(tenantId);
+      if (!activation.ok) {
+        // スイッチは ON だが、環境の設定を読めなかった（動いているかどうかが分からない）。返信は読まない。
+        coachLoadFailed = true;
+      } else if (activation.active) {
+        const replies = await listCoachRepliesForParticipant(participantId, tenantId, COACH_REPLY_READ_LIMIT);
+        if (replies === null) coachLoadFailed = true;
+        else coachReplies = replies;
+        tenantSlug = (await getTenantById(tenantId))?.slug ?? null;
+      }
+    }
   } catch (e) {
     console.error("Failed to fetch data:", e);
+    loadFailed = true;
   }
 
-  const formatTime = formatTimeJST;
   const issueTerms = missionTerms(useIssueLabel);
+  const entryNames = entryTerms(questionEnv);
+  const dayViews = buildAdminDayLogViews(
+    logs.map((entry: NotionLogEntry) => ({
+      id: entry.id,
+      date: entry.date,
+      dayOfWeek: entry.dayOfWeek,
+      status: getDayStatus(entry),
+      energy: entry.energy,
+      morningIntent: entry.morningIntent,
+      eveningInsight: entry.eveningInsight,
+      morningTime: entry.morningTime,
+      eveningTime: entry.eveningTime,
+      managerComment: entry.managerComment,
+    })),
+    coachReplies
+  );
+  const coachBoardHref = tenantSlug
+    ? (date: string) =>
+        `/a/${encodeURIComponent(token)}/coach?tenant=${encodeURIComponent(tenantSlug as string)}&date=${encodeURIComponent(date)}`
+    : null;
 
   // Stats — use the same completion logic as the dashboard
   const todayJST = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" });
@@ -129,6 +186,17 @@ export default async function AdminParticipantPage({ params }: Params) {
       </header>
 
       <main className="px-5 py-5 space-y-5 max-w-2xl mx-auto animate-fade-up">
+        {/* 読み取りの途中で失敗したとき：読めた分だけを出しているので、その旨を先頭に出す */}
+        {loadFailed && (
+          <p
+            className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 leading-relaxed"
+            role="status"
+            data-testid="admin-participant-load-failed"
+          >
+            {ADMIN_DAY_LOG_TERMS.pageLoadFailed}
+          </p>
+        )}
+
         {/* Summary Stats */}
         <section className="card overflow-hidden">
           <div className="px-5 py-4 border-b border-[#EFE8DD]">
@@ -156,6 +224,9 @@ export default async function AdminParticipantPage({ params }: Params) {
           </div>
         </section>
 
+        {/* 設計図（feature.coachingProfile の環境だけ）。読めるのは、このページを開ける人（記入と同じ範囲） */}
+        {blueprint && <AdminBlueprintCard profile={blueprint.profile} loadFailed={blueprint.loadFailed} />}
+
         {/* イシュー（ミッション）：題・状態・背景と目的（仮説）。コメントは、リンク先のページで読む・書く */}
         <AdminIssueList
           missions={missions}
@@ -164,137 +235,16 @@ export default async function AdminParticipantPage({ params }: Params) {
           commentsHref={managerParticipantPagePath(token, participantName)}
         />
 
-        {/* HM Feedback History (from feedback table) */}
-        {feedbacks.length > 0 && (
-          <section className="card overflow-hidden">
-            <div className="px-5 py-4 border-b border-[#EFE8DD]">
-              <h2 className="text-xs font-semibold text-[#5B5560] tracking-wide uppercase">
-                HMフィードバック ({feedbacks.length}件)
-              </h2>
-            </div>
-            <div className="divide-y divide-[#EFE8DD]">
-              {feedbacks.map((fb: { id: string; content: string; authorName: string; type: string; period: string; weekNum: number; date: string }) => (
-                <div key={fb.id} className="p-4">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] font-medium text-amber-600">{fb.type || "HMフィードバック"}</span>
-                    <span className="text-[10px] text-[#8B8489]">
-                      {fb.date || ""}
-                      {fb.period ? ` · ${fb.period}` : ""}
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#2C2C4A] leading-relaxed whitespace-pre-wrap">{fb.content}</p>
-                  <div className="mt-1 text-[10px] text-[#8B8489]">by {fb.authorName}</div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Log Entries */}
-        <section className="card overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#EFE8DD]">
-            <h2 className="text-xs font-semibold text-[#5B5560] tracking-wide uppercase">
-              日報一覧
-            </h2>
-          </div>
-          {logs.length === 0 ? (
-            <div className="p-8 text-center text-[#8B8489] text-sm">
-              まだ日報がありません
-            </div>
-          ) : (
-            <div className="divide-y divide-[#EFE8DD]">
-              {logs.map((entry: NotionLogEntry) => {
-                const dayStatus = getDayStatus(entry);
-                const statusIcon = dayStatus === "complete" ? "◎" : (dayStatus === "morning_only" || dayStatus === "evening_only") ? "△" : "ー";
-                const statusColor = dayStatus === "complete" ? "text-emerald-500" : (dayStatus === "morning_only" || dayStatus === "evening_only") ? "text-amber-500" : "text-gray-300";
-                return (
-                <div key={entry.id} className="p-4">
-                  {/* Date & Energy */}
-                  <div className="flex justify-between items-center mb-2.5">
-                    <span className="text-sm font-medium text-[#1A1A2E] flex items-center gap-1.5">
-                      <span className={`text-base font-bold ${statusColor}`}>{statusIcon}</span>
-                      {entry.datetime
-                        ? formatFullDateTimeJST(entry.datetime)
-                        : entry.date}
-                      （{entry.dayOfWeek}）
-                    </span>
-                    {entry.energy && (
-                      <div className="flex items-center gap-1.5">
-                        <EnergyGlyph level={entry.energy} size={16} />
-                        <span className="text-[11px] text-[#8B8489]">
-                          {energyLabel[entry.energy] || ""}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Morning Intent */}
-                  {entry.morningIntent && (
-                    <div className="mb-2">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-[10px] font-medium text-[#1A1A2E] tracking-wide uppercase">
-                          朝の意図
-                        </span>
-                        {entry.morningTime && (
-                          <span className="text-[10px] text-[#C9BDAE]">
-                            {formatTime(entry.morningTime)}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-[#2C2C4A] leading-relaxed">
-                        {entry.morningIntent}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Evening Insight */}
-                  {entry.eveningInsight && (
-                    <div className="mb-2">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-[10px] font-medium text-amber-600 tracking-wide uppercase">
-                          本日の振り返り
-                        </span>
-                        {entry.eveningTime && (
-                          <span className="text-[10px] text-[#C9BDAE]">
-                            {formatTime(entry.eveningTime)}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-[#2C2C4A] leading-relaxed">
-                        {entry.eveningInsight}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* HM Feedback */}
-                  {entry.hmFeedback && (
-                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-2.5 mt-2">
-                      <span className="text-[10px] font-medium text-amber-600 tracking-wide">
-                        HM FB
-                      </span>
-                      <p className="text-xs text-[#2C2C4A] mt-0.5 leading-relaxed">
-                        {entry.hmFeedback}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Manager Comment (read-only for admin) */}
-                  {entry.managerComment && (
-                    <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-2.5 mt-2">
-                      <span className="text-[10px] font-medium text-indigo-600 tracking-wide">
-                        上司コメント
-                      </span>
-                      <p className="text-xs text-[#2C2C4A] mt-0.5 leading-relaxed">
-                        {entry.managerComment}
-                      </p>
-                    </div>
-                  )}
-                </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
+        {/* 日ごとの記入：1 日＝1 枚。その日の AIコーチの返信・上司コメントを、その日の下に並べる。
+            HM フィードバックは、ここには出さない（管理画面トップの「FB履歴」で読む） */}
+        <AdminDayLogList
+          days={dayViews}
+          morningLabel={entryNames.morningEntryName}
+          eveningLabel={entryNames.eveningEntryName}
+          formatTime={formatTimeJST}
+          coachBoardHref={coachBoardHref}
+          coachLoadFailed={coachLoadFailed}
+        />
       </main>
     </div>
   );
