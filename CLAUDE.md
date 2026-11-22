@@ -62,7 +62,8 @@ core-log/
 │   │   ├── QuickNoteSheet.tsx        # 途中メモのシート＋「＋ メモ」ボタン（ホーム・standalone のみ）
 │   │   ├── MissionContextCard.tsx    # 入力画面の問いの上に、本人の進行中のミッションを出すカード（feature.missionOnInput。表示だけ・API は呼ばない）
 │   │   ├── MissionPurposeView.tsx    # ミッション画面の「背景・目的」の表示。仮説つきで保存された文は、仮説と残りを分けて出す（表示だけ）
-│   │   └── CoachingProfileCard.tsx   # 入力画面の問いの上に、本人の設計図の「毎朝の一文」を出す枠（feature.coachingProfile。確認済みのときだけ本人の文を出す。表示だけ・API は呼ばない）
+│   │   ├── CoachingProfileCard.tsx   # 入力画面の問いの上に、本人の設計図の「毎朝の一文」を出す枠（feature.coachingProfile。確認済みのときだけ本人の文を出す。表示だけ・API は呼ばない）
+│   │   └── BlueprintEntryLink.tsx    # 設計図のページへの入口（ホームと「イシュー」のページに置く。feature.coachingProfile。表示だけ）
 │   ├── components/admin/
 │   │   ├── AdminDirectory.tsx        # 管理画面「環境とユーザー」の欄（環境の一覧／環境ごとのユーザーと「画面を開く」「URLをコピー」。管理者にだけ出す。表示だけ・API は呼ばない）
 │   │   └── EnvironmentBanner.tsx     # 管理画面のヘッダーの「表示中の環境」の帯（本番は赤・テスト用は緑。表示だけ）
@@ -210,6 +211,7 @@ PR タイトル例（リポの履歴に合わせる）:
 - **入力画面**（従来型の `InputClient` だけ）：問いの上に `CoachingProfileCard`。確認済みなら毎朝の一文（成長課題と行動は開いて読む）、確認前・未作成なら設計図のページへの案内。`initialCoachingProfile` は **`null` = 出さない（スイッチ OFF／読めなかった）**。読めなかったことを「まだ無い」と扱わないこと（確定済みの人に「確認してください」と出る）。
 - **夕方の「あなたの問い」**：全員共通の夕方の問いの後ろに 1 つ足す（`withPersonalEveningQuestion()`。本人が決めた問い、無ければ毎朝の一文を入れた定型の問い）。入力画面のサーバー側（`page.tsx`）と `/api/features/daily-questions` が同じ関数で足す。答えは従来と同じ「Q3: 問い / A3: 答え」で保存され、欄は増えない。共通の問いが無い日には足さない。
 - **リマインドメール**：問いを載せたメール（§6）にだけ、その人の分を足す（`buildReminderPersonal()`）。朝・確認済み＝「あなたの設計図から」（進行中のイシューの 1 件目、仮説、毎朝の一文）／朝・確認前＝確認のお願いと設計図へのリンク／夕方・確認済み＝「あなたの問い」。スイッチが OFF の環境と、その人の分が空のときの HTML は、従来と同じ（`reminder-mail-question.test.ts` で固定）。
+- **設計図のページへの入口**（2026-11-22 追加）：入力画面の枠、朝のメール（確認前の人）のほかに、ホーム（`ParticipantHomeClient`）と「イシュー」のページ（`/p/[token]/mission`）に `BlueprintEntryLink` を置く。入力画面は、その日の記入を終えると完了の表示になり、枠が出ないため（入口が枠とメールだけだと、記入を終えた人が翌日まで設計図を開けない）。出すのは、スイッチが ON で、商品モードでない環境だけ（ホームはサーバーが渡す `standalone`、「イシュー」のページは `isOn("standalone_mode")` で見る）。
 - 運営が置いた「傾向」（`tendencies`）は、本人が「使う／使わない」だけを選べる（文は書き換えられない。`mergeTendencyChoices()`）。直したときは、直す前の内容を `history` に残す。
 - 同じ migration で `coach_replies` 表（AIコーチの返信）も用意した。**読み書きするコードはまだ無い**（次の変更で入れる）。
 

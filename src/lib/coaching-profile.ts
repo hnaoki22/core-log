@@ -262,6 +262,9 @@ export const COACHING_TERMS = {
   inputCardDraft: "設計図を確認すると、ここに「毎朝の一文」が表示されます。",
   inputCardLinkDraft: "設計図を確認する",
   inputCardLinkConfirmed: "設計図を開く",
+  // ホームと「イシュー」のページに置く入口
+  entryTitle: "設計図",
+  entryLead: "毎朝の一文、成長課題、これからの行動を開く",
   // 夕方の問いの欄
   personalQuestionCaption: "あなたの問い",
   // メール

@@ -7,6 +7,7 @@ import { entryTerms } from "@/lib/entry-terms";
 import { answersOnly } from "@/lib/daily-question-answers";
 import { MoodCandlestick } from "@/components/features/MoodCandlestick";
 import { QuickNoteSheet, QuickNoteButton, type QuickNoteItem } from "@/components/features/QuickNoteSheet";
+import { BlueprintEntryLink } from "@/components/features/BlueprintEntryLink";
 import { EnergyGlyph, EnergyDot, ENERGY_COLORS } from "@/components/EnergyGlyph";
 import {
   IconRepeat,
@@ -316,6 +317,12 @@ export default function ParticipantHomeClient({ token, initialData }: Props) {
               <QuickNoteButton count={quickNotes.length} onClick={() => setNoteSheetOpen(true)} variant="light" />
             )}
           </div>
+        )}
+
+        {/* 設計図への入口（feature.coachingProfile）。従来型のテナントだけに出す。
+            その日の記入を終えた人も、ここから設計図を開ける（入力画面の枠は、記入を終えると出ない）。 */}
+        {isOn("feature.coachingProfile") && !sa && (
+          <BlueprintEntryLink href={`/p/${token}/blueprint`} />
         )}
 
         {/* Stats Row */}

@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useFeatures } from "@/lib/use-features";
 import { missionTerms, composeIssuePurpose } from "@/lib/mission-context";
 import { MissionPurposeView } from "@/components/features/MissionPurposeView";
+import { BlueprintEntryLink } from "@/components/features/BlueprintEntryLink";
 
 type Mission = {
   id: string;
@@ -296,6 +297,14 @@ export default function MissionPage() {
       </div>
 
       <div className="max-w-md mx-auto px-5 pt-5 animate-fade-up relative z-10">
+        {/* 設計図への入口（feature.coachingProfile）。商品モードのテナントには出さない
+            （設計図は、従来型の入力画面とそのメールに出すもの）。 */}
+        {isOn("feature.coachingProfile") && !isOn("standalone_mode") && (
+          <div className="mb-5">
+            <BlueprintEntryLink href={`/p/${token}/blueprint`} />
+          </div>
+        )}
+
         {/* New Mission Button */}
         {!showCreateForm && (
           <button
