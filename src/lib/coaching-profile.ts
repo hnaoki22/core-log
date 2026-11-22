@@ -282,3 +282,21 @@ export const COACHING_TERMS = {
   mailConfirmPrompt: "設計図を確認すると、ここにあなたの「毎朝の一文」が載ります。",
   mailConfirmLink: "設計図を確認する",
 } as const;
+
+/**
+ * 管理画面の、参加者 1 人のページに出す、設計図の欄の文言（運営の側の言葉。案）。
+ * 欄の名前（毎朝の一文、成長課題 など）と状態の呼び名は、本人の画面と同じ COACHING_TERMS を使う。
+ * 読めるのは、記入を読める人と同じ範囲（管理者と、その環境の閲覧者。2026-11-23 の決定）。
+ */
+export const ADMIN_BLUEPRINT_TERMS = {
+  none: "まだ設計図がありません。本人が、設計図のページで書きます。",
+  noneStatus: "まだ無い",
+  loadFailed: "設計図を読めませんでした。時間をおいて、開き直してください。",
+  draftNote:
+    "本人が、まだ確定していません。確定するまで、メールにも、夕方の「あなたの問い」にも、AIコーチにも使われません。",
+  detailsSummary: "成長課題・これからの行動などを開く",
+  emptyField: "（空欄）",
+  tendencyUnset: "未選択",
+  confirmedOn: (monthDay: string) => `確定 ${monthDay}`,
+  updatedOn: (monthDay: string) => `更新 ${monthDay}`,
+} as const;

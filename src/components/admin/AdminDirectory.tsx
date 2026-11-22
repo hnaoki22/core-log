@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import {
+  DIRECTORY_OTP_NOTE,
   USER_KIND_LABEL,
+  canOpenUserScreen,
   countUsersByEnvironment,
   emptyCounts,
   environmentLabel,
@@ -20,6 +22,8 @@ import {
  * 管理画面の「環境とユーザー」の欄（管理者にだけ出す）。
  *  - 環境の一覧：用途・人数・入力画面の型・確認コードの有無。押すと、その環境に切り替わる。
  *  - ユーザーの一覧：環境ごとに区切り、1 人ずつ「画面を開く」「URLをコピー」を出す。
+ *    確認コードが ON の環境では、「画面を開く」を出さない（開いた先のコードが、本人のアドレスに届くため。
+ *    canOpenUserScreen）。その環境では、説明を 1 行出す。
  *
  * ログイン用の URL の文字列は画面に出さない（画面の共有やスクリーンショットに残さないため）。
  * 開くか、コピーして使う。コピーできなかったときだけ、その人の URL を欄に出す。
@@ -202,6 +206,11 @@ export function AdminDirectory({ environments, users, truncated, selectedSlug, o
                     {open && group.users.length === 0 && (
                       <p className="text-[11px] text-[#8B8489] px-3 py-2.5">この環境には、まだユーザーがいません。</p>
                     )}
+                    {open && group.users.length > 0 && !canOpenUserScreen(group.environment) && (
+                      <p className="text-[11px] text-[#5B5560] leading-relaxed px-3 py-2.5 border-t border-[#EFE8DD] bg-white">
+                        {DIRECTORY_OTP_NOTE}
+                      </p>
+                    )}
                     {open &&
                       group.users.map((user) => {
                         const added = formatJstMonthDay(user.createdAt);
@@ -226,14 +235,17 @@ export function AdminDirectory({ environments, users, truncated, selectedSlug, o
                                 </div>
                               </div>
                               <div className="flex flex-wrap items-center gap-1.5 flex-shrink-0">
-                                <a
-                                  href={user.loginPath}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-[11px] font-medium px-3 py-1.5 rounded-lg bg-[#1A1A2E] text-white hover:bg-[#2C2C4A] transition-colors whitespace-nowrap"
-                                >
-                                  画面を開く
-                                </a>
+                                {/* 確認コードが ON の環境では出さない（開いた先のコードは、本人のアドレスに届く） */}
+                                {canOpenUserScreen(group.environment) && (
+                                  <a
+                                    href={user.loginPath}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[11px] font-medium px-3 py-1.5 rounded-lg bg-[#1A1A2E] text-white hover:bg-[#2C2C4A] transition-colors whitespace-nowrap"
+                                  >
+                                    画面を開く
+                                  </a>
+                                )}
                                 <button
                                   type="button"
                                   onClick={() => copyUrl(user)}

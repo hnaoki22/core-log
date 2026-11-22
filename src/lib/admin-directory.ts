@@ -116,6 +116,22 @@ export function buildLoginPath(kind: DirectoryUserKind, token: string): string {
   return `/a/${t}`;
 }
 
+/**
+ * 「画面を開く」を出してよい環境か。確認コード（OTP）が ON の環境では、出さない。
+ *
+ * その環境では、開いた先で確認コードを求められる。コードは、開こうとした相手（本人）の登録アドレスに届き、
+ * 管理者のアドレスには届かない。管理者には使えず、押し進めると本人にメールが届くので、ボタンを出さない
+ * （2026-11-23）。その人の設計図・イシュー・記入は、管理画面の、参加者 1 人のページで読む。
+ * 「URLをコピー」は、どの環境でも出す（本人に URL を伝えるための操作）。
+ */
+export function canOpenUserScreen(environment: { otpEnabled?: boolean | null }): boolean {
+  return environment.otpEnabled !== true;
+}
+
+/** 確認コードが ON の環境の、ユーザーの一覧の上に出す説明。 */
+export const DIRECTORY_OTP_NOTE =
+  "この環境は確認コードがONのため、「画面を開く」は出していません（開いた先で求められるコードは、本人のメールアドレスに届きます）。参加者の設計図・イシュー・記入は、下の参加者一覧の「ログ」から読めます。";
+
 export const USER_KIND_LABEL: Record<DirectoryUserKind, string> = {
   participant: "参加者",
   manager: "マネージャー",
