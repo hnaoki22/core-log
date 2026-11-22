@@ -235,6 +235,37 @@ describe("missionTerms", () => {
     }
   });
 
+  it("offers no way to edit a set mission when the flag is off", () => {
+    // 本人が直す操作（「直す」のボタン、フォーム、直した履歴）は、従来の画面には出さない。
+    expect(missionTerms(false).edit).toBeNull();
+  });
+
+  it("lets the participant fix the wording of an issue when the flag is on", () => {
+    const t = missionTerms(true);
+    const edit = t.edit;
+    expect(edit).not.toBeNull();
+    if (!edit) return;
+    expect(edit.button).toBe("直す");
+    expect(edit.formHeading).toBe("イシューを直す");
+    // 説明には、直す前の文が残ることと、仮説が変わったときの直し方（閉じて新しく設定）を書く。
+    expect(edit.note).toContain("直した履歴");
+    expect(edit.note).toContain(t.closeButton);
+    expect(edit.note).toContain("新しく設定");
+    // 件数と日時を入れる場所がある。
+    expect(edit.historyToggle).toContain("{n}");
+    expect(edit.historyEntryByParticipant).toContain("{t}");
+    expect(edit.historyEntryByManager).toContain("{t}");
+    expect(edit.historyEntryByManager).not.toBe(edit.historyEntryByParticipant);
+    const texts = Object.values(edit);
+    expect(texts.length).toBeGreaterThan(10);
+    for (const value of texts) {
+      expect(typeof value).toBe("string");
+      expect(value).not.toBe("");
+      expect(value).not.toContain("ミッション");
+      expect(value).not.toContain("解くべき問題");
+    }
+  });
+
   it("keeps the tab label short enough for the bottom navigation", () => {
     expect(missionTerms(false).tab.length).toBeLessThanOrEqual(5);
     expect(missionTerms(true).tab.length).toBeLessThanOrEqual(5);

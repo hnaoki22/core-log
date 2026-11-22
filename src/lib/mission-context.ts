@@ -219,6 +219,34 @@ export type MissionTerms = {
   blueprintActionsHeading: string;
   /** 新しく設定した直後に出す、設計図の見直しの案内（設計図を出している環境だけ）。 */
   createdNotice: string;
+  /**
+   * 設定したものを本人が直す操作（「直す」のボタン、フォーム、直した履歴）の文言。
+   * null のときは出さない（従来の画面のまま。本人の画面からは直せない）。
+   */
+  edit: MissionEditTerms | null;
+};
+
+/** 設定したイシューを本人が直す操作の文言（決まりは mission-edit.ts）。 */
+export type MissionEditTerms = {
+  button: string;
+  formHeading: string;
+  /** フォームの先頭に出す説明（何のための操作か、直す前の文が残ること、仮説が変わったときの直し方）。 */
+  note: string;
+  deadlineLabel: string;
+  save: string;
+  saving: string;
+  cancel: string;
+  saveError: string;
+  /** 保存していない変更があるときに、ページを離れる前に確かめる文。 */
+  leaveConfirm: string;
+  /** 履歴を開くボタン。{n} は件数。 */
+  historyToggle: string;
+  historyLoadError: string;
+  /** 履歴の 1 件の見出し。{t} は直した日時。 */
+  historyEntryByParticipant: string;
+  historyEntryByManager: string;
+  /** 直す前に、その欄が空だったときの表示。 */
+  historyEmptyValue: string;
 };
 
 // 既定の呼び名。ミッション画面とタブに元から書かれていた文言と一字一句同じにしてある
@@ -252,6 +280,8 @@ const MISSION_TERMS: MissionTerms = {
   blueprintLink: "ミッションを見直す",
   blueprintActionsHeading: "このミッションに向けた行動",
   createdNotice: "新しいミッションを設定しました。設計図（このミッションに向けた行動）も見直してください。",
+  // 本人が直す操作は出さない（従来の画面のまま）。
+  edit: null,
 };
 
 // feature.missionLabelIssue が ON のテナントの呼び名。
@@ -259,7 +289,7 @@ const MISSION_TERMS: MissionTerms = {
 // 3 つ目の欄（背景・目的）に目指す状態と行動を書いてもらう。入力画面には、問いと仮説が
 // 常に見える形で出る。入力欄の案内は書き方だけを示し、答えの見本は置かない。
 // 仮説は確かめると変わるので、書き直すのではなく、理由を書いて閉じ、新しく設定してもらう
-// （前の問い・仮説と、変えた理由が残る）。
+// （前の問い・仮説と、変えた理由が残る）。誤字や言い回しは、本人が「直す」で直せる（edit）。
 const ISSUE_TERMS: MissionTerms = {
   tab: "イシュー",
   pageTitle: "イシュー（解くべき問い）",
@@ -289,6 +319,24 @@ const ISSUE_TERMS: MissionTerms = {
   blueprintLink: "イシューを見直す",
   blueprintActionsHeading: "このイシューに向けた行動",
   createdNotice: "新しいイシューを設定しました。設計図（このイシューに向けた行動）も見直してください。",
+  // 誤字や言い回しは、本人が直せる。直す前の文は残す（mission_edits 表）。「直す」は、誤字の修正と
+  // 仮説の書き換えを見分けられないので、仮説が変わったときの直し方（閉じて新しく設定）を説明に書く。
+  edit: {
+    button: "直す",
+    formHeading: "イシューを直す",
+    note: "誤字や言い回しを直すときに使います。直す前の文は「直した履歴」に残ります。仮説が変わったときは、「このイシューを閉じる」で理由を書いて閉じ、新しく設定してください。",
+    deadlineLabel: "達成期限",
+    save: "保存する",
+    saving: "保存中...",
+    cancel: "キャンセル",
+    saveError: "保存できませんでした。時間をおいて、もう一度お試しください。",
+    leaveConfirm: "保存していない変更があります。このページを離れると、直した分は消えます。離れますか？",
+    historyToggle: "直した履歴（{n}件）",
+    historyLoadError: "直した履歴を読めませんでした。",
+    historyEntryByParticipant: "{t} に直す前の文",
+    historyEntryByManager: "{t} に運営が直す前の文",
+    historyEmptyValue: "（なし）",
+  },
 };
 
 /** useIssueLabel = feature.missionLabelIssue が ON か。 */

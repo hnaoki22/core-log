@@ -1,5 +1,6 @@
 // POST /api/mission - Create a new mission (manager action)
-// PATCH /api/mission - Update mission status (manager action)
+// PATCH /api/mission - Update mission status (manager action) / edit title・purpose・deadline
+//   （イシューの呼び名の環境では、直す前の文を mission_edits に残してから直す。本人も直せる）
 // GET /api/mission?participantName=xxx - Get missions for participant
 
 import { NextRequest, NextResponse } from "next/server";
@@ -16,6 +17,10 @@ import type { ManagerInfo, ParticipantInfo } from "@/lib/participant-db";
 import { getTodayJST } from "@/lib/date-utils";
 import { sendNotificationEmail } from "@/lib/email";
 import { sanitizeInput } from "@/lib/sanitize";
+import { isFeatureEnabled } from "@/lib/feature-flags";
+import { logger } from "@/lib/logger";
+import { decideMissionEdit, type MissionEditActor, type MissionEditSubmission } from "@/lib/mission-edit";
+import { deleteMissionEdit, getMissionEditTarget, insertMissionEdit } from "@/lib/mission-edit-store";
 
 // Allowed mission status values. Persisting arbitrary strings caused enum drift
 // across UI/DB; whitelist at the API boundary.
@@ -82,6 +87,72 @@ async function resolveMissionTarget(
     }
   }
   return null;
+}
+
+// 直す前の文を残してから、イシュー（ミッション）の文を直す（feature.missionLabelIssue の環境）。
+// - 直してよいか、何を残すかは decideMissionEdit（純関数）が決める。
+// - 本人のときは、イシューの持ち主（participant_id）が、トークンから引いた本人と同じことも確かめる
+//   （氏名の一致だけで本人と見なさない）。
+// - 順序：履歴を 1 行残す → イシューを更新する。更新に失敗したら、残した 1 行を取り消す。
+//   履歴を残せなかったときは、更新しない（直す前の文が残らないまま、書き換えない）。
+async function editMissionWithHistory(args: {
+  missionId: string;
+  tenantId: string;
+  actor: MissionEditActor;
+  /** 本人のとき、トークンから引いた参加者 ID。 */
+  participantId: string | null;
+  submitted: MissionEditSubmission;
+}): Promise<NextResponse> {
+  const target = await getMissionEditTarget(args.missionId, args.tenantId);
+  if (!target.ok) {
+    return NextResponse.json({ error: "Failed to update mission" }, { status: 500 });
+  }
+  if (!target.row) {
+    return NextResponse.json({ error: "Mission not found" }, { status: 404 });
+  }
+
+  const decision = decideMissionEdit({
+    actor: args.actor,
+    ownerMatches:
+      args.actor === "participant"
+        ? Boolean(args.participantId) && target.row.participantId === args.participantId
+        : true,
+    status: target.row.status,
+    current: target.row,
+    submitted: args.submitted,
+  });
+  if (decision.action === "reject") {
+    return NextResponse.json({ error: decision.error }, { status: decision.status });
+  }
+  if (decision.action === "noop") {
+    return NextResponse.json({ success: true, changed: false, mission: decision.current });
+  }
+
+  const saved = await insertMissionEdit({
+    tenantId: args.tenantId,
+    missionId: args.missionId,
+    participantId: target.row.participantId,
+    editedBy: args.actor,
+    before: decision.before,
+  });
+  if (!saved.ok) {
+    return NextResponse.json({ error: "Failed to update mission" }, { status: 500 });
+  }
+
+  const success = await updateMissionFields(args.missionId, decision.update, args.tenantId);
+  if (!success) {
+    const undone = await deleteMissionEdit(saved.id, args.tenantId);
+    if (!undone) {
+      logger.error("Mission edit: history row was left behind after a failed update", {
+        missionId: args.missionId,
+        tenantId: args.tenantId,
+        editId: saved.id,
+      });
+    }
+    return NextResponse.json({ error: "Failed to update mission" }, { status: 500 });
+  }
+  // 保存した値（無害化と、前後の空白の整理を通したあとの値）を返す。画面は、この値に表示を合わせる。
+  return NextResponse.json({ success: true, changed: true, mission: decision.after });
 }
 
 export async function GET(request: NextRequest) {
@@ -252,6 +323,27 @@ export async function PATCH(request: NextRequest) {
     if (title !== undefined) {
       const sanitizedTitle = sanitizeInput(title);
       const sanitizedPurpose = purpose !== undefined ? sanitizeInput(purpose) : undefined;
+
+      // イシューの呼び名の環境（feature.missionLabelIssue）では、直す前の文を残してから直す
+      // （mission_edits 表。決まりは mission-edit.ts）。本人が文を直せるのは、この環境だけ
+      // （「直す」のボタンを出しているのも、この環境だけ）。スイッチを読めなかったときは OFF と
+      // 同じ扱いになる：本人の修正は受け付けない（履歴を残せないまま直さない）。上司・運営の
+      // 画面からの修正は、下の従来の処理で、履歴を残さずに直す。
+      const keepHistory = await isFeatureEnabled("feature.missionLabelIssue", tenantId);
+      if (participant && !keepHistory) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      if (keepHistory) {
+        return await editMissionWithHistory({
+          missionId,
+          tenantId,
+          actor: participant ? "participant" : "manager",
+          participantId: participant ? participant.id : null,
+          submitted: { title: sanitizedTitle, purpose: sanitizedPurpose, deadline },
+        });
+      }
+
+      // 従来の処理（上司・運営の画面からの修正。イシューの呼び名でない環境）。
       const success = await updateMissionFields(missionId, {
         title: sanitizedTitle,
         purpose: sanitizedPurpose,

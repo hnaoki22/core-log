@@ -50,6 +50,7 @@ core-log/
 │   │   │   ├── features/
 │   │   │   │   ├── daily-questions/route.ts   # メゾ層 API（曜日ローテ）
 │   │   │   │   └── voice-input/route.ts       # Whisper proxy（OpenAI）
+│   │   │   ├── mission/edits/route.ts         # 本人のイシュー 1 件の「直した履歴」（直す前の文。feature.missionLabelIssue の環境だけ。§5 参照）
 │   │   │   ├── auth/otp/, cron/, entry/, feedback/, logs/, mission/, ...
 │   │   ├── a/[token]/          # 管理者 UI（coach/ = 「AIコーチの確認」のページ）
 │   │   ├── p/[token]/          # 参加者 UI（入力・履歴・mission）
@@ -64,6 +65,9 @@ core-log/
 │   │   ├── QuickNoteSheet.tsx        # 途中メモのシート＋「＋ メモ」ボタン（ホーム・standalone のみ）
 │   │   ├── MissionContextCard.tsx    # 入力画面の問いの上に、本人の進行中のミッションを出すカード（feature.missionOnInput。表示だけ・API は呼ばない）
 │   │   ├── MissionPurposeView.tsx    # ミッション画面の「背景・目的」の表示。仮説つきで保存された文は、仮説と残りを分けて出す（表示だけ）
+│   │   ├── IssueEditableBody.tsx     # 「イシュー」のページで、背景・目的の表示と、本人が直す操作（「直す」「直した履歴」）を受け持つ。直す操作を出さない環境では MissionPurposeView だけを出す
+│   │   ├── IssueEditForm.tsx         # 設定したイシューを直すフォーム（問い・仮説・目指す状態と行動・期限。表示と入力の受け渡しだけ）
+│   │   ├── IssueEditHistory.tsx      # 「直した履歴」（1 回の修正ごとに、変わった欄の、直す前の文。表示だけ）
 │   │   ├── CoachingProfileCard.tsx   # 入力画面の問いの上に、本人の設計図の「毎朝の一文」を出す枠（feature.coachingProfile。確認済みのときだけ本人の文を出す。表示だけ・API は呼ばない）
 │   │   ├── BlueprintEntryLink.tsx    # 設計図のページへの入口（ホームに置く。feature.coachingProfile。表示だけ）
 │   │   ├── BlueprintIssueCard.tsx    # 設計図のページの先頭に出す、いまのイシュー（ミッション）と仮説（進行中のうち、いちばん新しい 1 件。表示だけ・API は呼ばない）
@@ -86,7 +90,9 @@ core-log/
 │   │   ├── quick-notes.ts            # 途中メモ（quick_notes 表の保存/取得/削除・本人と装置だけ）
 │   │   ├── feedback-draft.ts         # 管理画面「AI下書き」のモデル選択・リクエスト組立て・応答の読み取り（純関数・テスト付き）
 │   │   ├── mission-context.ts        # 入力画面に出すミッションの絞り込み（進行中・最大3件）、呼び名（ミッション／イシュー）の文言表、仮説つきの「背景・目的」のまとめ方と読み方、設計図のページの先頭に出す「いまの 1 件」の選び方（純関数・テスト付き）
-│   │   ├── use-leave-guard.ts        # 保存していない変更があるときに、ページを離れる前に確かめる（設計図のページ。どのクリックを離れる操作と見るかは純関数・テスト付き）
+│   │   ├── mission-edit.ts           # 設定したイシューの文を直すときの決まり：直してよいか、何を残して何を書くか、履歴の見せ方（純関数・テスト付き。§5 参照）
+│   │   ├── mission-edit-store.ts     # 「直す前の文」の読み書き（mission_edits 表。本人の読み取りは、テナントと参加者でも絞る。サーバー側だけ）
+│   │   ├── use-leave-guard.ts        # 保存していない変更があるときに、ページを離れる前に確かめる（設計図のページと、イシューを直すフォーム。どのクリックを離れる操作と見るかは純関数・テスト付き）
 │   │   ├── coaching-profile.ts       # 設計図の決まり：欄の上限、確定の条件、メールと夕方の「あなたの問い」に使ってよいか、履歴、画面とメールの言葉（純関数・テスト付き。§5 参照）
 │   │   ├── coaching-profile-store.ts # 設計図の読み書き（coaching_profiles 表。本人の分だけ。読めなかったことと、まだ無いことを分けて返す。サーバー側だけ）
 │   │   ├── coach-reply.ts            # AIコーチの返信の決まり：環境の設定の読み方、返してよいか、本人の画面に返す形、確認ページを読める人・操作・状態、画面の言葉（純関数・テスト付き。画面の部品はこのファイルだけを読み込む。§5 参照）
@@ -214,10 +220,18 @@ PR タイトル例（リポの履歴に合わせる）:
 
 **ミッションを入力画面に出す 2 つのフラグ（2026-11-21 追加。どちらも既定 OFF・`feature.mission` に依存）**:
 - `feature.missionOnInput` = 本人の進行中のミッションを、従来型の入力画面（`InputClient`）の問いの上に出す。読み取りはサーバー（`/p/[token]/input` の `page.tsx`）が `getMissionsByParticipantId`（参加者 ID で引く。氏名では引かない）で行い、`selectActiveMissions`（進行中・新しい順・最大 3 件）を通して `MissionContextCard` に渡す。`initialMissions` は **`null` = 出さない（スイッチ OFF／読めなかった）、`[]` = 未設定（ミッション画面への案内を出す）**。失敗を `[]` にしないこと（設定済みの人に「設定すると表示されます」と出る）。standalone のテナントは `StandaloneInputClient` に分岐するので出ない。
-- `feature.missionLabelIssue` = 参加者画面での呼び名を「ミッション」から「イシュー（解くべき問い）」に切り替える。文言は `src/lib/mission-context.ts` の `missionTerms()` に集約（下のタブ・`/p/[token]/mission` の見出しと設定フォーム・入力画面のカード）。**OFF のときの文言は、元から画面にあった文言と一字一句同じ**（テストで固定）。通知メール（`mission_created` / `mission_comment`）と、マネージャー・管理者の画面は切り替えていない。「フル」プリセットには含めない（呼び名の切り替えは機能の追加ではないため）。ON のテナントでは、文言のほかに次の 2 点が変わる。
+- `feature.missionLabelIssue` = 参加者画面での呼び名を「ミッション」から「イシュー（解くべき問い）」に切り替える。文言は `src/lib/mission-context.ts` の `missionTerms()` に集約（下のタブ・`/p/[token]/mission` の見出しと設定フォーム・入力画面のカード）。**OFF のときの文言は、元から画面にあった文言と一字一句同じ**（テストで固定）。通知メール（`mission_created` / `mission_comment`）と、マネージャー・管理者の画面は切り替えていない。「フル」プリセットには含めない（呼び名の切り替えは機能の追加ではないため）。ON のテナントでは、文言のほかに次の 3 点が変わる。
   - **設定フォームに「仮説」の欄（必須）が加わる**。保存先は増やしていない。仮説と「目指す状態・行動」を `composeIssuePurpose()` で見出しつきの 1 本（`【仮説】…` / `【目指す状態と、これからの行動】…`）にまとめ、既存の `missions.purpose` に保存する（`daily-question-answers.ts` と同じ考え方）。読む側は `parseIssuePurpose()` で分ける：入力画面のカードは仮説を折りたたまずに出し、ミッション画面は `MissionPurposeView` で 2 つの枠に分ける。先頭が見出しで始まらない文（従来の登録、マネージャー画面で書いた文）は分けずにそのまま出す。**マネージャー・管理者の画面には、見出しつきの文がそのまま見える**（そこで編集すると見出しも編集対象になる）。必須の判定は画面側だけ（API は従来どおり）。
   - **「完了にする」が「このイシューを閉じる」になり、理由の記入が必須になる**（`closeNoteRequired`）。DB の値は従来どおり status=`完了`・`final_review` に理由。仮説は確かめると変わるので、書き直すのではなく「理由を書いて閉じ、新しく設定する」運用（前の問い・仮説と、変えた理由が残る）。
-- 参加者画面にはミッションの名前・内容を書き直す欄が無い（閉じて作り直すか、マネージャー画面の「ミッション管理」→「編集」）。上の運用のため、書き直す欄は意図して足していない。AI下書きにミッションは渡していない。
+  - **設定したイシューを、本人が直せる（2026-11-22 追加）**。誤字や言い回しを直すための操作（`IssueEditableBody`。「直す」→ フォーム → 保存）。直す前の文は、1 回の修正につき 1 行、`mission_edits` 表に残す（migration `20261122_mission_edits.sql`。RLS deny_all + service_role。missions には列を足していない）。決まりは `src/lib/mission-edit.ts`、読み書きは `src/lib/mission-edit-store.ts`。
+    - 「直す」は、誤字の修正と、仮説の書き換えを見分けられない。**仮説が変わったときの直し方（理由を書いて閉じ、新しく設定する）は変えていない**（変えた理由が残るのは、その方法だけ。フォームの説明にも書いている）。直す前の文を残すのは、仮説を「直す」で書き換えても、前の仮説が消えないようにするため。
+    - 入口は `PATCH /api/mission`（題・背景と目的・期限の更新）。この環境では、**履歴を 1 行残してから更新する**（`editMissionWithHistory()`。履歴を残せなかったら更新しない。更新に失敗したら、残した 1 行を取り消す。中身が変わっていないときは、何も書かない）。上司・運営の画面（`MissionManager`）からの修正も、同じ処理を通る（`edited_by='manager'`）。
+    - 本人が直せるのは、自分のイシューで、閉じていないものだけ（`decideMissionEdit()`。持ち主は、氏名に加えて `participant_id` で確かめる。閉じたイシューは 409）。**OFF の環境では、本人のトークンでの文の更新を 403 にした**（それまでは、画面に操作が無いだけで、入口は受け付けていた）。上司・運営の画面からの修正は、OFF の環境では従来の処理のまま（履歴を残さない）。
+    - スイッチを読めなかったときは、OFF と同じ扱いになる（`getFlagsForTenant` が既定値に戻すため）：本人の修正は 403。上司・運営の画面からの修正は、履歴を残さずに直る。
+    - 履歴は、本人の画面にだけ出す（`POST /api/mission/edits`。トークンを URL に載せないために POST。行は、トークンから引いたテナント ID と参加者 ID で絞る）。カードを開いたときに読む。その修正で変わった欄だけを、直す前の値で出す（`buildMissionEditViews()`）。読めなかったときは、その旨を出す（履歴なしの見え方にしない）。**上司・運営の画面に、履歴を出す経路は無い。**
+    - フォームに保存していない変更があるあいだは、ページを離れる前（`useLeaveGuard`）と、カードを閉じる・ほかのカードを開く前（`toggleExpanded`）に確かめる。
+    - 画面の言葉（`MissionTerms.edit`）は案。OFF の環境は `edit: null`（操作を出さない。`IssueEditableBody` は、これまでと同じ HTML を返す。テストで固定）。
+- `feature.missionLabelIssue` が OFF の環境の参加者画面には、ミッションの名前・内容を書き直す欄が無い（閉じて作り直すか、マネージャー画面の「ミッション管理」→「編集」）。AI下書きにミッションは渡していない。
 
 **設計図（`feature.coachingProfile`。2026-11-22 追加。既定 OFF）**: 設計図 = 本人が自分で確認した、毎朝の一文・成長課題・これからの行動・期待する結果・止まりそうな場面・夕方に自分へ聞く問い。保存先は `coaching_profiles` 表（migration `20261122_coaching_profiles_and_coach_replies.sql`。1 人 1 行。RLS deny_all + service_role）。決まりは `src/lib/coaching-profile.ts`、読み書きは `src/lib/coaching-profile-store.ts`、本人の API は `/api/coaching-profile`、ページは `/p/[token]/blueprint`。
 - **状態は `draft`（確認前）/ `confirmed`（確認済み）。運営が下書きを置き、本人が確かめて確定する。確認前の内容は、メールにも、夕方の「あなたの問い」にも使わない**（`isUsableProfile()`）。本人が確かめていない文を、本人の言葉として毎日見せないため。確定には「毎朝の一文」だけが必須。
