@@ -343,3 +343,14 @@ const ISSUE_TERMS: MissionTerms = {
 export function missionTerms(useIssueLabel: boolean): MissionTerms {
   return useIssueLabel === true ? ISSUE_TERMS : MISSION_TERMS;
 }
+
+/**
+ * 管理画面の、参加者 1 人のページに出す、イシュー（ミッション）の欄の文言（運営の側の言葉。案）。
+ * 欄の見出しと「背景・目的」の呼び名は、その環境の missionTerms()（pageTitle / purposeLabel）に合わせる。
+ */
+export const ADMIN_ISSUE_VIEW_TERMS = {
+  /** コメントを読む・書くページ（上司の側の、参加者 1 人のページ）へのリンク。 */
+  commentsLink: "コメントを読む・書く",
+  /** 題が空のとき（従来の表示と同じ）。 */
+  untitled: "（タイトルなし）",
+} as const;

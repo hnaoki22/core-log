@@ -58,3 +58,11 @@ export function decideStaffParticipantView(args: {
   if (viewerTenantId !== null) return { ok: true, tenantId: viewerTenantId };
   return { ok: false };
 }
+
+/**
+ * 上司の側の、参加者 1 人のページのパス。イシュー（ミッション）のコメントを読む・書く、
+ * 設定・編集する操作は、このページにある。管理画面の側のページから、ここへリンクする。
+ */
+export function managerParticipantPagePath(token: string, participantName: string): string {
+  return `/m/${encodeURIComponent(token)}/${encodeURIComponent(participantName)}`;
+}

@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createElement, type ReactElement, type ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 // 管理画面の側の、参加者 1 人のページ（/a/[token]/participant/[氏名]）が、開いた人を確かめてから
 // 読むことを確かめる。入れるのは、管理画面に入れる人（管理者・閲覧者）だけ。
@@ -30,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   getMissionsByParticipant: vi.fn(),
   getFeedbackByParticipant: vi.fn(),
   isStandaloneTenant: vi.fn(),
+  isFeatureEnabled: vi.fn(),
   notFound: vi.fn(),
 }));
 
@@ -41,9 +44,16 @@ vi.mock("@/lib/supabase", () => ({
 }));
 vi.mock("@/lib/participant-db", () => ({ getManagerByToken: mocks.getManagerByToken }));
 vi.mock("@/lib/standalone", () => ({ isStandaloneTenant: mocks.isStandaloneTenant }));
+vi.mock("@/lib/feature-flags", () => ({ isFeatureEnabled: mocks.isFeatureEnabled }));
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
+// next/link は Next のルーターに依存するので、素の <a> に置き換える（行き先だけを見る）。
+vi.mock("next/link", () => ({
+  default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) =>
+    createElement("a", { href, className }, children),
+}));
 
 import AdminParticipantPage from "./page";
+import { ADMIN_ISSUE_VIEW_TERMS, composeIssuePurpose, missionTerms } from "@/lib/mission-context";
 
 const NOT_FOUND = "NEXT_NOT_FOUND";
 
@@ -55,6 +65,11 @@ function expectNothingRead() {
   expect(mocks.getLogsByParticipant).not.toHaveBeenCalled();
   expect(mocks.getMissionsByParticipant).not.toHaveBeenCalled();
   expect(mocks.getFeedbackByParticipant).not.toHaveBeenCalled();
+  expect(mocks.isFeatureEnabled).not.toHaveBeenCalled();
+}
+
+async function html(token: string, name: string): Promise<string> {
+  return renderToStaticMarkup((await open(token, name)) as ReactElement);
 }
 
 beforeEach(() => {
@@ -66,6 +81,7 @@ beforeEach(() => {
   mocks.getLogsByParticipant.mockResolvedValue([]);
   mocks.getMissionsByParticipant.mockResolvedValue([]);
   mocks.getFeedbackByParticipant.mockResolvedValue([]);
+  mocks.isFeatureEnabled.mockResolvedValue(false);
   mocks.isStandaloneTenant.mockImplementation(async (tenantId: string) => tenantId === TENANT_S);
   mocks.notFound.mockImplementation(() => {
     throw new Error(NOT_FOUND);
@@ -125,5 +141,72 @@ describe("/a/[token]/participant/[氏名]：商品モードの環境", () => {
     expect(page).toBeTruthy();
     expect(mocks.isStandaloneTenant).toHaveBeenCalledWith(TENANT_S);
     expectNothingRead();
+  });
+});
+
+describe("/a/[token]/participant/[氏名]：イシュー（ミッション）の欄", () => {
+  const ISSUE = missionTerms(true);
+  const MISSION = missionTerms(false);
+  const MISSIONS = [
+    {
+      id: "m-1",
+      title: "合成の問い",
+      status: "進行中",
+      purpose: composeIssuePurpose("合成の仮説", "合成の目指す状態と行動"),
+    },
+  ];
+
+  it("イシューの呼び名の環境では、見出しをその呼び名にし、仮説と「目指す状態と、これからの行動」を出す", async () => {
+    mocks.getMissionsByParticipant.mockResolvedValue(MISSIONS);
+    mocks.isFeatureEnabled.mockImplementation(async (key: string) => key === "feature.missionLabelIssue");
+    const out = await html("tok-observer-a", PARTICIPANT_IN_A);
+    expect(mocks.isFeatureEnabled).toHaveBeenCalledWith("feature.missionLabelIssue", TENANT_A);
+    expect(out).toContain(ISSUE.pageTitle);
+    expect(out).toContain("合成の問い");
+    expect(out).toContain("合成の仮説");
+    expect(out).toContain(`>${ISSUE.purposeLabel}<`);
+    expect(out).toContain("合成の目指す状態と行動");
+  });
+
+  it("呼び名のスイッチは、参加者の側の環境で読む（管理者がほかの環境の参加者を開いたとき）", async () => {
+    mocks.getMissionsByParticipant.mockResolvedValue(MISSIONS);
+    await html("tok-admin-b", PARTICIPANT_IN_A);
+    expect(mocks.isFeatureEnabled).toHaveBeenCalledWith("feature.missionLabelIssue", TENANT_A);
+    expect(mocks.isFeatureEnabled).not.toHaveBeenCalledWith("feature.missionLabelIssue", TENANT_B);
+  });
+
+  it("コメントを読む・書くページ（上司の側の、参加者 1 人のページ）へのリンクを出す", async () => {
+    mocks.getMissionsByParticipant.mockResolvedValue(MISSIONS);
+    const out = await html("tok-admin-b", PARTICIPANT_IN_A);
+    expect(out).toContain(ADMIN_ISSUE_VIEW_TERMS.commentsLink);
+    expect(out).toContain(`href="/m/tok-admin-b/${encodeURIComponent(PARTICIPANT_IN_A)}"`);
+  });
+
+  it("ミッションの呼び名の環境では、見出しは「ミッション」、文の見出しは「背景・目的」", async () => {
+    mocks.getMissionsByParticipant.mockResolvedValue([
+      { id: "m-2", title: "合成のミッション", status: "進行中", purpose: "合成の背景と目的" },
+    ]);
+    const out = await html("tok-observer-a", PARTICIPANT_IN_A);
+    expect(out).toContain(`>${MISSION.pageTitle}<`);
+    expect(out).toContain(`>${MISSION.purposeLabel}<`);
+    expect(out).toContain("合成の背景と目的");
+    expect(out).not.toContain(ISSUE.pageTitle);
+  });
+
+  it("1 件も無いときは、欄もリンクも出さない", async () => {
+    const out = await html("tok-observer-a", PARTICIPANT_IN_A);
+    expect(out).not.toContain(ADMIN_ISSUE_VIEW_TERMS.commentsLink);
+    expect(out).not.toContain(`>${MISSION.pageTitle}<`);
+  });
+
+  it("呼び名のスイッチを読めなくても、ページは返し、従来の呼び名で出す", async () => {
+    mocks.getMissionsByParticipant.mockResolvedValue(MISSIONS);
+    mocks.isFeatureEnabled.mockRejectedValue(new Error("flags down"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const out = await html("tok-observer-a", PARTICIPANT_IN_A);
+    errorSpy.mockRestore();
+    expect(out).toContain(`>${MISSION.pageTitle}<`);
+    expect(out).toContain("合成の問い");
+    expect(out).toContain("合成の仮説");
   });
 });
