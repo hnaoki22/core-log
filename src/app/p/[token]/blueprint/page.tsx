@@ -8,7 +8,9 @@ import { notFound } from "next/navigation";
 import { getParticipantByToken } from "@/lib/participant-db";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { getCoachingProfile } from "@/lib/coaching-profile-store";
-import BlueprintClient from "./BlueprintClient";
+import { isCoachKillSwitchOn } from "@/lib/coach-reply-llm";
+import { getCoachActivation, getCoachOptIn } from "@/lib/coach-reply-store";
+import BlueprintClient, { type BlueprintCoachProps } from "./BlueprintClient";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -29,11 +31,25 @@ export default async function BlueprintPageServer({
 
   const read = await getCoachingProfile(participant.id, participant.tenantId);
 
+  // AIコーチの欄（説明と、受け取る・受け取らない）。AIコーチの返信が動いている環境だけ出す
+  // （スイッチが ON、商品モードでない、環境の設定がある。getCoachActivation）。アプリ全体で止めているあいだと、
+  // 動いているかを読めなかったときは、出さない（失敗は記録済み）。
+  // 本人のいまの設定を読めなかったときは、ボタンを出さずにその旨を出す（違う設定を出さない）。
+  let coach: BlueprintCoachProps = null;
+  if (!isCoachKillSwitchOn()) {
+    const activation = await getCoachActivation(participant.tenantId);
+    if (activation.ok && activation.active) {
+      const optIn = await getCoachOptIn(participant.id, participant.tenantId);
+      coach = optIn.ok ? { optIn: optIn.enabled, loadFailed: false } : { optIn: null, loadFailed: true };
+    }
+  }
+
   return (
     <BlueprintClient
       token={token}
       initialProfile={read.ok ? read.profile : null}
       loadFailed={!read.ok}
+      coach={coach}
     />
   );
 }

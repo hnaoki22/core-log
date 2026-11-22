@@ -118,3 +118,39 @@ describe("mission flags (input screen / label)", () => {
     expect(off["feature.missionLabelIssue"]).toBe(false);
   });
 });
+
+// 設計図（feature.coachingProfile）と、AIコーチの返信（feature.coachReply）。
+// AIコーチの返信は、記入を外部のAIに送る。スイッチを個別に入れたときだけ動くことを固定する。
+describe("coaching flags (blueprint / coach reply)", () => {
+  const keys = ["feature.coachingProfile", "feature.coachReply"];
+  const byKey = (key: string) => FEATURE_CATALOG.find((f) => f.key === key);
+
+  it("are in the catalog and default OFF", () => {
+    for (const key of keys) {
+      const f = byKey(key);
+      expect(f, key).toBeDefined();
+      expect(f!.defaultEnabled).toBe(false);
+      expect(f!.phase1Enabled).toBe(false);
+      expect(f!.implemented).toBe(true);
+      expect(f!.category).toBe("existing");
+    }
+  });
+
+  it("the coach reply depends on the blueprint", () => {
+    expect(byKey("feature.coachReply")!.dependencies).toEqual(["feature.coachingProfile"]);
+  });
+
+  it("stay OFF in every preset except 'full'", () => {
+    for (const preset of PRESETS) {
+      if (preset.id === "full") continue;
+      const flags = preset.getFlags();
+      for (const key of keys) expect(flags[key], `${preset.id}:${key}`).toBe(false);
+    }
+  });
+
+  it("'full' turns the blueprint ON but never the coach reply", () => {
+    const full = PRESETS.find((p) => p.id === "full")!.getFlags();
+    expect(full["feature.coachingProfile"]).toBe(true);
+    expect(full["feature.coachReply"]).toBe(false);
+  });
+});

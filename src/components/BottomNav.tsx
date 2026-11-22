@@ -56,6 +56,9 @@ export function BottomNav({ active, baseUrl, badges }: BottomNavProps) {
   // フィードバック機能がOFFでも、フィードバックが1件でもあればタブを表示する（HM送信分を閲覧可能にする）
   // 未読数ではなく総数で判定：既読後もタブが消えないようにする
   const hasFeedbacks = (badges?.feedbackTotal ?? 0) > 0;
+  // AIコーチの返信を出す環境（feature.coachReply と feature.coachingProfile が ON）では、返信の一覧が
+  // このタブの中にあるので、フィードバック機能が OFF でもタブを出す。フラグを読み終えてから見る。
+  const coachOn = loaded && isOn("feature.coachReply") && isOn("feature.coachingProfile");
   // タブの呼び名（feature.missionLabelIssue が ON のテナントは「イシュー」）。
   // フラグの読み込みが終わるまでは既定の「ミッション」で出る。
   const missionTabLabel = missionTerms(isOn("feature.missionLabelIssue")).tab;
@@ -63,7 +66,7 @@ export function BottomNav({ active, baseUrl, badges }: BottomNavProps) {
   const allTabs = [
     { id: "home" as const, label: "ホーム", Icon: HomeIcon, path: "", visible: true },
     { id: "logs" as const, label: "ログ", Icon: LogIcon, path: "logs", visible: true },
-    { id: "feedback" as const, label: "FB", Icon: FeedbackIcon, path: "feedback", visible: fbOn || hasFeedbacks },
+    { id: "feedback" as const, label: "FB", Icon: FeedbackIcon, path: "feedback", visible: fbOn || hasFeedbacks || coachOn },
     { id: "mission" as const, label: missionTabLabel, Icon: MissionIcon, path: "mission", visible: missionOn },
   ];
   const tabs = allTabs.filter((t) => t.visible);

@@ -26,6 +26,8 @@ type Options = {
   questions?: { morning: string[]; evening: string[] };
   morningIntent?: string;
   alreadyCompleted?: boolean;
+  /** ほかに ON にするスイッチ。 */
+  flags?: string[];
 };
 
 function render(o: Options): string {
@@ -39,7 +41,10 @@ function render(o: Options): string {
     initialIsMorning: o.isMorning,
     initialMorningClosed: false,
     initialAlreadyCompleted: o.alreadyCompleted === true,
-    initialFlags: enabled ? { "feature.dailyQuestions": true } : {},
+    initialFlags: {
+      ...(enabled ? { "feature.dailyQuestions": true } : {}),
+      ...Object.fromEntries((o.flags ?? []).map((key) => [key, true])),
+    },
     initialKanNoKiPhase: null,
     initialDailyQuestions: { enabled, morning: questions.morning, evening: questions.evening, axis: "", day: "monday" },
     initialMissions: null,
@@ -124,5 +129,31 @@ describe("InputClient：「朝・夕の問い」を出している環境", () =>
     const html = render({ questionEnv: true, isMorning: false, questions, morningIntent: "x", alreadyCompleted: true });
     expect(html).toContain("今日の行動と本日の振り返りが記入されています");
     expect(html).not.toContain("朝の意図");
+  });
+});
+
+describe("InputClient：AIコーチの返信（feature.coachReply）", () => {
+  const done = { questionEnv: false, isMorning: false, morningIntent: "x", alreadyCompleted: true } as const;
+  const BOTH = ["feature.coachReply", "feature.coachingProfile"];
+
+  it("スイッチが OFF の環境では、記入済みの日の画面に、AIコーチの表示を出さない（元の画面のまま）", () => {
+    const html = render(done);
+    expect(html).toContain("今日の記入は完了済みです");
+    expect(html).not.toContain("AIコーチ");
+  });
+
+  it("スイッチが ON の環境でも、最初の描画は元の画面と同じ（返してよい人かを確かめ終えるまで、何も出さない）", () => {
+    // 受け取らない設定の人や、設計図が確認前の人の画面に、AI が記入を読んでいるかのような表示を出さないため。
+    // 確かめたあとの表示は、CoachReply.test.tsx で確かめている。
+    expect(render({ ...done, flags: BOTH })).toBe(render(done));
+  });
+
+  it("記入の途中の画面（朝・夕方）も、スイッチの ON・OFF で変わらない", () => {
+    expect(render({ questionEnv: false, isMorning: true, flags: BOTH })).toBe(
+      render({ questionEnv: false, isMorning: true })
+    );
+    expect(render({ questionEnv: false, isMorning: false, morningIntent: "x", flags: BOTH })).toBe(
+      render({ questionEnv: false, isMorning: false, morningIntent: "x" })
+    );
   });
 });

@@ -13,6 +13,8 @@ import { getTodayJST, calculateWeekNum } from "@/lib/date-utils";
 import { resolveManagerTenantStrict } from "@/lib/tenant-context";
 import { isStandaloneTenant } from "@/lib/standalone";
 import { tokenForViewer } from "@/lib/admin-directory";
+import { getCoachActivation } from "@/lib/coach-reply-store";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -174,9 +176,26 @@ export async function GET(request: NextRequest) {
       .filter(Boolean),
   }));
 
+  // 「AIコーチの確認」のページ（/a/[token]/coach）への入口を出すか。
+  // 環境が 1 つに決まっていて、その環境で AIコーチの返信が動いているとき（スイッチが ON、商品モードでない、
+  // 環境の設定がある。getCoachActivation）だけ true。動いていない環境の管理画面は、これまでと変わらない。
+  // 画面の入口の出し分けにだけ使う（読めるかどうかは /api/admin/coach-replies が決める）。
+  // 読めなかったときは false（入口を出さない）。失敗は記録する。
+  let coachReplyEnabled = false;
+  if (tenantId) {
+    try {
+      const activation = await getCoachActivation(tenantId);
+      coachReplyEnabled = activation.ok && activation.active;
+    } catch (error) {
+      logger.error("admin: coach reply activation read failed", { tenantId, error: String(error) });
+    }
+  }
+
   return NextResponse.json({
     participants: enrichedParticipants,
     managers: managerData,
+    // AIコーチの確認のページへの入口を出すか（上の説明を参照）。
+    coachReplyEnabled,
     viewerRole,
     // 管理者（is_admin）か。画面は、管理者にだけ出す欄（環境とユーザー）の出し分けにこれを使う。
     // role の文字列ではなく、サーバーの権限の判定（is_admin）と同じ値で決めるため。

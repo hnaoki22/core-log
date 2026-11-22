@@ -13,6 +13,7 @@ import { VoiceInputButton } from "@/components/features/VoiceInput";
 import { DailyQuestionsBlock } from "@/components/features/DailyQuestionsBlock";
 import { MissionContextCard } from "@/components/features/MissionContextCard";
 import { CoachingProfileCard } from "@/components/features/CoachingProfileCard";
+import { CoachReplyPanel } from "@/components/features/CoachReply";
 import type { CoachingProfileCardData } from "@/lib/coaching-profile";
 import { missionTerms, type MissionContextItem } from "@/lib/mission-context";
 import { entryTerms, entrySubheading } from "@/lib/entry-terms";
@@ -203,6 +204,9 @@ export default function InputPage({ token, initialData }: Props) {
   // 「今日の行動」と呼ぶ。サーバーが決めた値をそのまま使う（開いている間に呼び名が変わらないように）。
   const entryQuestionEnv = initialData.initialEntryQuestionEnv === true;
   const terms = entryTerms(entryQuestionEnv);
+  // 夕方の記入のあとに、AIコーチの返信を出す（feature.coachReply。設計図のスイッチも ON の環境だけ）。
+  // 出してよいか（設計図を確定しているか、受け取りを切っていないか）は、サーバーが決める。
+  const useCoachReply = isOn("feature.coachReply") && isOn("feature.coachingProfile");
 
   const ruminationEveningState = useRuminationDetector(eveningTextareaRef, useRumination && !isMorning);
   const ruminationMorningState = useRuminationDetector(morningTextareaRef, useRumination && isMorning);
@@ -290,6 +294,7 @@ export default function InputPage({ token, initialData }: Props) {
           </div>
           <h2 className="text-xl font-semibold text-[#1A1A2E] mb-2">今日の記入は完了済みです</h2>
           <p className="text-[#5B5560] text-sm mb-8">{terms.alreadyCompleted}</p>
+          {useCoachReply && <CoachReplyPanel token={token} className="mb-8" />}
           <button
             onClick={() => router.push(`/p/${token}`)}
             className="btn-primary w-full py-3.5 text-sm"
@@ -441,6 +446,7 @@ export default function InputPage({ token, initialData }: Props) {
             </p>
           )}
           {!durationLabel && <div className="mb-8" />}
+          {useCoachReply && !isMorning && <CoachReplyPanel token={token} className="mb-8" />}
           <button
             onClick={() => router.push(`/p/${token}`)}
             className="btn-primary w-full py-3.5 text-sm"

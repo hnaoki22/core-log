@@ -14,6 +14,7 @@ import {
   type DirectoryEnvironment,
   type DirectoryUser,
 } from "@/lib/admin-directory";
+import { COACH_BOARD_TERMS } from "@/lib/coach-reply";
 import {
   IconChartBar,
   IconTrendingUp,
@@ -114,6 +115,8 @@ type AdminData = {
   viewerRole?: "admin" | "observer" | "manager";
   /** 管理者（is_admin）か。管理者にだけ出す欄の出し分けに使う */
   viewerIsAdmin?: boolean;
+  /** 表示中の環境で、AIコーチの返信を出しているか（「AIコーチの確認」への入口の出し分け） */
+  coachReplyEnabled?: boolean;
   tenantId?: string;
   tenants?: TenantInfo[];
 };
@@ -924,6 +927,23 @@ export default function AdminDashboard() {
             <div className="text-[10px] text-[#8B8489] font-medium tracking-wide mt-0.5">FB配信数</div>
           </div>
         </div>
+
+        {/* AIコーチの確認（feature.coachReply）への入口。表示中の環境で AIコーチの返信を出している
+            ときだけ出す（サーバーが決めた coachReplyEnabled。管理者が全環境を表示しているあいだは出ない）。
+            ほかのスイッチで囲んだ欄の中には置かない（その欄が消えると、道連れで消えるため）。
+            管理者と閲覧者の両方に出す（どちらも、このページを読める）。 */}
+        {data.coachReplyEnabled === true && (
+          <Link
+            href={`/a/${token}/coach${selectedTenantSlug ? `?tenant=${encodeURIComponent(selectedTenantSlug)}` : ""}`}
+            className="card p-4 mb-5 flex items-center justify-between gap-3 hover:shadow-md transition-shadow"
+          >
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-[#1A1A2E] mb-0.5">{COACH_BOARD_TERMS.entryCardTitle}</h3>
+              <p className="text-xs text-[#8B8489] break-words">{COACH_BOARD_TERMS.entryCardLead}</p>
+            </div>
+            <span className="text-[#8B8489] flex-shrink-0" aria-hidden="true">→</span>
+          </Link>
+        )}
 
         {showAnalytics && (
           <div className="card overflow-hidden mb-5">

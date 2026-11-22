@@ -3,6 +3,7 @@
 import { BottomNav } from "@/components/BottomNav";
 import { useState, useEffect } from "react";
 import { useFeatures } from "@/lib/use-features";
+import { CoachReplyList } from "@/components/features/CoachReply";
 
 type FeedbackEntry = {
   id: string;
@@ -40,6 +41,9 @@ export default function FeedbackClient({ token, initialData }: Props) {
   // フィードバック機能フラグがOFFでも、既にフィードバックが存在する場合は表示する
   const fbOn = !featuresLoaded || isOn("feature.managerFeedback");
   const hasFeedbacks = feedbacks.length > 0;
+  // AIコーチの返信（feature.coachReply。設計図のスイッチも ON の環境だけ）。運営のフィードバックの下に、
+  // 分けて出す。スイッチを読み終えるまでは出さない（OFF の環境で、一覧の API を呼ばないため）。
+  const coachOn = featuresLoaded && isOn("feature.coachReply") && isOn("feature.coachingProfile");
 
   // Background revalidate: pick up mission badge count (which needs an extra
   // query into mission_comments) and refresh feedback list if anything
@@ -77,7 +81,8 @@ export default function FeedbackClient({ token, initialData }: Props) {
   };
 
   // フィードバック機能がOFFでも、既にフィードバックが届いている場合は表示する
-  if (featuresLoaded && !fbOn && !hasFeedbacks) {
+  // （AIコーチの返信を出す環境でも、このページを表示する）
+  if (featuresLoaded && !fbOn && !hasFeedbacks && !coachOn) {
     return (
       <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6 pb-24">
         <div className="text-center max-w-sm">
@@ -165,6 +170,7 @@ export default function FeedbackClient({ token, initialData }: Props) {
             })}
           </div>
         )}
+        {coachOn && <CoachReplyList token={token} className="pt-4" />}
       </div>
 
       <BottomNav active="feedback" baseUrl={`/p/${token}`} badges={badges} />
