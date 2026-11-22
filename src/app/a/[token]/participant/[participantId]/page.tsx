@@ -2,8 +2,10 @@
 // Shows full log history for a single participant (read-only from admin perspective)
 
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { getLogsByParticipant, getMissionsByParticipant, getParticipantByNameCrossTenant, getFeedbackByParticipant, NotionLogEntry } from "@/lib/supabase";
 import { getManagerByToken } from "@/lib/participant-db";
+import { decideStaffParticipantView } from "@/lib/staff-page-access";
 import { isStandaloneTenant } from "@/lib/standalone";
 import { formatTimeJST, formatFullDateTimeJST } from "@/lib/date-utils";
 import { hasMorning, hasEvening, getDayStatus, computeParticipantStats } from "@/lib/stats";
@@ -29,6 +31,23 @@ export default async function AdminParticipantPage({ params }: Params) {
   const { token, participantId } = params;
   const participantName = decodeURIComponent(participantId);
 
+  // 読む前に、開いた人（URL のトークン）を確かめる。決まりは src/lib/staff-page-access.ts。
+  // ここを通るまで、記入・イシュー・フィードバックを読まない。notFound() は、下の try の中で
+  // 呼ばない（catch に入って、確かめないまま先へ進んでしまう）。
+  const viewer = await getManagerByToken(token);
+  if (!viewer) notFound();
+  // Admin views participants across tenants, so we must resolve
+  // the participant's own tenantId — not the admin's tenantId.
+  // When the lookup fails, only the viewer's own tenant is read.
+  const participant = await getParticipantByNameCrossTenant(participantName);
+  const access = decideStaffParticipantView({
+    surface: "admin",
+    viewer,
+    participantTenantId: participant?.tenantId ?? null,
+  });
+  if (!access.ok) notFound();
+  const tenantId = access.tenantId;
+
   let logs: NotionLogEntry[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let missions: any[] = [];
@@ -36,23 +55,8 @@ export default async function AdminParticipantPage({ params }: Params) {
   let feedbacks: any[] = [];
 
   try {
-    // Admin views participants across tenants, so we must resolve
-    // the participant's own tenantId — not the admin's tenantId.
-    // First try cross-tenant lookup by participant name.
-    const participant = await getParticipantByNameCrossTenant(participantName);
-    let tenantId: string | null = null;
-
-    if (participant?.tenantId) {
-      // Use the participant's actual tenant
-      tenantId = participant.tenantId;
-    } else {
-      // Fallback: use the admin/manager's tenant
-      const manager = await getManagerByToken(token);
-      tenantId = manager?.tenantId ?? null;
-    }
-
     // standalone §7-1: 管理者の個別ログ閲覧ページもサーバー側で遮断
-    if (tenantId && (await isStandaloneTenant(tenantId))) {
+    if (await isStandaloneTenant(tenantId)) {
       return (
         <div className="min-h-screen bg-[#F5F0EB] flex items-center justify-center p-6">
           <div className="max-w-md mx-auto text-center">
@@ -69,16 +73,14 @@ export default async function AdminParticipantPage({ params }: Params) {
       );
     }
 
-    if (tenantId) {
-      const [fetchedLogs, fetchedMissions, fetchedFeedbacks] = await Promise.all([
-        getLogsByParticipant(participantName, tenantId),
-        getMissionsByParticipant(participantName, tenantId),
-        getFeedbackByParticipant(participantName, tenantId),
-      ]);
-      logs = fetchedLogs;
-      missions = fetchedMissions;
-      feedbacks = fetchedFeedbacks;
-    }
+    const [fetchedLogs, fetchedMissions, fetchedFeedbacks] = await Promise.all([
+      getLogsByParticipant(participantName, tenantId),
+      getMissionsByParticipant(participantName, tenantId),
+      getFeedbackByParticipant(participantName, tenantId),
+    ]);
+    logs = fetchedLogs;
+    missions = fetchedMissions;
+    feedbacks = fetchedFeedbacks;
   } catch (e) {
     console.error("Failed to fetch data:", e);
   }
