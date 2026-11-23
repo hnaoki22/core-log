@@ -157,6 +157,25 @@ export type CoachNoticeCounts = {
   needsAttention: number;
 };
 
+/**
+ * メールの手順が、名前で指している管理画面（/a/[token]）の呼び名。
+ *
+ * 手順には、入口の場所を書く（「AIコーチの確認」を開く、とだけ書くと、初めて開く人が入口を見つけられない）。
+ * 管理画面の上からの並びは、次のとおり：
+ *   環境の選択欄（管理者だけ。開いたときは「全環境」）→「環境とユーザー」の欄（管理者だけ）
+ *   → 4 つの数字 → 入口のカード（「AIコーチの確認」。環境を 1 つ選び、その環境で動いているときだけ出る）。
+ * 管理画面の並びや呼び名を変えるときは、ここも同じ変更で直す
+ * （coach-notice.test.ts が、ここの呼び名と並びが、管理画面のコードと合っていることを確かめる）。
+ */
+export const COACH_NOTICE_ADMIN_SCREEN = {
+  /** 環境の選択欄の、開いたときの表示（src/app/a/[token]/page.tsx）。 */
+  tenantSelectAll: "全環境",
+  /** 管理者にだけ出る欄の見出し（src/components/admin/AdminDirectory.tsx）。 */
+  directoryHeading: "環境とユーザー",
+  /** 集計の 4 つの数字の呼び名（src/app/a/[token]/page.tsx。左からの順）。 */
+  statLabels: ["参加者", "平均完了率", "今日の記入", "FB配信数"],
+} as const;
+
 /** メールの文言。文を足す・変えるときは、ここに足す。 */
 export const COACH_NOTICE_MAIL_TERMS = {
   subjectPrefix: "【CORE Log】AIコーチ：",
@@ -186,11 +205,24 @@ export const COACH_NOTICE_MAIL_TERMS = {
       `この環境は、運営が確認してから返信を届ける設定です。届けるまで、本人の画面には「${shownToParticipant}」と出ています。`,
   },
   stepsHeading: "していただくこと",
-  stepOpenAdmin: (tenantName: string) =>
-    tenantName === "" ? "管理画面を開き、この環境を選びます。" : `管理画面を開き、環境「${tenantName}」を選びます。`,
+  // 管理者あて：環境を選ぶ場所（いちばん上の選択欄）を書く。入口は、環境を 1 つ選ぶまで出ない。
+  stepOpenAdmin: (tenantName: string) => {
+    const select = `いちばん上の選択欄（開いたときは「${COACH_NOTICE_ADMIN_SCREEN.tenantSelectAll}」）`;
+    return tenantName === ""
+      ? `管理画面を開き、${select}で、この環境を選びます。`
+      : `管理画面を開き、${select}で「${tenantName}」を選びます。`;
+  },
+  // 閲覧者あて：選択欄は出ない（自分の環境だけが表示される）。
   stepOpenViewer: "管理画面を開きます。",
-  stepOpenBoard: (boardTitle: string, date: string, what: "記入" | "返信") =>
-    `「${boardTitle}」を開き、${date} の${what}を読みます。開いたときの日付は今日です。違う日のときは、「← 前の日」で合わせます。`,
+  // 入口の場所を書く。管理者の画面では、4 つの数字の上に「環境とユーザー」の欄がある
+  // （閲覧者の画面には、その欄が出ない）ので、文を分ける。
+  stepOpenBoard: (entryTitle: string, date: string, what: "記入" | "返信", isAdmin: boolean) => {
+    const stats = `4つの数字（${COACH_NOTICE_ADMIN_SCREEN.statLabels.join("・")}）`;
+    const where = isAdmin
+      ? `「${COACH_NOTICE_ADMIN_SCREEN.directoryHeading}」の欄の下にある${stats}のすぐ下の`
+      : `上の${stats}のすぐ下にある`;
+    return `${where}「${entryTitle}」を押し、${date} の${what}を読みます。開いたときの日付は今日です。違う日のときは、「← 前の日」で合わせます。`;
+  },
   stepAcknowledge: (label: string) =>
     `必要な連絡をしたあとで「${label}」を押します。本人の画面の表示が消えます。`,
   stepAcknowledgeViewer: (label: string) => `「${label}」の操作は、管理者が行います。`,
@@ -283,7 +315,7 @@ export function buildCoachNoticeEmail(input: CoachNoticeEmailInput): { subject: 
 
   const steps: string[] = [
     canAct ? T.stepOpenAdmin(tenantName) : T.stepOpenViewer,
-    T.stepOpenBoard(COACH_BOARD_TERMS.title, dateShort, kind === "needs_attention" ? "記入" : "返信"),
+    T.stepOpenBoard(COACH_BOARD_TERMS.entryCardTitle, dateShort, kind === "needs_attention" ? "記入" : "返信", canAct),
   ];
   if (kind === "needs_attention") {
     steps.push(
