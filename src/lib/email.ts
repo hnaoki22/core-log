@@ -50,7 +50,7 @@ async function sendWithRetry(payload: {
   to: string[];
   subject: string;
   html: string;
-}, context: { type: string; email: string }): Promise<boolean> {
+}, context: { type: string } & Record<string, unknown>): Promise<boolean> {
   if (!checkAndIncrementQuota()) {
     logger.error("Email blocked: daily quota reached", context);
     return false;
@@ -382,6 +382,34 @@ export async function sendNotificationEmail(options: NotificationOptions): Promi
   return sendWithRetry(
     { from: FROM_EMAIL, to: [options.to], subject: emailContent.subject, html: emailContent.html },
     { type: options.type, email: options.to }
+  );
+}
+
+// ===== Staff Notice Emails =====
+
+/**
+ * 運営の担当者あてのお知らせメール（AIコーチの確認。件名と本文は coach-notice.ts が組み立てる）。
+ *
+ * - 宛先は、呼び出し側が運営の人の行（managers）から引いたアドレス。
+ * - 記録（ログ）には、アドレスを残さない。残すのは、種類、運営の人の ID、環境の ID。
+ * - 参加者の emailEnabled は見ない（運営あてのメールで、参加者のリマインドの設定の対象ではない）。
+ */
+export async function sendStaffNoticeEmail(options: {
+  to: string;
+  subject: string;
+  html: string;
+  type: string;
+  managerId: string;
+  tenantId: string;
+}): Promise<boolean> {
+  const context = { type: options.type, managerId: options.managerId, tenantId: options.tenantId };
+  if (!RESEND_API_KEY) {
+    logger.info("Staff notice skipped: no API key", context);
+    return false;
+  }
+  return sendWithRetry(
+    { from: FROM_EMAIL, to: [options.to], subject: sanitizeSubject(options.subject), html: options.html },
+    context
   );
 }
 

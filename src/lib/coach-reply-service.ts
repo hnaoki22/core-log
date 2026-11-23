@@ -12,6 +12,8 @@
 // 5. 無ければ作る。強い不調などの語があれば、AI を呼ばずに運営の確認待ちにする。
 //    AI が「作らない」と返したとき・応答を断ったときも、運営の確認待ちにする。
 // 6. 保存する。ほぼ同時の 2 回目で一意制約に当たったら、先に保存されたほうを返す。
+// 7. 運営の確認を待つ状態（確認待ち・確認が必要）で保存したときは、結果に notice を入れる。
+//    運営へメールで知らせるのは、呼び出し側（API）。ここでは送らない。
 
 import type { CoachingProfile } from "./coaching-profile";
 import {
@@ -34,6 +36,7 @@ import {
   type CoachIssue,
   type CoachOutcome,
 } from "./coach-reply-prompt";
+import { coachNoticeKind, type CoachNoticeKind } from "./coach-notice";
 
 type Read<T> = ({ ok: true } & T) | { ok: false };
 
@@ -87,6 +90,13 @@ export type EnsureCoachReplyResult =
        * true のときだけ、画面は「AIコーチが読んでいます」と出して、作る呼び出しをする。
        */
       willGenerate?: boolean;
+      /**
+       * 今回の呼び出しで新しく保存した返信が、運営の確認を待つ状態（確認待ち・確認が必要）のときだけ入る。
+       * 呼び出し側（API）は、これがあるときに、運営へメールで知らせる（coach-notice-service.ts）。
+       * すでにあった返信を返したとき・届いた状態で保存したとき・保存がぶつかったときは、入らない
+       * （同じ返信で、2 回知らせない）。
+       */
+      notice?: { kind: CoachNoticeKind; replyDate: string };
     }
   | { kind: "error"; error: "read_failed" | "ai_failed" | "save_failed"; detail?: string };
 
@@ -217,7 +227,16 @@ async function generate(
     model,
     inputsUsed,
   });
-  if (saved.ok) return { kind: "view", view: toParticipantView(saved.reply), generated: true };
+  if (saved.ok) {
+    const noticeKind = coachNoticeKind(saved.reply);
+    return {
+      kind: "view",
+      view: toParticipantView(saved.reply),
+      generated: true,
+      // 運営の確認を待つ状態で保存したときだけ、知らせる対象として返す。
+      ...(noticeKind ? { notice: { kind: noticeKind, replyDate: saved.reply.replyDate } } : {}),
+    };
+  }
   if (saved.reason === "conflict") {
     // ほぼ同時の 2 回目。先に保存されたほうを返す。
     const again = await deps.getReply(participantId, tenantId, log.date);
