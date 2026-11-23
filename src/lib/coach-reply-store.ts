@@ -174,6 +174,73 @@ export async function getPreviousDeliveredReply(
   return row ? mapReply(row) : null;
 }
 
+/** getLatestDeliveredRepliesForTenant が、1 回の読み取りで読む行の上限。 */
+const LATEST_REPLIES_ROW_CAP = 1000;
+
+/**
+ * その環境の、届いた毎日の返信を、参加者ごとに、いちばん新しい 1 件（朝のメールに「前回の問い」を載せるため）。
+ * sinceDate 以上・beforeDate 未満（YYYY-MM-DD）の記入への返信だけを読む。
+ * 「前回」の選び方は、getPreviousDeliveredReply と同じ（その日より前の、届いた毎日の返信のうち、いちばん新しいもの）。
+ * 読めなかったときは null（呼び出し側は、その分を載せずに送る。失敗はここで記録する）。
+ *
+ * 行の数は、多くて「期間の日数 × 参加者の数」（1 人・1 日・1 種類に 1 行）。上限（LATEST_REPLIES_ROW_CAP）に
+ * 届いたときは、古い日の行が欠けているかもしれないので、警告を記録する（その人たちの分が、朝のメールに
+ * 載らないことがある。入力画面は 1 人ずつ読むので影響しない）。
+ */
+export async function getLatestDeliveredRepliesForTenant(
+  tenantId: string,
+  sinceDate: string,
+  beforeDate: string
+): Promise<Map<string, CoachReply> | null> {
+  const { data, error } = await getClient()
+    .from("coach_replies")
+    .select(`${REPLY_COLS}, participant_id`)
+    .eq("tenant_id", tenantId)
+    .eq("kind", "daily")
+    .eq("status", "delivered")
+    .gte("reply_date", sinceDate)
+    .lt("reply_date", beforeDate)
+    .order("reply_date", { ascending: false })
+    .limit(LATEST_REPLIES_ROW_CAP);
+  if (error) {
+    logger.error("getLatestDeliveredRepliesForTenant failed", { error: error.message, tenantId });
+    return null;
+  }
+  if ((data || []).length >= LATEST_REPLIES_ROW_CAP) {
+    logger.warn("getLatestDeliveredRepliesForTenant hit the row cap; older rows may be missing", {
+      tenantId,
+      rows: (data || []).length,
+    });
+  }
+  const latest = new Map<string, CoachReply>();
+  for (const row of (data || []) as Array<ReplyRow & { participant_id: string | null }>) {
+    // 新しい順に並んでいるので、最初に出てきた 1 件が、その人のいちばん新しい返信。
+    if (row.participant_id && !latest.has(row.participant_id)) latest.set(row.participant_id, mapReply(row));
+  }
+  return latest;
+}
+
+/**
+ * その環境で、AIコーチを「受け取らない」にしている参加者の ID（朝のメールに「前回の問い」を載せない人）。
+ * 読めなかったときは null（呼び出し側は、だれの分も載せずに送る。失敗はここで記録する）。
+ */
+export async function getCoachOptedOutIds(tenantId: string): Promise<Set<string> | null> {
+  const { data, error } = await getClient()
+    .from("coaching_profiles")
+    .select("participant_id")
+    .eq("tenant_id", tenantId)
+    .eq("coach_enabled", false);
+  if (error) {
+    logger.error("getCoachOptedOutIds failed", { error: error.message, tenantId });
+    return null;
+  }
+  return new Set(
+    ((data || []) as Array<{ participant_id: string | null }>)
+      .map((r) => r.participant_id)
+      .filter((id): id is string => typeof id === "string" && id !== "")
+  );
+}
+
 // ---------------------------------------------------------------------------
 // 返信の保存
 // ---------------------------------------------------------------------------

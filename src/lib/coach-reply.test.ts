@@ -367,7 +367,10 @@ describe("formatReplyDate / formatJstDateTime", () => {
 
 describe("COACH_TERMS（参加者に見える文）", () => {
   const all = [
-    ...Object.values(COACH_TERMS).flatMap((v) => (typeof v === "string" ? [v] : [...v])),
+    // 文字列、文字列の並び（説明文）、日付を受け取って文を返すもの（"11/24" を入れて確かめる）。
+    ...Object.values(COACH_TERMS).flatMap((v) =>
+      typeof v === "string" ? [v] : typeof v === "function" ? [v("11/24")] : [...v]
+    ),
     ...Object.values(COACH_BOARD_TERMS).flatMap((v) => (typeof v === "string" ? [v] : Object.values(v))),
   ];
 
@@ -378,7 +381,7 @@ describe("COACH_TERMS（参加者に見える文）", () => {
   });
 
   it("説明文は、決まっていないこと（評価への利用、消し方、保存の期間）を約束しない", () => {
-    for (const line of COACH_TERMS.aboutLines) {
+    for (const line of [...COACH_TERMS.aboutLines, COACH_TERMS.aboutLinePreviousQuestion]) {
       expect(line).not.toMatch(/評価に(は)?使いません|削除|消去|消せます|保存期間|学習に(は)?使われません/);
     }
   });

@@ -178,4 +178,27 @@ describe("BlueprintClient：AIコーチの欄（feature.coachReply）", () => {
     expect(html).toContain(COACH_TERMS.optInLoadFailed);
     expect(html).not.toContain(COACH_TERMS.optInHelp);
   });
+
+  it("前回の問いを、メールと記入画面に出している環境では、そのことを説明に足す（feature.coachPreviousQuestion）", () => {
+    const html = render(profile, { optIn: true, loadFailed: false, previousQuestion: true });
+    expect(html).toContain(COACH_TERMS.aboutLinePreviousQuestion);
+    // もとの説明文は、そのまま出る。
+    for (const line of COACH_TERMS.aboutLines) expect(html).toContain(line);
+  });
+
+  it("前回の問いを出していない環境の説明は、これまでと同じ（指定なし・false）", () => {
+    const base = render(profile, { optIn: true, loadFailed: false });
+    expect(base).not.toContain(COACH_TERMS.aboutLinePreviousQuestion);
+    expect(render(profile, { optIn: true, loadFailed: false, previousQuestion: false })).toBe(base);
+  });
+
+  it("設計図がまだ無い人・確認前の人にも、説明の 1 行は出す（確定の前に読めるように）", () => {
+    const none = render(null, { optIn: null, loadFailed: false, previousQuestion: true });
+    expect(none).toContain(COACH_TERMS.aboutLinePreviousQuestion);
+    const draft = render(
+      { ...profile, status: "draft", confirmedAt: null },
+      { optIn: true, loadFailed: false, previousQuestion: true }
+    );
+    expect(draft).toContain(COACH_TERMS.aboutLinePreviousQuestion);
+  });
 });

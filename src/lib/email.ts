@@ -8,6 +8,7 @@ import { escapeHtml } from "./sanitize";
 import { MORNING_CLOSE_HOUR_JST } from "./date-utils";
 import { buildQuestionReminderEmail } from "./reminder-mail-question";
 import { buildReminderPersonal, type CoachingProfile } from "./coaching-profile";
+import { previousQuestionMailLabel, type PreviousCoachQuestion } from "./coach-reply";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const FROM_EMAIL = process.env.REMIND_FROM_EMAIL || "CORE Log <noreply@resend.dev>";
@@ -126,6 +127,11 @@ interface SendEmailOptions {
   personal?: {
     profile: CoachingProfile | null;
     issue: { label: string; title: string; hypothesisLabel: string; hypothesis: string | null } | null;
+    /**
+     * 前回の AIコーチの問い（feature.coachPreviousQuestion。朝・確認済みの人にだけ載る）。
+     * 出してよいかは、呼び出し側（coach-previous-question.ts）が決めて渡す。無いときは null か未指定。
+     */
+    coachQuestion?: PreviousCoachQuestion | null;
   };
 }
 
@@ -449,6 +455,13 @@ export async function sendReminderEmail(options: SendEmailOptions): Promise<bool
               profile: options.personal.profile,
               issue: options.personal.issue,
               profileUrl: `${APP_BASE_URL}/p/${token}/blueprint`,
+              // 前回の AIコーチの問い（見出しは「前回のAIコーチの問い（11/24 の記入への返信から）」の形）。
+              coachQuestion: options.personal.coachQuestion
+                ? {
+                    label: previousQuestionMailLabel(options.personal.coachQuestion.replyDate),
+                    text: options.personal.coachQuestion.text,
+                  }
+                : null,
             })
           : null,
       });

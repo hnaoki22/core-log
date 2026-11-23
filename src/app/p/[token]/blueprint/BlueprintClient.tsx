@@ -38,8 +38,10 @@ import { useLeaveGuard } from "@/lib/use-leave-guard";
  * - null・未指定 = 欄を出さない（スイッチが OFF、商品モード、アプリ全体で止めている）。
  * - optIn: null  = 設計図の行が、まだ無い。
  * - loadFailed   = いまの設定を読めなかった（ボタンを出さない）。
+ * - previousQuestion = 前回の問いを、翌朝のメールと記入画面に出している環境（feature.coachPreviousQuestion）。
+ *                      true のときだけ、説明に 1 行足す。未指定は false。
  */
-export type BlueprintCoachProps = { optIn: boolean | null; loadFailed: boolean } | null;
+export type BlueprintCoachProps = { optIn: boolean | null; loadFailed: boolean; previousQuestion?: boolean } | null;
 
 /**
  * 先頭に出す、いまのイシュー（ミッション）。サーバー（page.tsx）が決める。
@@ -336,6 +338,7 @@ export default function BlueprintClient({ token, initialProfile, loadFailed, coa
                 hasProfile={status !== "none"}
                 initialOptIn={coach.optIn}
                 loadFailed={coach.loadFailed}
+                previousQuestionOn={coach.previousQuestion === true}
               />
             )}
 

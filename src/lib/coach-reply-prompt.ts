@@ -174,15 +174,11 @@ export function interpretCoachOutput(raw: string): CoachOutcome {
   return { kind: "reply", text: text.replace(/\n{3,}/g, "\n\n") };
 }
 
-/** 返信の最後の段落（「あした確かめること」の問い）。次の返信を作るときに、前回の問いとして渡す。 */
-export function lastParagraph(content: string): string | null {
-  const paragraphs = content
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter((p) => p !== "");
-  if (paragraphs.length === 0) return null;
-  return paragraphs[paragraphs.length - 1];
-}
+/**
+ * 返信の最後の段落（「あした確かめること」の問い）。次の返信を作るときに、前回の問いとして渡す。
+ * 切り方は coach-reply.ts に置いている（画面とメールに出す「前回の問い」と、同じ切り方を使うため）。
+ */
+export { lastParagraph } from "./coach-reply";
 
 /** 作った返信を、どの状態で保存するか。 */
 export function statusForNewReply(outcome: CoachOutcome, config: CoachConfig): CoachReplyStatus | null {

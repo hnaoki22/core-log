@@ -323,6 +323,77 @@ export function formatJstDateTime(iso: string | null | undefined): string {
   return `${Number(get("month"))}/${Number(get("day"))} ${get("hour")}:${get("minute")}`;
 }
 
+// ---------------------------------------------------------------------------
+// 前回の問い（翌朝のメールと入力画面に出す。feature.coachPreviousQuestion）
+// ---------------------------------------------------------------------------
+
+/** 返信の段落（空行で区切る。前後の空白を除き、空の段落は数えない）。 */
+export function replyParagraphs(content: string): string[] {
+  return content
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter((p) => p !== "");
+}
+
+/**
+ * 返信の最後の段落（「あした確かめること」の問い）。
+ * 次の返信を作るときに、前回の問いとして AI に渡す（coach-reply-prompt.ts）。画面とメールに出すときは、
+ * 下の pickPreviousCoachQuestion を通す。
+ */
+export function lastParagraph(content: string): string | null {
+  const paragraphs = replyParagraphs(content);
+  if (paragraphs.length === 0) return null;
+  return paragraphs[paragraphs.length - 1];
+}
+
+/** 「前回の問い」を出すのは、その返信の記入の日から、この日数まで（古い問いを、毎朝出し続けない）。 */
+export const COACH_PREVIOUS_QUESTION_MAX_AGE_DAYS = 7;
+/** 「前回の問い」として出す段落の、長さの上限。これより長いときは出さない（途中で切った問いを見せない）。 */
+export const COACH_PREVIOUS_QUESTION_MAX_CHARS = 200;
+
+/** 画面とメールに出す「前回の問い」。replyDate は、その返信が返した記入の日（YYYY-MM-DD）。 */
+export type PreviousCoachQuestion = { text: string; replyDate: string };
+
+/** YYYY-MM-DD の 2 つの日付の差（to − from。暦の日数）。形が違うときは null。 */
+function daysBetween(from: string, to: string): number | null {
+  if (!DATE_RE.test(from) || !DATE_RE.test(to)) return null;
+  const [fy, fm, fd] = from.split("-").map(Number);
+  const [ty, tm, td] = to.split("-").map(Number);
+  const a = Date.UTC(fy, fm - 1, fd);
+  const b = Date.UTC(ty, tm - 1, td);
+  if (Number.isNaN(a) || Number.isNaN(b)) return null;
+  return Math.round((b - a) / 86_400_000);
+}
+
+/**
+ * 翌朝のメールと入力画面に出す「前回の AIコーチの問い」を、前回の返信から取り出す。出さないときは null。
+ *
+ * - 届いた（delivered）毎日の返信からだけ。確認待ち・取り下げ済みの返信の文は、本人に見せない（toParticipantView と同じ）。
+ * - 今日より前の記入への返信で、COACH_PREVIOUS_QUESTION_MAX_AGE_DAYS 日以内のものだけ。
+ * - 段落が 2 つ以上ある返信の、最後の段落。段落が 1 つだけの返信（問いの段落を分けていない）と、
+ *   最後の段落が COACH_PREVIOUS_QUESTION_MAX_CHARS 字を超える返信からは、出さない（全文は「FB」のタブで読める）。
+ *
+ * どの返信を「前回」とするかは、AI に渡す前回の問いと同じ（その日より前の、届いた毎日の返信のうち、
+ * いちばん新しいもの。coach-reply-store.ts の getPreviousDeliveredReply）。出すかどうかの条件だけ、ここで足す。
+ */
+export function pickPreviousCoachQuestion(args: {
+  reply: { status: CoachReplyStatus; kind?: string | null; replyDate: string; content: string } | null | undefined;
+  /** 今日（JST。YYYY-MM-DD）。 */
+  today: string;
+}): PreviousCoachQuestion | null {
+  const reply = args.reply;
+  if (!reply) return null;
+  if (reply.status !== "delivered") return null;
+  if (reply.kind != null && reply.kind !== "daily") return null;
+  const age = daysBetween(reply.replyDate, args.today);
+  if (age === null || age < 1 || age > COACH_PREVIOUS_QUESTION_MAX_AGE_DAYS) return null;
+  const paragraphs = replyParagraphs(reply.content);
+  if (paragraphs.length < 2) return null;
+  const text = paragraphs[paragraphs.length - 1];
+  if (text.length > COACH_PREVIOUS_QUESTION_MAX_CHARS) return null;
+  return { text, replyDate: reply.replyDate };
+}
+
 /** 画面の文言（参加者の画面と、運営の確認ページ）。文言を足す・変えるときは、ここに足す。 */
 export const COACH_TERMS = {
   name: "AIコーチ",
@@ -335,6 +406,11 @@ export const COACH_TERMS = {
   listEmptyNoProfile: "設計図を確定すると、夕方の記入のあとに、AIコーチからの問いかけが届きます。",
   listEmptyOptedOut: "AIコーチの返信を「受け取らない」に設定しています。設計図のページで切り替えられます。",
   replyDateSuffix: "の記入への返信",
+  // 前回の問い（翌朝のメールと入力画面に出す。feature.coachPreviousQuestion）
+  previousQuestionLabel: "前回のAIコーチの問い",
+  /** date は "11/24" の形（formatReplyDate）。 */
+  previousQuestionFrom: (date: string) => `${date} の記入への返信から`,
+  previousQuestionLink: "返信の全文を読む",
   // 設計図のページ
   optInLabel: "AIコーチの返信を受け取る",
   optInOn: "受け取る",
@@ -361,7 +437,19 @@ export const COACH_TERMS = {
     "設定によっては、運営の担当者が読んでから、返信が届きます。",
     "「受け取らない」にしても、それまでに届いた返信は残ります。",
   ],
+  /**
+   * 説明文に足す 1 行（前回の問いを翌朝に出している環境＝feature.coachPreviousQuestion が ON の環境だけ）。
+   * 届いた返信の文が、メールにも載ることを書く。スイッチが OFF の環境では出さない（行っていないことを書かない）。
+   * 「何行で」「いつまで」は書かない（問いは 200 字までで、1 行とは限らない。次の返信が届くか、7 日たつまで出る）。
+   */
+  aboutLinePreviousQuestion:
+    "届いた返信の最後の問いは、朝のリマインドメールと記入画面にも出ます。「受け取らない」にしているあいだは、出ません。",
 } as const;
+
+/** 朝のリマインドメールに載せる、前回の問いの見出し：「前回のAIコーチの問い（11/24 の記入への返信から）」。 */
+export function previousQuestionMailLabel(replyDate: string): string {
+  return `${COACH_TERMS.previousQuestionLabel}（${COACH_TERMS.previousQuestionFrom(formatReplyDate(replyDate))}）`;
+}
 
 /**
  * 運営へのお知らせメール（返信が、確認待ち・確認が必要になったときに送る。coach-notice.ts）の、

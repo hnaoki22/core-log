@@ -217,6 +217,16 @@ export const FEATURE_CATALOG: FeatureFlag[] = [
     implemented: true,
     dependencies: ["feature.coachingProfile"],
   },
+  {
+    key: "feature.coachPreviousQuestion",
+    label: "前回のAIコーチの問いを、翌朝に出す",
+    description: "前回の、届いたAIコーチの返信の最後の問いを、朝のリマインドメール（問いを載せたメール）と、入力画面の問いの上に出す。AIコーチの返信が動いている環境で、設計図を確定していて、受け取りを切っていない人にだけ出す。7日より前の返信の問いは出さない。新しくAIに送るものは無い。",
+    category: "existing",
+    defaultEnabled: false,
+    phase1Enabled: false,
+    implemented: true,
+    dependencies: ["feature.coachReply"],
+  },
 
   // ===== Tier S: Differentiators =====
   {
@@ -749,6 +759,8 @@ export const PRESETS: Preset[] = [
       // AIコーチの返信は、記入を外部のAIに送る。プリセットを当てただけで ON にならないよう、
       // 「全機能ON」には含めない（ON にするときは、スイッチを個別に入れる）。
       flags["feature.coachReply"] = false;
+      // AIコーチの返信に付く表示なので、同じ扱いにする（AIコーチの返信を ON にした環境で、個別に入れる）。
+      flags["feature.coachPreviousQuestion"] = false;
       return flags;
     },
   },
