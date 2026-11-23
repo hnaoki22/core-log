@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
+import fs from "fs";
+import path from "path";
 import {
+  COACH_NOTICE_ADMIN_SCREEN,
   COACH_NOTICE_CONFIG_KEY,
   COACH_NOTICE_MAIL_TERMS,
   COACH_NOTICE_MAX_RECIPIENTS,
@@ -174,15 +177,18 @@ describe("buildCoachNoticeEmail：確認が必要（返信を作らなかった�
       `記入に、強い不調などを書いた言い方があったか、AIが返信を作らないと判断しました。本人の画面には「${COACH_TERMS.pending}」と出ています。`
     );
     expect(mail.html).toContain("していただくこと");
-    expect(mail.html).toContain("管理画面を開き、環境「見本の環境」を選びます。");
+    // 入口の場所を書く（環境を選ぶ場所／「環境とユーザー」の欄の下の、4 つの数字のすぐ下）。
     expect(mail.html).toContain(
-      "「AIコーチの確認」を開き、1/6 の記入を読みます。開いたときの日付は今日です。違う日のときは、「← 前の日」で合わせます。"
+      "管理画面を開き、いちばん上の選択欄（開いたときは「全環境」）で「見本の環境」を選びます。"
+    );
+    expect(mail.html).toContain(
+      "「環境とユーザー」の欄の下にある4つの数字（参加者・平均完了率・今日の記入・FB配信数）のすぐ下の「AIコーチの確認」を押し、1/6 の記入を読みます。開いたときの日付は今日です。違う日のときは、「← 前の日」で合わせます。"
     );
     expect(mail.html).toContain("必要な連絡をしたあとで「確認済みにする」を押します。本人の画面の表示が消えます。");
     expect(mail.html).toContain("この環境で、いま確認を待っているもの：2件（うち、返信を作っていないもの 1件）");
     // 手順の番号は、文の中に書く（番号つきの並びの見た目に頼らない）。
     expect(mail.html).toContain(">1. 管理画面を開き、");
-    expect(mail.html).toContain(">2. 「AIコーチの確認」を開き、");
+    expect(mail.html).toContain(">2. 「環境とユーザー」の欄の下にある4つの数字");
     expect(mail.html).toContain(">3. 必要な連絡をしたあとで");
     expect(mail.html).not.toContain("<ol");
     expect(mail.html).not.toContain("<li");
@@ -209,7 +215,8 @@ describe("buildCoachNoticeEmail：確認が必要（返信を作らなかった�
   });
 
   it("画面の言葉（確認ページの名前・ボタンの名前・本人の画面の文）は、画面の表と同じものを使う", () => {
-    expect(mail.html).toContain(`「${COACH_BOARD_TERMS.title}」`);
+    // 手順で「押す」と書くのは、管理画面の入口のカードの名前。
+    expect(mail.html).toContain(`「${COACH_BOARD_TERMS.entryCardTitle}」を押し、`);
     expect(mail.html).toContain(`「${COACH_BOARD_TERMS.acknowledge}」`);
     expect(mail.html).toContain(`「${COACH_TERMS.pending}」`);
   });
@@ -225,7 +232,7 @@ describe("buildCoachNoticeEmail：確認待ち（運営が確認してから届�
     expect(mail.html).toContain(
       `この環境は、運営が確認してから返信を届ける設定です。届けるまで、本人の画面には「${COACH_TERMS.pending}」と出ています。`
     );
-    expect(mail.html).toContain("「AIコーチの確認」を開き、1/6 の返信を読みます。");
+    expect(mail.html).toContain("のすぐ下の「AIコーチの確認」を押し、1/6 の返信を読みます。");
     expect(mail.html).toContain("「この返信を届ける」か「取り下げる」を選びます。");
     expect(mail.html).not.toContain("強い不調");
     expect(mail.html).not.toContain("確認済みにする");
@@ -239,10 +246,70 @@ describe("buildCoachNoticeEmail：宛先が閲覧者のとき（操作はでき�
     expect(hold.html).not.toContain("を選びます。");
     expect(hold.html).toContain("「確認済みにする」の操作は、管理者が行います。");
     expect(hold.html).not.toContain("を押します");
+    // 入口の場所は、閲覧者の画面の並びで書く（閲覧者の画面には、環境の選択欄と「環境とユーザー」の欄が出ない）。
+    expect(hold.html).toContain(
+      "上の4つの数字（参加者・平均完了率・今日の記入・FB配信数）のすぐ下にある「AIコーチの確認」を押し、1/6 の記入を読みます。開いたときの日付は今日です。違う日のときは、「← 前の日」で合わせます。"
+    );
+    expect(hold.html).not.toContain("環境とユーザー");
+    expect(hold.html).not.toContain("全環境");
 
     const pending = buildCoachNoticeEmail({ ...BASE, kind: "pending", canAct: false });
     expect(pending.html).toContain("届ける・取り下げるは、管理者が行います。");
     expect(pending.html).not.toContain("を選びます。");
+  });
+});
+
+// 手順は、管理画面の呼び名と並びを、名前で指している。管理画面の側を変えて、メールの文だけが
+// 古くなることを防ぐ（管理画面のコードを文字として読み、呼び名と並びを確かめる）。
+describe("COACH_NOTICE_ADMIN_SCREEN：手順が指す呼び名と並びが、管理画面のコードと合っている", () => {
+  const page = fs.readFileSync(path.resolve(__dirname, "../app/a/[token]/page.tsx"), "utf-8");
+  const directory = fs.readFileSync(path.resolve(__dirname, "../components/admin/AdminDirectory.tsx"), "utf-8");
+  const STATS_START = "{/* Summary Stats */}";
+  const ENTRY_START = "{data.coachReplyEnabled === true && (";
+
+  it("環境の選択欄は、開いたときに「全環境」を表示している", () => {
+    expect(page).toMatch(
+      new RegExp(`<option value="" [^>]*>${COACH_NOTICE_ADMIN_SCREEN.tenantSelectAll}</option>`)
+    );
+    expect(page).toContain('const [selectedTenantSlug, setSelectedTenantSlug] = useState<string>("");');
+  });
+
+  it("「環境とユーザー」は、管理者にだけ出る欄の見出し", () => {
+    expect(directory).toContain(`>${COACH_NOTICE_ADMIN_SCREEN.directoryHeading}</h2>`);
+    expect(page).toMatch(/\{data\.viewerIsAdmin === true && directory && \(\s*<AdminDirectory/);
+  });
+
+  it("4つの数字の呼び名が、この順で並んでいる", () => {
+    let from = page.indexOf(STATS_START);
+    expect(from).toBeGreaterThan(-1);
+    for (const label of COACH_NOTICE_ADMIN_SCREEN.statLabels) {
+      const at = page.indexOf(`>${label}</div>`, from);
+      expect(at, label).toBeGreaterThan(from);
+      from = at;
+    }
+  });
+
+  it("並びは、「環境とユーザー」の欄 → 4つの数字 → 入口のカード。あいだに、ほかの欄を挟まない", () => {
+    // 部品のタグ（<AdminDirectory のあとに空白）。型の名前（AdminDirectoryData）には当てない。
+    const directoryAt = page.search(/<AdminDirectory\s/);
+    const statsAt = page.indexOf(STATS_START);
+    const lastLabel = COACH_NOTICE_ADMIN_SCREEN.statLabels[COACH_NOTICE_ADMIN_SCREEN.statLabels.length - 1];
+    const lastStatAt = page.indexOf(`>${lastLabel}</div>`, statsAt);
+    const entryAt = page.indexOf(ENTRY_START);
+    expect(directoryAt).toBeGreaterThan(-1);
+    expect(statsAt).toBeGreaterThan(directoryAt);
+    expect(lastStatAt).toBeGreaterThan(statsAt);
+    expect(entryAt).toBeGreaterThan(lastStatAt);
+    // 「環境とユーザー」の欄と 4つの数字のあいだ、4つの数字と入口のあいだに、見出しつきの欄が無い。
+    const directoryEnd = page.indexOf("/>", directoryAt);
+    expect(page.slice(directoryEnd, statsAt)).not.toMatch(/<h2|<h3|<section|className="card/);
+    expect(page.slice(lastStatAt, entryAt)).not.toMatch(/<h2|<h3|<section|className="card/);
+  });
+
+  it("入口のカードの名前は、手順に書く名前と同じ", () => {
+    const entryAt = page.indexOf(ENTRY_START);
+    expect(page.slice(entryAt, entryAt + 900)).toContain("{COACH_BOARD_TERMS.entryCardTitle}");
+    expect(COACH_BOARD_TERMS.entryCardTitle).toBe("AIコーチの確認");
   });
 });
 
@@ -256,7 +323,9 @@ describe("buildCoachNoticeEmail：値が欠けているとき・変わった値�
     const mail = buildCoachNoticeEmail({ ...BASE, kind: "needs_attention", tenantName: "" });
     expect(mail.subject).toBe("【CORE Log】AIコーチ：確認が必要な記入があります（1/6）");
     expect(mail.html).toContain(COACH_NOTICE_MAIL_TERMS.tenantUnknown);
-    expect(mail.html).toContain("管理画面を開き、この環境を選びます。");
+    expect(mail.html).toContain(
+      "管理画面を開き、いちばん上の選択欄（開いたときは「全環境」）で、この環境を選びます。"
+    );
   });
 
   it("環境の名前に入った記号は、本文では無害にし、件名からは改行を除く", () => {
