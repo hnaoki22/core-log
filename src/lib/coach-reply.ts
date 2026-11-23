@@ -363,6 +363,18 @@ export const COACH_TERMS = {
   ],
 } as const;
 
+/**
+ * 運営へのお知らせメール（返信が、確認待ち・確認が必要になったときに送る。coach-notice.ts）の、
+ * その環境の宛先の設定の状態。確認ページに、管理者にだけ出す。
+ * - ready          = 宛先があり、送れる
+ * - not_configured = 宛先の設定（ai_settings の coach_notify_config）が無い
+ * - invalid_config = 設定の行はあるが、形が正しくない
+ * - no_recipient   = 設定はあるが、送れる人がいない（このページを読めない人か、アドレスの登録が無い人）
+ * - unknown        = 設定を読めなかった
+ * ready 以外では、確認待ち・確認が必要になっても、メールは送られない。
+ */
+export type CoachNoticeState = "ready" | "not_configured" | "invalid_config" | "no_recipient" | "unknown";
+
 /** 運営の確認ページ（/a/[token]/coach）の文言。 */
 export const COACH_BOARD_TERMS = {
   title: "AIコーチの確認",
@@ -403,4 +415,24 @@ export const COACH_BOARD_TERMS = {
   conflict: "ほかの操作で状態が変わっています。読み込み直しました。",
   actionFailed: "操作できませんでした。時間をおいて、もう一度お試しください。",
   loadFailed: "読み込めませんでした。時間をおいて、ページを開き直してください。",
+  // 運営へのお知らせメールの欄（管理者にだけ出す）。
+  noticeHeading: "お知らせメール",
+  noticeStates: {
+    ready: "「確認待ち」「確認が必要」の返信が出たときに、運営の担当者へメールで知らせます。",
+    not_configured: "宛先の設定がありません。「確認待ち」「確認が必要」の返信が出ても、メールは送られません。",
+    invalid_config:
+      "宛先の設定の形が正しくありません。「確認待ち」「確認が必要」の返信が出ても、メールは送られません。",
+    no_recipient:
+      "設定された宛先に、送れる人がいません（このページを読めない人か、メールアドレスの登録が無い人です）。メールは送られません。",
+    unknown: "宛先の設定を読めませんでした。時間をおいて、ページを開き直してください。",
+  } satisfies Record<CoachNoticeState, string>,
+  noticeRecipients: (count: number) => `宛先：${count}名`,
+  noticeSkipped: (count: number) =>
+    `設定された宛先のうち、${count}名には送れません（このページを読めない人か、メールアドレスの登録が無い人です）。`,
+  noticeTest: "試しに送る",
+  noticeTestSending: "送っています…",
+  noticeTestSent: (count: number) =>
+    `試し送りのメールを、${count}名に送りました。届かないときは、迷惑メールのフォルダを確かめてください。`,
+  noticeTestFailed: "送れませんでした。時間をおいて、もう一度お試しください。",
+  noticeTestTooMany: "続けて送れる回数を超えました。10分ほどおいてから、お試しください。",
 } as const;

@@ -10,6 +10,8 @@
 // - 作る流れは src/lib/coach-reply-service.ts（テスト付き）。ここは、実際の読み書きをつなぐだけ。
 // - 動くのは、feature.coachReply と feature.coachingProfile の両方が ON で、環境の設定
 //   （届け方と開始日。ai_settings の coach_reply_config）がある環境だけ。
+// - 新しく保存した返信が、運営の確認を待つ状態（確認待ち・確認が必要）のときは、運営へメールで知らせる
+//   （coach-notice-service.ts。宛先は、環境ごとの設定 coach_notify_config。送れなくても、本人への応答は変えない）。
 
 import { NextRequest, NextResponse } from "next/server";
 import { getParticipantByToken } from "@/lib/participant-db";
@@ -37,6 +39,14 @@ import {
   listCoachRepliesForParticipant,
   setCoachOptIn,
 } from "@/lib/coach-reply-store";
+import type { CoachNoticeKind } from "@/lib/coach-notice";
+import {
+  noticeLogLevel,
+  sendCoachNotice,
+  withTimeout,
+  type CoachNoticeSendResult,
+} from "@/lib/coach-notice-service";
+import { COACH_NOTICE_TIMEOUT_MS, coachNoticeDeps } from "@/lib/coach-notice-runtime";
 
 export const dynamic = "force-dynamic";
 // AI の応答を待つ（coach-reply-llm.ts の上限は 50 秒）。
@@ -92,6 +102,31 @@ const deps: CoachDeps = {
   callModel: callCoachModel,
   insertReply: insertCoachReply,
 };
+
+/**
+ * 新しく保存した返信が、運営の確認を待つ状態（確認待ち・確認が必要）のときに、運営へメールで知らせる。
+ *
+ * - 送れなかったことで、本人への応答を変えない（返信の保存は済んでいる）。ここからは例外を外に出さない。
+ * - 待つ時間を区切る（COACH_NOTICE_TIMEOUT_MS）。時間内に終わらなかったら、本人への応答を先に返す。
+ * - 記録に残すのは、環境、種類、記入の日、件数だけ（参加者の ID・アドレス・記入の文は残さない）。
+ */
+async function notifyStaff(tenantId: string, notice: { kind: CoachNoticeKind; replyDate: string }): Promise<void> {
+  try {
+    const raced = await withTimeout(
+      sendCoachNotice(coachNoticeDeps, { tenantId, replyDate: notice.replyDate, kind: notice.kind }),
+      COACH_NOTICE_TIMEOUT_MS
+    );
+    const outcome: CoachNoticeSendResult = raced.timedOut ? { status: "timeout" } : raced.value;
+    logger[noticeLogLevel(outcome)]("coach notice", {
+      tenantId,
+      kind: notice.kind,
+      replyDate: notice.replyDate,
+      ...outcome,
+    });
+  } catch (err) {
+    logger.error("coach notice error", { tenantId, error: err instanceof Error ? err.message : String(err) });
+  }
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -165,6 +200,10 @@ export async function POST(req: NextRequest) {
 
     if (result.generated) {
       logger.info("coach-reply saved", { tenantId: me.tenantId, participantId: me.id, state: result.view.state });
+    }
+    // 運営の確認を待つ状態で保存したときだけ、運営へ知らせる（すでにあった返信・届いた返信では、知らせない）。
+    if (result.notice) {
+      await notifyStaff(me.tenantId, result.notice);
     }
     // スイッチが OFF・止める設定・商品モード・環境の設定がまだ無いときは、enabled:false（画面は何も出さない）。
     const enabled = !(

@@ -20,6 +20,13 @@ import {
   type CoachReplyStatus,
 } from "@/lib/coach-reply";
 import { DEFAULT_COACH_SYSTEM_PROMPT } from "@/lib/coach-reply-prompt";
+import {
+  COACH_NOTICE_CONFIG_KEY,
+  parseCoachNoticeConfig,
+  type CoachNoticeConfig,
+  type CoachNoticeCounts,
+  type CoachNoticeRecipientRow,
+} from "@/lib/coach-notice";
 
 const REPLY_COLS = "id, reply_date, kind, content, status, created_at";
 
@@ -512,4 +519,84 @@ export async function setCoachReplyStatus(args: {
     return "conflict";
   }
   return "ok";
+}
+
+// ---------------------------------------------------------------------------
+// 運営へのお知らせメール（返信が、確認待ち・確認が必要になったとき。coach-notice.ts）
+// ---------------------------------------------------------------------------
+
+/**
+ * お知らせの宛先の設定（ai_settings の key='coach_notify_config'。運営の人の ID の並び）。
+ * config: null = 設定が無い、または、形が正しくない（そのときは invalid: true）。どちらも、メールは送らない。
+ * 読めなかったこと（ok: false）と、無いことを分けて返す。
+ */
+export async function getCoachNoticeConfig(
+  tenantId: string
+): Promise<{ ok: true; config: CoachNoticeConfig | null; invalid: boolean } | { ok: false }> {
+  const read = await readSetting(tenantId, COACH_NOTICE_CONFIG_KEY);
+  if (!read.ok) return { ok: false };
+  const config = parseCoachNoticeConfig(read.value);
+  const invalid = config === null && read.value !== null && read.value.trim() !== "";
+  if (invalid) {
+    // 設定の行はあるが、形が正しくない。送らずに、記録に残す（値そのものは残さない）。
+    logger.warn("coach_notify_config is set but not valid; staff notices stay off", { tenantId });
+  }
+  return { ok: true, config, invalid };
+}
+
+/**
+ * お知らせの宛先の候補（運営の人の行から、要る欄だけ）。recipient: null = その ID の人がいない。
+ * メールアドレスを返す。呼び出し側は、アドレスを記録（ログ）にも、画面への応答にも入れないこと。
+ * トークンは読まない（メールに、管理画面を開ける URL を載せないため）。
+ */
+export async function getCoachNoticeRecipient(
+  managerId: string
+): Promise<{ ok: true; recipient: CoachNoticeRecipientRow | null } | { ok: false }> {
+  const { data, error } = await getClient()
+    .from("managers")
+    .select("id, email, is_admin, role, tenant_id")
+    .eq("id", managerId)
+    .maybeSingle();
+  if (error) {
+    logger.error("getCoachNoticeRecipient failed", { error: error.message, managerId });
+    return { ok: false };
+  }
+  if (!data) return { ok: true, recipient: null };
+  const row = data as {
+    id: string;
+    email: string | null;
+    is_admin: boolean | null;
+    role: string | null;
+    tenant_id: string | null;
+  };
+  return {
+    ok: true,
+    recipient: { id: row.id, email: row.email, isAdmin: row.is_admin, role: row.role, tenantId: row.tenant_id },
+  };
+}
+
+/**
+ * その環境で、いま運営の確認を待っている返信の件数（件数だけを数える。文も、だれの返信かも読まない）。
+ * pending = 確認待ちの合計。needsAttention = そのうち、返信の文が無いもの（返信を作らなかった記入）。
+ */
+export async function countPendingCoachReplies(
+  tenantId: string
+): Promise<({ ok: true } & CoachNoticeCounts) | { ok: false }> {
+  const client = getClient();
+  const base = () =>
+    client
+      .from("coach_replies")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .eq("kind", "daily")
+      .eq("status", "pending_review");
+  const [all, empty] = await Promise.all([base(), base().eq("content", "")]);
+  if (all.error || empty.error || all.count === null || empty.count === null) {
+    logger.error("countPendingCoachReplies failed", {
+      error: all.error?.message ?? empty.error?.message ?? "count was not returned",
+      tenantId,
+    });
+    return { ok: false };
+  }
+  return { ok: true, pending: all.count, needsAttention: empty.count };
 }

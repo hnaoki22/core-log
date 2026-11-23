@@ -8,11 +8,19 @@
 // API が決める。この画面は、返ってきたものを出すだけ）。
 //
 // 環境（?tenant=）と日付（?date=）は URL から読む。管理者は、管理画面で環境を 1 つ選んでから開く。
+//
+// 管理者には、お知らせメール（返信が、確認待ち・確認が必要になったときに、運営へ送るメール）の
+// 宛先の設定の状態と、「試しに送る」を出す（CoachNoticePanel。だれに送るかは API が決める）。
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { CoachBoardView, type CoachBoardRowView } from "@/components/admin/CoachBoard";
+import {
+  CoachNoticePanel,
+  type CoachNoticeMessage,
+  type CoachNoticeStatusView,
+} from "@/components/admin/CoachNoticePanel";
 import {
   COACH_BOARD_TERMS as T,
   formatReplyDate,
@@ -34,6 +42,8 @@ type BoardData = {
   killSwitch: boolean;
   config: CoachConfig | null;
   rows: CoachBoardRowView[];
+  /** お知らせメールの宛先の設定の状態。管理者にだけ返る（閲覧者には null）。 */
+  notice?: CoachNoticeStatusView | null;
 };
 
 type LoadState =
@@ -50,6 +60,9 @@ export default function CoachBoardPage() {
   const [state, setState] = useState<LoadState>({ phase: "loading" });
   const [busyReplyId, setBusyReplyId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  // お知らせメールの「試しに送る」。
+  const [mailTestBusy, setMailTestBusy] = useState(false);
+  const [mailTestMessage, setMailTestMessage] = useState<CoachNoticeMessage | null>(null);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -122,6 +135,35 @@ export default function CoachBoardPage() {
     setBusyReplyId(null);
   };
 
+  // お知らせメールを、その環境に設定された宛先へ、試しに送る（管理者だけ。だれに送るかは API が決める）。
+  const testNoticeMail = async () => {
+    if (!query || mailTestBusy || state.phase !== "ready") return;
+    const slug = state.data.tenant.slug;
+    setMailTestBusy(true);
+    setMailTestMessage(null);
+    try {
+      const res = await fetch("/api/admin/coach-replies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, action: "test_notice", tenant: slug }),
+      });
+      const json = (await res.json().catch(() => null)) as { ok?: boolean; sent?: number } | null;
+      if (res.ok && json?.ok === true && typeof json.sent === "number") {
+        setMailTestMessage({ tone: "ok", text: T.noticeTestSent(json.sent) });
+      } else if (res.status === 429) {
+        setMailTestMessage({ tone: "error", text: T.noticeTestTooMany });
+      } else if (res.status !== 409) {
+        // 409 = 宛先が決まらない（設定が無い・送れる人がいない）。読み直したあとの、欄の文が理由を示す。
+        setMailTestMessage({ tone: "error", text: T.noticeTestFailed });
+      }
+    } catch {
+      setMailTestMessage({ tone: "error", text: T.noticeTestFailed });
+    }
+    // 宛先の設定が変わっていることがあるので、読み直す。
+    await load(query);
+    setMailTestBusy(false);
+  };
+
   const data = state.phase === "ready" ? state.data : null;
 
   return (
@@ -190,6 +232,16 @@ export default function CoachBoardPage() {
                 </p>
               )}
               {data.killSwitch && <p className="text-[11px] text-red-700 leading-relaxed">{T.killSwitchNote}</p>}
+              {/* お知らせメールの宛先の設定の状態（管理者にだけ返る）。スイッチが OFF の環境・設定がまだ無い環境でも出す
+                  （AIコーチを動かす前に、宛先を置いて、届くことを確かめられるように）。 */}
+              {data.canAct && data.notice && (
+                <CoachNoticePanel
+                  status={data.notice}
+                  busy={mailTestBusy}
+                  message={mailTestMessage}
+                  onTest={testNoticeMail}
+                />
+              )}
             </div>
 
             {notice && (

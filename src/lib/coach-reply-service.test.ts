@@ -174,7 +174,12 @@ describe("ensureCoachReply：作る場合", () => {
   it("設定が review（既定）なら、確認待ちで保存し、本人には文を返さない", async () => {
     const deps = makeDeps({ getConfig: vi.fn(async () => ({ ok: true as const, config: { deliveryMode: "review" as const, startDate: null } })) });
     const result = await ensureCoachReply(deps, ARGS);
-    expect(result).toEqual({ kind: "view", view: { state: "pending", replyDate: TODAY }, generated: true });
+    expect(result).toEqual({
+      kind: "view",
+      view: { state: "pending", replyDate: TODAY },
+      generated: true,
+      notice: { kind: "pending", replyDate: TODAY },
+    });
     expect(deps.insertReply).toHaveBeenCalledWith(expect.objectContaining({ status: "pending_review", content: REPLY_TEXT }));
   });
 
@@ -201,7 +206,12 @@ describe("ensureCoachReply：作る場合", () => {
       getDayLogs: vi.fn(async () => ({ ok: true as const, logs: [log(TODAY, "もう消えたいと思った")] })),
     });
     const result = await ensureCoachReply(deps, ARGS);
-    expect(result).toEqual({ kind: "view", view: { state: "pending", replyDate: TODAY }, generated: true });
+    expect(result).toEqual({
+      kind: "view",
+      view: { state: "pending", replyDate: TODAY },
+      generated: true,
+      notice: { kind: "needs_attention", replyDate: TODAY },
+    });
     expect(deps.callModel).not.toHaveBeenCalled();
     expect(deps.insertReply).toHaveBeenCalledWith(
       expect.objectContaining({ status: "pending_review", content: "", model: null, inputsUsed: [] })
@@ -211,7 +221,11 @@ describe("ensureCoachReply：作る場合", () => {
   it("AI が「返信を作らない」と返したときは、設定が auto でも確認待ち（文なし）にする", async () => {
     const deps = makeDeps({ callModel: vi.fn(async () => ({ ok: true as const, text: COACH_HOLD_MARKER, model: "model-x" })) });
     const result = await ensureCoachReply(deps, ARGS);
-    expect(result).toMatchObject({ view: { state: "pending", replyDate: TODAY }, generated: true });
+    expect(result).toMatchObject({
+      view: { state: "pending", replyDate: TODAY },
+      generated: true,
+      notice: { kind: "needs_attention", replyDate: TODAY },
+    });
     expect(deps.insertReply).toHaveBeenCalledWith(expect.objectContaining({ status: "pending_review", content: "" }));
   });
 
@@ -220,7 +234,12 @@ describe("ensureCoachReply：作る場合", () => {
       callModel: vi.fn(async () => ({ ok: false as const, reason: "refusal", model: "model-x" })),
     });
     const result = await ensureCoachReply(deps, ARGS);
-    expect(result).toEqual({ kind: "view", view: { state: "pending", replyDate: TODAY }, generated: true });
+    expect(result).toEqual({
+      kind: "view",
+      view: { state: "pending", replyDate: TODAY },
+      generated: true,
+      notice: { kind: "needs_attention", replyDate: TODAY },
+    });
     // AI に送ったことは、記録に残す（強い不調などの語で止めたときは、送っていないので残らない）
     expect(deps.insertReply).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -258,6 +277,63 @@ describe("ensureCoachReply：作る場合", () => {
   it("保存に失敗したときは、失敗を返す", async () => {
     const deps = makeDeps({ insertReply: vi.fn(async () => ({ ok: false as const, reason: "error" as const })) });
     expect(await ensureCoachReply(deps, ARGS)).toEqual({ kind: "error", error: "save_failed" });
+  });
+});
+
+describe("ensureCoachReply：運営へ知らせる対象（notice）", () => {
+  // notice があるときだけ、API が運営へメールで知らせる。同じ返信で 2 回知らせないために、
+  // 「今回の呼び出しで、確認を待つ状態の行を新しく保存した」ときにだけ入る。
+  const hasNotice = (result: unknown) => typeof result === "object" && result !== null && "notice" in result;
+
+  it("届いた状態で保存したときは、入らない", async () => {
+    const result = await ensureCoachReply(makeDeps(), ARGS);
+    expect(result).toMatchObject({ view: { state: "delivered" }, generated: true });
+    expect(hasNotice(result)).toBe(false);
+  });
+
+  it("前日の記入を確認待ちで保存したときは、その日付で入る", async () => {
+    const deps = makeDeps({
+      getDayLogs: vi.fn(async () => ({ ok: true as const, logs: [log(TODAY, ""), log(YESTERDAY, "もう消えたいと思った")] })),
+    });
+    expect(await ensureCoachReply(deps, ARGS)).toMatchObject({
+      generated: true,
+      notice: { kind: "needs_attention", replyDate: YESTERDAY },
+    });
+  });
+
+  it("すでにある確認待ちの返信を返したときは、入らない（本人が開き直すたびに、知らせない）", async () => {
+    for (const existing of [reply(TODAY, "pending_review"), reply(TODAY, "pending_review", "")]) {
+      const deps = makeDeps({ getReply: vi.fn(async () => ({ ok: true as const, reply: existing })) });
+      const result = await ensureCoachReply(deps, ARGS);
+      expect(result).toMatchObject({ view: { state: "pending" }, generated: false });
+      expect(hasNotice(result)).toBe(false);
+    }
+  });
+
+  it("ほぼ同時の 2 回目で保存がぶつかったときは、入らない（先に保存したほうの呼び出しが知らせる）", async () => {
+    const getReply = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, reply: null })
+      .mockResolvedValueOnce({ ok: true, reply: reply(TODAY, "pending_review", "") });
+    const deps = makeDeps({
+      getDayLogs: vi.fn(async () => ({ ok: true as const, logs: [log(TODAY, "もう消えたいと思った")] })),
+      getReply,
+      insertReply: vi.fn(async () => ({ ok: false as const, reason: "conflict" as const })),
+    });
+    const result = await ensureCoachReply(deps, ARGS);
+    expect(result).toMatchObject({ view: { state: "pending" }, generated: false });
+    expect(hasNotice(result)).toBe(false);
+  });
+
+  it("確かめるだけの呼び出し・作らなかったとき・失敗したときは、入らない", async () => {
+    const hold = { getDayLogs: vi.fn(async () => ({ ok: true as const, logs: [log(TODAY, "もう消えたいと思った")] })) };
+    expect(hasNotice(await ensureCoachReply(makeDeps(hold), { ...ARGS, checkOnly: true }))).toBe(false);
+    expect(hasNotice(await ensureCoachReply(makeDeps({ ...hold, getOptIn: vi.fn(async () => ({ ok: true as const, enabled: false })) }), ARGS))).toBe(false);
+    expect(
+      hasNotice(
+        await ensureCoachReply(makeDeps({ ...hold, insertReply: vi.fn(async () => ({ ok: false as const, reason: "error" as const })) }), ARGS)
+      )
+    ).toBe(false);
   });
 });
 
