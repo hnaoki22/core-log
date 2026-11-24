@@ -162,6 +162,11 @@ export type ReminderPersonal = {
   confirmPrompt: boolean;
   /** 設計図のページの URL。 */
   profileUrl: string;
+  /**
+   * 前回の AIコーチの問い（朝。確認済みの人だけ。feature.coachPreviousQuestion）。載せないときは、キーごと無い。
+   * label は見出し（呼び出し側が、coach-reply.ts の言葉で作って渡す。このファイルは coach-reply.ts を読み込まない）。
+   */
+  coachQuestion?: { label: string; text: string };
 };
 
 export function buildReminderPersonal(args: {
@@ -170,6 +175,8 @@ export function buildReminderPersonal(args: {
   /** 進行中のイシュー（ミッション）の 1 件目。無ければ null。 */
   issue: { label: string; title: string; hypothesisLabel: string; hypothesis: string | null } | null;
   profileUrl: string;
+  /** 前回の AIコーチの問い。朝・確認済みの人にだけ載る（確認前の人、夕方のメールには載せない）。 */
+  coachQuestion?: { label: string; text: string } | null;
 }): ReminderPersonal {
   const usable = isUsableProfile(args.profile);
   if (args.type === "morning") {
@@ -184,7 +191,17 @@ export function buildReminderPersonal(args: {
       }
     }
     lines.push({ label: COACHING_TERMS.headlineLabel, value: (args.profile as CoachingProfile).headline });
-    return { lines, personalQuestion: null, confirmPrompt: false, profileUrl: args.profileUrl };
+    const personal: ReminderPersonal = {
+      lines,
+      personalQuestion: null,
+      confirmPrompt: false,
+      profileUrl: args.profileUrl,
+    };
+    const coachQuestion = args.coachQuestion;
+    if (coachQuestion && coachQuestion.text.trim() !== "") {
+      personal.coachQuestion = { label: coachQuestion.label, text: coachQuestion.text.trim() };
+    }
+    return personal;
   }
   return {
     lines: [],

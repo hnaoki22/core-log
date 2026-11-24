@@ -72,7 +72,7 @@ core-log/
 │   │   ├── BlueprintEntryLink.tsx    # 設計図のページへの入口（ホームに置く。feature.coachingProfile。表示だけ）
 │   │   ├── BlueprintIssueCard.tsx    # 設計図のページの先頭に出す、いまのイシュー（ミッション）と仮説（進行中のうち、いちばん新しい 1 件。表示だけ・API は呼ばない）
 │   │   ├── BlueprintReviewNotice.tsx # 新しいイシューを設定した直後に、「イシュー」のページに出す、設計図の見直しの案内（表示だけ）
-│   │   ├── CoachReply.tsx            # AIコーチの返信を本人の画面に出す部品（1 件のカード／完了の画面に置く枠／「FB」のタブの一覧。feature.coachReply）
+│   │   ├── CoachReply.tsx            # AIコーチの返信を本人の画面に出す部品（1 件のカード／完了の画面に置く枠／「FB」のタブの一覧。feature.coachReply）。入力画面の問いの上に置く、前回の問い（CoachPreviousQuestionCard。feature.coachPreviousQuestion。表示だけ）もここ
 │   │   └── CoachOptInCard.tsx        # 設計図のページに置く、AIコーチの説明と「受け取る・受け取らない」（押したときに保存する）
 │   ├── components/admin/
 │   │   ├── AdminDirectory.tsx        # 管理画面「環境とユーザー」の欄（環境の一覧／環境ごとのユーザーと「画面を開く」「URLをコピー」。「画面を開く」は、確認コードが OFF の環境にだけ出す。管理者にだけ出す。表示だけ・API は呼ばない）
@@ -105,6 +105,8 @@ core-log/
 │   │   ├── coach-reply-service.ts    # 返信を、要るときに 1 回だけ作る流れ（読み書きと AI の呼び出しは引数で受け取る。テスト付き）
 │   │   ├── coach-reply-llm.ts        # AIコーチの AI の呼び出し（モデルの選び方、アプリ全体の停止、失敗の種類。記入の文をログに残さない。テスト付き）
 │   │   ├── coach-reply-store.ts      # AIコーチの返信の読み書き（coach_replies 表、環境の設定、その環境で動いているか、本人の受け取りの設定、確認ページの読み取り、お知らせメールの宛先の設定・宛先の人・確認待ちの件数。サーバー側だけ）
+│   │   ├── coach-previous-question.ts # 前回の AIコーチの問いを、翌朝のメールと入力画面に出してよいかを決める流れ（1 人分／環境の全員分。読み取りは引数で受け取る。例外を外に出さない。テスト付き。サーバー側だけ。§5 参照）
+│   │   ├── coach-previous-question-runtime.ts # 上の流れに、実際の読み取り（スイッチ、アプリ全体の停止、AIコーチの返信が動いているか、受け取りの設定、前回の返信）をつないだもの（サーバー側だけ）
 │   │   ├── coach-notice.ts           # 運営へのお知らせメールの決まりと文面：知らせる対象か、宛先の設定の読み方、宛先にしてよい人、メールの件名と本文（純関数・テスト付き。サーバー側だけが読み込む。§5 参照）
 │   │   ├── coach-notice-service.ts   # お知らせメールを送る流れ（設定→宛先→送信。読み取りと送信は引数で受け取る。例外を外に出さない。結果は件数だけ。テスト付き）
 │   │   ├── coach-notice-runtime.ts   # お知らせメールの、実際の読み取りと送信をつないだもの。待つ時間の上限（サーバー側だけ）
@@ -221,7 +223,7 @@ PR タイトル例（リポの履歴に合わせる）:
 
 ## 5. 機能フラグ（FEATURE_CATALOG 実数）
 
-`src/lib/feature-flags.ts` の `FEATURE_CATALOG` は **2026-11-22 時点で 58 件 / 12 カテゴリ**（下の表はコードを数え直した値。2026-06-10 に mode カテゴリ + `standalone_mode` を追加。§9 決定で `tier-f.beforeAfter` と `tier-d.heroAssessment` を削除——打合せ文字起こしの「色軸評価」は「4軸評価」の誤変換で、正対象は HERO自己評価と本藤さん確認済み）。
+`src/lib/feature-flags.ts` の `FEATURE_CATALOG` は **2026-11-23 時点で 59 件 / 12 カテゴリ**（下の表はコードを数え直した値。2026-06-10 に mode カテゴリ + `standalone_mode` を追加。§9 決定で `tier-f.beforeAfter` と `tier-d.heroAssessment` を削除——打合せ文字起こしの「色軸評価」は「4軸評価」の誤変換で、正対象は HERO自己評価と本藤さん確認済み）。
 
 **mode カテゴリ（2026-06-10 追加）**: `standalone_mode` = 商品版の動作モード。ON のテナントは①朝夕3画面入力（体調→意図/結果→気分、`evening_energy` 分離保存）②気分ローソク足③分析機能の段階開示（21日+記入10日）④マネージャー/管理者のログ本文閲覧を API レベルで遮断＋投稿通知メール停止⑤未記入フォローアップ。大幸薬品では `applyTenantFlagGuards` が強制 OFF（tier-0 と同じ防御）。サーバー判定は `src/lib/standalone.ts`（`isStandaloneTenant` / `standaloneGuard` / `computeUnlockState` / `computeSkipFollowup`）、21日レポートは `src/lib/standalone-report.ts` + `standalone_reports` テーブル、スキップ記録は `skip_reasons` テーブル（migration: `20260610_standalone_mode_schema.sql`）。途中メモ（ホーム右上「＋」の中身。2026-08-18 定例・太田さん FB）は `src/lib/quick-notes.ts` + `quick_notes` テーブル（migration: `20260819_quick_notes.sql`）+ `/api/standalone/quick-note`。本人と装置だけが読み、AI分析の素材にも入る（管理者・上司向けの読み取り経路を作らないこと）。
 
@@ -229,7 +231,7 @@ PR タイトル例（リポの履歴に合わせる）:
 |---|---:|---|
 | `mode` 動作モード | 2 | **standalone_mode**（商品版。大幸は非表示&強制OFF）, logform_v2（standalone の上に重ねる入力フォーム刷新版） |
 | `core` | 3 | morningInput / eveningInput / logHistory |
-| `existing` | 15 | energyTracking, mission, streak, badges, animations, reminderMail, managerFeedback, csvExport, otpAuth, managerAnalytics, **dailyQuestions**, **missionOnInput**, **missionLabelIssue**, **coachingProfile**, **coachReply** |
+| `existing` | 16 | energyTracking, mission, streak, badges, animations, reminderMail, managerFeedback, csvExport, otpAuth, managerAnalytics, **dailyQuestions**, **missionOnInput**, **missionLabelIssue**, **coachingProfile**, **coachReply**, **coachPreviousQuestion** |
 | `tier-0` 観の期(KAN のキー) | 10 | kanNoKi / weeklyMirror / bodyPrompt / silenceObservation / peerComparison(.tenant/.crossTenant/.industry/.global) / transitionSignal（reflection-lab 限定・大幸薬品は非表示&強制OFF） |
 | `tier-s` Differentiators | 4 | ruminationDetection, doubleLoopPrompt, weeklyConceptualization, structuredInput |
 | `tier-a` Manager Safety Net | 5 | oneOnOneBriefing, burnoutScore, consultantSpotlight, psychSafetyMonitor, managerSelfReflection |
@@ -300,7 +302,18 @@ PR タイトル例（リポの履歴に合わせる）:
 - **画面の言葉**：参加者の画面の言葉（`COACH_TERMS`）は、2026-11-23 に、いまの文のままで始めると決まった（§10）。運営の画面の言葉（`COACH_BOARD_TERMS`）、お知らせメールの文、AI への指示文は案。説明文（`aboutLines`）には、コードで行っていることだけを書く。評価への利用、消し方、保存の期間は、決まるまで書かない（テストで固定）。
 - AI への指示文と、強い不調などの語の一覧は、サーバー側だけが読み込む（`coach-reply-prompt.ts`）。画面の部品は `coach-reply.ts` だけを読み込む。ビルドのあと、`.next/static` に指示文が入っていないことを確かめた（2026-11-22。管理画面の、参加者 1 人のページに返信を出した 2026-11-23 の変更のあとにも確かめた）。
 - **運営が、1 人の返信を続けて読む場所**（2026-11-23）：管理画面の、参加者 1 人のページの、その日の記入の下（§3）。確認のページは、環境と日付を選んで、その日の全員を見るページ。管理画面トップの「FB履歴」（HM フィードバック）には、AIコーチの返信は出ない。
-- まだ無いもの：翌朝のメールと入力画面に、前回の返信の問いを 1 行出すこと／週のまとめ（`kind='weekly'`。表の値だけ用意）／環境の設定・指示文・お知らせメールの宛先を置く画面／運営が設計図を書く・直す画面／本人への、届いたことの通知（`review` のときは、本人が「FB」のタブを開くまで気づかない）。
+- **前回の問いを、翌朝のメールと入力画面に出す**（`feature.coachPreviousQuestion`。2026-11-23 追加。既定 OFF・`feature.coachReply` に依存。「全機能ON」のプリセットには含めない）：
+  - 出すもの：前回の、届いた毎日の返信の、最後の段落（「あした確かめること」の問い）。**新しく AI に送るものは無い**（すでに本人に届いた文を、もう一度見せるだけ）。
+  - 出す場所：朝のリマインドメール（問いを載せたメールの、「あなたの設計図から」の枠の下。見出しは「前回のAIコーチの問い（1/6 の記入への返信から）」）と、入力画面の問いの上（`CoachPreviousQuestionCard`。朝・夕とも。設計図の枠の下。「返信の全文を読む」＝「FB」のタブへのリンク）。夕方のメールには載せない。
+  - 「前回」の選び方は、AI に渡す前回の問いと同じ（その日より前の、届いた毎日の返信のうち、いちばん新しいもの。`getPreviousDeliveredReply()`／環境の全員分は `getLatestDeliveredRepliesForTenant()`）。切り方も同じ関数（`lastParagraph()`。`coach-reply.ts` に置き、`coach-reply-prompt.ts` は、そこから読み直して渡している）。環境の全員分は、1 回で 1,000 行まで読む（`LATEST_REPLIES_ROW_CAP`。7 日分なら、約 140 人まで）。上限に届いたときは、警告を記録する（古い日の返信しか無い人の分が、朝のメールに載らないことがある。入力画面は 1 人ずつ読むので、影響しない）。
+  - 出してよいかは `coach-previous-question.ts` が決める（入力画面の 1 人分＝`loadPreviousCoachQuestion()`、朝のメールの環境の全員分＝`loadPreviousCoachQuestionsForTenant()`）。条件は、次のすべて：アプリ全体の停止が入っていない／その環境でスイッチが ON／その環境で AIコーチの返信が動いている（`getCoachActivation()`）／本人の設計図が確認済み／本人が「受け取らない」にしていない／前回の返信が出せる形（`pickPreviousCoachQuestion()`）。
+  - **入力画面では、読み取りを並べて、開く時間を延ばさない**：データベースの 1 回の読み取りに、0.3〜1 秒かかる（2026-11-23 に、本番の実行の記録で確かめた。サーバーは東京、データベースはシドニー）。順に読むと、入力画面を開くたびに、その回数分だけ待つ。`loadPreviousCoachQuestion()` は、スイッチまでを確かめたあと、残りの 3 つ（動いているか・受け取りの設定・前回の返信）を並べて読む（条件に合わなければ、読んだ返信は使わない）。ページ（`input/page.tsx`）は、この読み取りを、設計図の読み取りのあとで始め、ミッションの読み取りのあとで待つ（`page.coach-question.test.ts` で固定）。入力画面のサーバー側に読み取りを足すときは、順に待つ読み取りを増やさない。朝のメールの環境の全員分（定時処理）は、環境を確かめてから読む。
+  - **実行の記録**：朝のリマインドの実行の記録（`cron_runs` の detail）に、問いを載せて送れたメールの数（`previousQuestionMails`）を残す（だれのメールに載せたか・問いの文は、残さない）。サーバーの記録は 1 時間で消えるので、あとから確かめるときは、この数を見る。
+  - 出せる形（`pickPreviousCoachQuestion()`）：届いた（`delivered`）毎日の返信で、今日より前・7 日以内（`COACH_PREVIOUS_QUESTION_MAX_AGE_DAYS`。古い問いを、毎朝出し続けない）。段落が 2 つ以上あり、最後の段落が 200 字以内（`COACH_PREVIOUS_QUESTION_MAX_CHARS`。段落が 1 つだけの返信と、長すぎる段落は出さない＝途中で切った問いを見せない）。確認待ち・取り下げ済みの返信からは出さない。
+  - **読めなかったときは、出さない**（失敗は、読み取りの側が記録する。記入の画面と朝のメールは止めない）。朝のメールで、受け取らない人の一覧を読めなかったときは、だれの分も載せない（受け取らない人に、誤って載せないため）。
+  - 出さない人のメールと画面の HTML は、これまでと同じ（テストで固定。朝のメールの呼び出しは、問いが無いときは `coachQuestion` のキーごと足さない）。
+  - 説明：この機能が ON の環境では、設計図のページの「AIコーチについて」に、1 行足す（`COACH_TERMS.aboutLinePreviousQuestion`。届いた返信の文が、メールにも載ることを書く。問いは 200 字までで 1 行とは限らず、次の返信が届くか 7 日たつまで出るので、「何行で」「いつまで」は書いていない）。OFF の環境の説明は、これまでと同じ。
+- まだ無いもの：週のまとめ（`kind='weekly'`。表の値だけ用意）／環境の設定・指示文・お知らせメールの宛先を置く画面／運営が設計図を書く・直す画面／本人への、届いたことの通知（`review` のときは、本人が「FB」のタブを開くまで気づかない）。
 
 保存形式: テナント毎に `ai_settings.value` 行（`tenant_id`, `key='feature_flags'`, `value=JSON`）。flat shape（`{flagKey: bool}`）が現行、legacy nested shape（`{default: {...}}`）は読み取り側で互換維持。
 
@@ -314,7 +327,7 @@ PR タイトル例（リポの履歴に合わせる）:
 3. 飾りフラグ（UI に出るがコードに繋がっていない）禁止
 4. **新しいカテゴリ（`tier-*` 等）を追加する場合は、同一 PR で `src/app/a/[token]/features/page.tsx` の `FlagCategory` 型 / `CATEGORY_META` / `CATEGORY_ORDER` を 1:1 で更新する。** 未更新だと features ページのグルーピングで `grouped[未知カテゴリ]` が undefined となり `undefined.push` で白画面クラッシュする（2026-06-02 / PR #30 の事故）。グルーピングは `(grouped[cat] ??= []).push(f)` で動的初期化し、未知カテゴリでも落ちない構造を保つこと。
 
-参考：core-log-engineer SKILL.md は「660 行・28 機能・7 ティア」と古い数値を持っている。**現状の真実は 58 機能・12 カテゴリ（2026-11-22）**。スキル本文の数値より、このリポの `src/lib/feature-flags.ts` を信用する。
+参考：core-log-engineer SKILL.md は「660 行・28 機能・7 ティア」と古い数値を持っている。**現状の真実は 59 機能・12 カテゴリ（2026-11-23）**。スキル本文の数値より、このリポの `src/lib/feature-flags.ts` を信用する。
 
 ---
 
@@ -401,6 +414,7 @@ PR タイトル例（リポの履歴に合わせる）:
     - **AI に渡すのは `buildCoachUserPrompt()` が組み立てるものだけ。** 足すときは、本人が設計図の画面で見られるものか、その日の記入に限る（§8 項目 13）。氏名・メールアドレス・ID、ほかの日の記入のまとめ、運営だけが持つ資料を足さない。足したら、`coachInputsUsed()` と、説明文（`COACH_TERMS.aboutLines`）も同じ変更で直す。
     - **本人が「受け取らない」にした人、設計図が確認前の人、商品モードの環境、観の期の記入には、AI を呼ばない。** 返してよいかは `decideCoachEligibility()` と `ensureCoachReply()` で決める。別の入口（定時処理、運営の操作）から作るときも、同じ関数を通す。
     - **確認待ち・取り下げ済みの返信の文を、本人に返さない**（`toParticipantView()`）。本人の分は、トークンから引いた参加者 ID とテナント ID で選ぶ。
+    - **本人あての朝のリマインドメールと、入力画面に出す AIコーチの文は、前回の届いた返信の、最後の段落だけ**（`feature.coachPreviousQuestion`。2026-11-23。`pickPreviousCoachQuestion()`）。返信の全文、確認待ち・取り下げ済みの返信の文、ほかの人の返信を載せない。出してよいかは、`coach-previous-question.ts` を通して決める（アプリ全体の停止・スイッチ・`getCoachActivation()`・設計図が確認済み・「受け取らない」にしていない）。「受け取らない」にした人には、前に届いた問いも、メールと入力画面には出さない（「FB」のタブには残る）。メールに載せる範囲を広げるときは、設計図のページの説明（`COACH_TERMS.aboutLinePreviousQuestion`）も同じ変更で直す。
     - **運営の確認ページを読めるのは、記入を読める人と同じ範囲**（管理者と閲覧者。`coachBoardRole()`）。操作は管理者（`is_admin`）だけ。対象の行の環境（`tenant_id`）を先に引き、その環境で絞って更新する。上司の画面（`/m/[token]`）に、返信を出す経路を作らない。
     - **運営が返信を読む場所は 2 つだけ**：確認のページと、管理画面の、参加者 1 人のページ（2026-11-23。その日の記入の下。§3）。どちらも、開けるのは管理者と閲覧者。参加者 1 人のページは、その環境で動いているとき（`getCoachActivation()`）だけ、参加者の ID と環境で絞って読む。商品モードの環境では読まない。観の期の記入は出ないので、返信も出ない。操作（届ける・取り下げる）は置かない。
     - **記入の文・AI に渡した文・返ってきた文を、ログに残さない**（残すのは、参加者 ID、モデル、トークン数、失敗の種類）。
@@ -467,7 +481,8 @@ PR タイトル例（リポの履歴に合わせる）:
     - 送信に失敗したときは、送信サービスが返した文を、ほかのメールと同じく記録に残す（その文にアドレスが入ることがあるかは、確かめていない）
   - 管理画面の「AI下書き」は、本人が AIコーチを「受け取らない」にしていても、管理者がボタンを押すと、その人の記入を AI に送る（別の機能）。説明文は AIコーチの分だけを書いている
   - 1 人が「作って」と頼める回数の制限（10 分に 6 回）は、サーバーの 1 台ごとに数える目安。AI の応答が使えなかったとき（長すぎる、途中で切れた）は、保存せずに失敗を返すので、本人が開き直すたびに AI を呼び直す
-  - 翌朝のメールと入力画面に前回の返信の問いを出すこと、週のまとめ、環境の設定・指示文・お知らせメールの宛先を置く画面、運営が設計図を書く・直す画面は、まだ無い（§5。運営が設計図を読む画面は、2026-11-23 に、管理画面の、参加者 1 人のページに置いた。§3）
+  - 週のまとめ、環境の設定・指示文・お知らせメールの宛先を置く画面、運営が設計図を書く・直す画面は、まだ無い（§5。運営が設計図を読む画面は、2026-11-23 に、管理画面の、参加者 1 人のページに置いた。§3。前回の返信の問いを、翌朝のメールと入力画面に出す部分は、2026-11-23 に作った＝`feature.coachPreviousQuestion`。§5）
+  - 前回の問い（`feature.coachPreviousQuestion`）で、決まっていないこと・確かめていないこと（2026-11-23）：画面とメールの言葉（「前回のAIコーチの問い」「◯/◯ の記入への返信から」「返信の全文を読む」、説明の 1 行）は案。出す期間（7 日）と、長さの上限（200 字）は、返信が 1 件しか無い時点で決めた値。載せる・載せないの決まり、メールの HTML、環境の全員分の読み取りの絞り込み（`coach-reply-store.previous-question.test.ts`）、朝のリマインドの呼び出し（`api/cron/remind/route.previous-question.test.ts`）、入力画面・設計図のページのサーバー側（それぞれの `page.coach-question.test.ts`）は、テストで確かめている（どれも、データベースとメールの送信は、作り物に差し替えている）。実際のデータベースへの問い合わせと、実際のメールの送信は、まだ動かしていない（スイッチを ON にした環境の、次の朝が最初。列の名前と型は、2026-11-23 に、同じ絞り込みの SQL で確かめた）
 - **設計図とイシューで、行動を書く欄が重なっている**（2026-11-22）：「これからの行動」を書く欄が、イシューの設定フォーム（「目指す状態と、これからの行動」。イシューごと）と、設計図（「これからの行動」「期待する結果と、確かめ方」。1 人に 1 つ）の両方にある。設計図のページでは、いまのイシューを先頭に出し、この 2 つの欄を「このイシューに向けた行動」としてまとめて見せている（§5）。イシューを新しく設定しても、設計図の欄は書き換わらない（設定した直後に、見直しを案内する）。行動と期待する結果を、イシューごとに持つ形に変えるかは未決
 - **設計図のページで、ブラウザの「戻る」を使うと、保存していない変更が確認なしで消える**（ページの中のリンクと、再読み込み・タブを閉じる操作は、離れる前に確かめる。§5。2026-11-22）。離れる前の確認は、実際のブラウザでの動きを、テストでは確かめられていない（この環境のテストは DOM なし）
 - **氏名で引く読み取りは、読めなかったときに、記録して空の配列を返す**（2026-11-23 コード確認）：`getLogsByParticipant()` / `getMissionsByParticipant()` / `getFeedbackByParticipant()`。呼び出し側は、「読めなかった」と「0 件」を分けられない。管理画面の、参加者 1 人のページは、この場合「まだ記入がありません」と出る（例外が出たときだけ、先頭に「一部を読み込めませんでした」と出す。§3）。直すときは、共有関数の呼び出し元をすべて確認する（参加者 ID で引く `getMissionsByParticipantId()` は、読めなかったときに `null` を返す）

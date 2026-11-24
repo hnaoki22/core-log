@@ -16,6 +16,9 @@ import { getReminderQuestionsForTenant } from "@/lib/entry-question-env";
 import { isUsableProfile, type CoachingProfile } from "@/lib/coaching-profile";
 import { getCoachingProfilesForTenant } from "@/lib/coaching-profile-store";
 import { ISSUE_HYPOTHESIS_LABEL, missionTerms, parseIssuePurpose, selectActiveMissions } from "@/lib/mission-context";
+import type { PreviousCoachQuestion } from "@/lib/coach-reply";
+import { loadPreviousCoachQuestionsForTenant } from "@/lib/coach-previous-question";
+import { previousQuestionTenantDeps } from "@/lib/coach-previous-question-runtime";
 
 // Vercel Cron secret for authentication
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -89,6 +92,9 @@ export async function GET(request: NextRequest) {
   const results: { name: string; email: string; sent: boolean; skipped?: string }[] = [];
   // 問いを載せたメール（reminder-mail-question.ts）で送った環境の数。実行の記録に残す。
   let questionMailTenants = 0;
+  // 前回の AIコーチの問い（feature.coachPreviousQuestion）を載せて、送れたメールの数。実行の記録に残す
+  // （だれのメールに載せたか・問いの文は、残さない）。
+  let previousQuestionMails = 0;
   try {
     const tenants = await getAllTenants();
 
@@ -134,6 +140,27 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      // 前回の AIコーチの問い（feature.coachPreviousQuestion）。朝のメールにだけ、確認済みの人の分を載せる。
+      // 出してよいか（アプリ全体の停止・スイッチ・AIコーチの返信が動いているか・受け取らない設定・返信の形）は
+      // coach-previous-question.ts が決める。読めなかったときは空の Map（その分を載せずに送る）。
+      // 設計図を読めなかった環境（profiles === null）では、読まない。
+      let coachQuestions = new Map<string, PreviousCoachQuestion>();
+      if (type === "morning" && profiles) {
+        coachQuestions = await loadPreviousCoachQuestionsForTenant(
+          previousQuestionTenantDeps,
+          { tenantId: tenant.id, today: todayStr },
+          (detail) => logger.error("Reminder: previous coach question read failed", { tenantId: tenant.id, error: detail })
+        );
+        if (coachQuestions.size > 0) {
+          // 出せる問いがある人の数。実際に載せて送れた数は、最後に previousQuestionMails で残す
+          // （朝の記入を済ませた人・設計図が確認前の人には、メールに載らない）。
+          logger.info("Reminder: previous coach questions available for this tenant", {
+            tenantId: tenant.id,
+            available: coachQuestions.size,
+          });
+        }
+      }
+
       for (const p of activeParticipants) {
         try {
           // Check startDate: skip if today is before participant's start date
@@ -170,6 +197,7 @@ export async function GET(request: NextRequest) {
             | {
                 profile: CoachingProfile | null;
                 issue: { label: string; title: string; hypothesisLabel: string; hypothesis: string | null } | null;
+                coachQuestion?: PreviousCoachQuestion | null;
               }
             | undefined;
           if (profiles) {
@@ -188,7 +216,11 @@ export async function GET(request: NextRequest) {
                 };
               }
             }
-            personal = { profile, issue };
+            // 前回の問いは、朝のメールで、設計図が確認済みの人にだけ載せる（確認前の人の分は、もともと作られない）。
+            const coachQuestion =
+              reminderType === "morning" && isUsableProfile(profile) ? coachQuestions.get(p.id) ?? null : null;
+            // 無いときは、キーごと足さない（これまでの呼び出しと同じ形のまま）。
+            personal = coachQuestion ? { profile, issue, coachQuestion } : { profile, issue };
           }
 
           const sent = await sendReminderEmail({
@@ -199,6 +231,7 @@ export async function GET(request: NextRequest) {
             questions: slotQuestions,
             personal,
           });
+          if (sent && personal?.coachQuestion) previousQuestionMails++;
 
           results.push({ name: p.name, email: p.email, sent });
         } catch (error) {
@@ -210,13 +243,19 @@ export async function GET(request: NextRequest) {
 
     const sentCount = results.filter((r) => r.sent).length;
 
-    logger.info("Reminder emails sent", { type, date: todayStr, totalParticipants: results.length, sentCount });
+    logger.info("Reminder emails sent", {
+      type,
+      date: todayStr,
+      totalParticipants: results.length,
+      sentCount,
+      previousQuestionMails,
+    });
 
     // Release lock with success status (captures completion time + counts for heartbeat)
     await releaseCronLock(lock.lockId, "success", {
       participantsProcessed: results.length,
       emailsSent: sentCount,
-      detail: { lockMethod: lock.method, jstHour, questionMailTenants },
+      detail: { lockMethod: lock.method, jstHour, questionMailTenants, previousQuestionMails },
     });
 
     return NextResponse.json({

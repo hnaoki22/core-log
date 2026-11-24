@@ -44,6 +44,11 @@ export default async function BlueprintPageServer({
     if (activation.ok && activation.active) {
       const optIn = await getCoachOptIn(participant.id, participant.tenantId);
       coach = optIn.ok ? { optIn: optIn.enabled, loadFailed: false } : { optIn: null, loadFailed: true };
+      // 前回の問いを、翌朝のメールと記入画面に出している環境では、そのことを説明に 1 行足す
+      // （スイッチが OFF の環境の説明は、これまでと同じ。キーごと足さない）。
+      if (await isFeatureEnabled("feature.coachPreviousQuestion", participant.tenantId)) {
+        coach = { ...coach, previousQuestion: true };
+      }
     }
   }
 

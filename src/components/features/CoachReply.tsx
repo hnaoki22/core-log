@@ -3,6 +3,7 @@
 // 「AIコーチの返信」を、本人の画面に出す部品（feature.coachReply）。
 //
 // - CoachReplyCard   : 1 件の返信（表示だけ）。届いた返信は文を、確認待ちは案内だけを出す。
+// - CoachPreviousQuestionCard : 入力画面の問いの上に置く、前回の問い（表示だけ。feature.coachPreviousQuestion）。
 // - CoachReplyPanel  : 記入の完了の画面に置く。その日の記入への返信を出す。まだ無ければ、作ってもらう。
 // - CoachReplyList   : 「FB」のタブに置く。これまでの返信の一覧。開いたときに、
 //                      まだ返信の無い記入（今日か前日）があれば、作ってもらう。
@@ -14,8 +15,9 @@
 //   AI が記入を読んでいるかのような表示を出さない。
 // 文言は coach-reply.ts の COACH_TERMS。
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { COACH_TERMS, formatReplyDate, type CoachReplyView } from "@/lib/coach-reply";
+import { COACH_TERMS, formatReplyDate, type CoachReplyView, type PreviousCoachQuestion } from "@/lib/coach-reply";
 
 type Shown = Exclude<CoachReplyView, { state: "none" }>;
 
@@ -43,6 +45,37 @@ export function CoachReplyCard({ view }: { view: Shown }) {
       ) : (
         <p className="text-xs text-[#5B5560] leading-relaxed">{COACH_TERMS.pending}</p>
       )}
+    </div>
+  );
+}
+
+/**
+ * 前回の AIコーチの問い（入力画面の問いの上。feature.coachPreviousQuestion）。表示だけ・API は呼ばない。
+ * 出してよいかは、サーバーが決めて渡す（coach-previous-question.ts）。届いた返信の、最後の段落だけを出す。
+ */
+export function CoachPreviousQuestionCard({
+  question,
+  feedbackPageHref,
+}: {
+  question: PreviousCoachQuestion;
+  /** 「FB」のタブ（/p/<token>/feedback）の URL。返信の全文を読む先。 */
+  feedbackPageHref: string;
+}) {
+  return (
+    <div className="bg-white border border-[#EFE8DD] p-4 rounded-2xl text-left">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 mb-1.5">
+        <p className="text-[10px] text-[#8B8489] font-medium tracking-wide">{COACH_TERMS.previousQuestionLabel}</p>
+        <p className="text-[10px] text-[#8B8489] whitespace-nowrap">
+          {COACH_TERMS.previousQuestionFrom(formatReplyDate(question.replyDate))}
+        </p>
+      </div>
+      <p className="text-sm text-[#2C2C4A] leading-relaxed whitespace-pre-wrap break-words">{question.text}</p>
+      <Link
+        href={feedbackPageHref}
+        className="inline-block mt-2 text-[11px] font-medium text-[#1A1A2E] underline underline-offset-2"
+      >
+        {COACH_TERMS.previousQuestionLink}
+      </Link>
     </div>
   );
 }

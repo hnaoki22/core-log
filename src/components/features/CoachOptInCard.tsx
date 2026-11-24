@@ -22,7 +22,13 @@ export function CoachOptInView({
   saving = false,
   message = null,
   onChoose,
+  previousQuestionOn = false,
 }: {
+  /**
+   * 前回の問いを、翌朝のメールと記入画面に出している環境か（feature.coachPreviousQuestion）。
+   * true のときだけ、そのことを説明に 1 行足す（行っていないことを、説明に書かない）。
+   */
+  previousQuestionOn?: boolean;
   /** 設計図の行があるか（確認前でもよい）。無いときは、ボタンを出さない。 */
   hasProfile: boolean;
   /** いまの設定を読めなかった。ボタンを出さない（違う設定を出して、押し間違えないように）。 */
@@ -42,6 +48,9 @@ export function CoachOptInView({
               {line}
             </li>
           ))}
+          {previousQuestionOn && (
+            <li className="text-[11px] text-[#5B5560] leading-relaxed">{COACH_TERMS.aboutLinePreviousQuestion}</li>
+          )}
         </ul>
       </div>
 
@@ -97,12 +106,15 @@ export function CoachOptInCard({
   hasProfile,
   initialOptIn,
   loadFailed = false,
+  previousQuestionOn = false,
 }: {
   token: string;
   hasProfile: boolean;
   /** いまの設定。設計図の行がまだ無いときは null（行ができたときの初期値は「受け取る」）。 */
   initialOptIn: boolean | null;
   loadFailed?: boolean;
+  /** 前回の問いを、翌朝のメールと記入画面に出している環境か（説明に 1 行足す）。 */
+  previousQuestionOn?: boolean;
 }) {
   const [optIn, setOptIn] = useState<boolean>(initialOptIn ?? true);
   const [saving, setSaving] = useState(false);
@@ -135,6 +147,7 @@ export function CoachOptInCard({
 
   return (
     <CoachOptInView
+      previousQuestionOn={previousQuestionOn}
       hasProfile={hasProfile}
       loadFailed={loadFailed}
       optIn={optIn}

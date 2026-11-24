@@ -16,6 +16,10 @@ import { getTodayQuestionsForTenant, getTodayDayKey, getWeeklyForTenant } from "
 import { isEntryQuestionEnv } from "@/lib/entry-terms";
 import { toCardData, withPersonalEveningQuestion, type CoachingProfileCardData } from "@/lib/coaching-profile";
 import { getCoachingProfile } from "@/lib/coaching-profile-store";
+import type { PreviousCoachQuestion } from "@/lib/coach-reply";
+import { loadPreviousCoachQuestion } from "@/lib/coach-previous-question";
+import { previousQuestionParticipantDeps } from "@/lib/coach-previous-question-runtime";
+import { logger } from "@/lib/logger";
 import InputClient, { type InputPageInitialData } from "./InputClient";
 import StandaloneInputClient, { type PrevDayRecord } from "./StandaloneInputClient";
 import { gaugesToRaws } from "@/lib/condition-gauges";
@@ -217,6 +221,30 @@ export default async function InputPageServer({
     }
   }
 
+  // 前回の AIコーチの問い（feature.coachPreviousQuestion）。設計図が確認済みの人の分だけ読む。
+  // null = 出さない（スイッチ OFF／AIコーチの返信が動いていない／受け取らない設定／出せる前回の問いが無い／
+  // 読めなかった）。出してよいかは coach-previous-question.ts が決める。記入のフローは止めない。
+  // ここでは読み取りを始めるだけで、待つのは、下のミッションの読み取りのあと（2 つを並べて進め、
+  // 入力画面を開く時間を延ばさないため）。この読み取りは例外を外に出さない（失敗は記録して null）。
+  let coachQuestionRead: Promise<PreviousCoachQuestion | null> = Promise.resolve(null);
+  if (
+    participant.tenantId &&
+    flagMap["feature.coachPreviousQuestion"] === true &&
+    initialCoachingProfile?.state === "confirmed"
+  ) {
+    const tenantIdForCoach = participant.tenantId;
+    coachQuestionRead = loadPreviousCoachQuestion(
+      previousQuestionParticipantDeps,
+      { participantId: participant.id, tenantId: tenantIdForCoach, today, profileUsable: true },
+      (detail) =>
+        logger.error("input page: previous coach question read failed", {
+          participantId: participant.id,
+          tenantId: tenantIdForCoach,
+          error: detail,
+        })
+    );
+  }
+
   const initialDailyQuestions = {
     enabled: dailyQuestionsFlagOn && dailyQuestionsHasData,
     morning: dailyQ?.morning ?? [],
@@ -251,6 +279,9 @@ export default async function InputPageServer({
     initialMissions = allMissions === null ? null : selectActiveMissions(allMissions);
   }
 
+  // 上で始めた、前回の AIコーチの問いの読み取りを、ここで待つ。
+  const initialCoachQuestion = await coachQuestionRead;
+
   const initialData: InputPageInitialData = {
     participant: {
       name: participant.name,
@@ -267,6 +298,7 @@ export default async function InputPageServer({
     initialMissions,
     initialEntryQuestionEnv,
     initialCoachingProfile,
+    initialCoachQuestion,
   };
 
   const tDone = Date.now();

@@ -54,6 +54,22 @@ function questionsHtml(questions: readonly string[], personalQuestion: string | 
   return parts.join("\n          ");
 }
 
+/**
+ * 前回の AIコーチの問いの枠（朝。確認済みの人で、前回の問いがあるときだけ。feature.coachPreviousQuestion）。
+ * 無ければ ""（その人のメールは、これまでと同じ HTML になる）。
+ * 載せるのは、すでに本人に届いた返信の、最後の段落だけ。
+ */
+function coachQuestionHtml(personal: ReminderPersonal): string {
+  const q = personal.coachQuestion;
+  if (!q || q.text.trim() === "") return "";
+  const text = escapeHtml(q.text.trim()).replace(/\r?\n/g, "<br>");
+  return `
+        <div style="border: 1px solid #E5DCD0; border-radius: 8px; padding: 14px 20px; margin: 16px 0;">
+          <p style="margin: 0 0 8px; font-size: 12px; color: #888;">${escapeHtml(q.label)}</p>
+          <p style="margin: 0; line-height: 1.7;">${text}</p>
+        </div>`;
+}
+
 /** 「あなたの設計図から」の枠（朝。確認済みの人だけ）と、確認のお願い（朝。確認前の人）。無ければ ""。 */
 function personalBlockHtml(personal: ReminderPersonal | null | undefined): string {
   if (!personal) return "";
@@ -68,7 +84,7 @@ function personalBlockHtml(personal: ReminderPersonal | null | undefined): strin
         <div style="border: 1px solid #E5DCD0; border-radius: 8px; padding: 14px 20px 6px; margin: 16px 0;">
           <p style="margin: 0 0 8px; font-size: 12px; color: #888;">${escapeHtml(COACHING_TERMS.mailLinesHeading)}</p>
           ${rows}
-        </div>`;
+        </div>${coachQuestionHtml(personal)}`;
   }
   if (personal.confirmPrompt) {
     return `

@@ -13,8 +13,9 @@ import { VoiceInputButton } from "@/components/features/VoiceInput";
 import { DailyQuestionsBlock } from "@/components/features/DailyQuestionsBlock";
 import { MissionContextCard } from "@/components/features/MissionContextCard";
 import { CoachingProfileCard } from "@/components/features/CoachingProfileCard";
-import { CoachReplyPanel } from "@/components/features/CoachReply";
+import { CoachPreviousQuestionCard, CoachReplyPanel } from "@/components/features/CoachReply";
 import type { CoachingProfileCardData } from "@/lib/coaching-profile";
+import type { PreviousCoachQuestion } from "@/lib/coach-reply";
 import { missionTerms, type MissionContextItem } from "@/lib/mission-context";
 import { entryTerms, entrySubheading } from "@/lib/entry-terms";
 import { answersOnly } from "@/lib/daily-question-answers";
@@ -69,6 +70,9 @@ export type InputPageInitialData = {
   // 問いの上に出す、本人の設計図の「毎朝の一文」（feature.coachingProfile）。
   // null・未指定 = 出さない（スイッチが OFF、または読めなかった）。
   initialCoachingProfile?: CoachingProfileCardData | null;
+  // 問いの上に出す、前回の AIコーチの問い（feature.coachPreviousQuestion）。
+  // null・未指定 = 出さない（出してよいかは、サーバーが決める。coach-previous-question.ts）。
+  initialCoachQuestion?: PreviousCoachQuestion | null;
   // 問いの上に出す、本人の進行中のミッション（feature.missionOnInput）。
   // null = 出さない（スイッチが OFF、または読めなかった）。[] = 未設定（設定先への案内を出す）。
   initialMissions: MissionContextItem[] | null;
@@ -542,6 +546,14 @@ export default function InputPage({ token, initialData }: Props) {
               <CoachingProfileCard
                 data={initialData.initialCoachingProfile}
                 profilePageHref={`/p/${token}/blueprint`}
+              />
+            )}
+
+            {/* 前回の AIコーチの問い（朝・夕とも。次の返信が届くまで）。出してよいかは、サーバーが決めて渡す。 */}
+            {isOn("feature.coachPreviousQuestion") && initialData.initialCoachQuestion != null && (
+              <CoachPreviousQuestionCard
+                question={initialData.initialCoachQuestion}
+                feedbackPageHref={`/p/${token}/feedback`}
               />
             )}
 

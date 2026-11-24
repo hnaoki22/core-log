@@ -129,3 +129,67 @@ describe("sendReminderEmail：問いを渡したとき（問いを出してい�
     expect(mail.subject).toBe("【CORE Log】おはようございます！今日の意図を記入しましょう");
   });
 });
+
+// 前回の AIコーチの問い（feature.coachPreviousQuestion）。出してよいかは、呼び出し側が決めて渡す。
+describe("sendReminderEmail：前回の AIコーチの問い", () => {
+  // 確認済みの設計図（合成データ）。
+  const PROFILE = {
+    headline: "最初に、相手の困りごとを一つ聞く",
+    growthTheme: "",
+    actions: "",
+    expected: "",
+    stallPoints: "",
+    eveningQuestion: "",
+    tendencies: [],
+    status: "confirmed",
+    confirmedAt: "2026-01-05T00:00:00Z",
+    updatedAt: "2026-01-05T00:00:00Z",
+  } as unknown as Parameters<typeof sendReminderEmail>[0]["personal"] extends infer P
+    ? P extends { profile: infer Q }
+      ? Q
+      : never
+    : never;
+  const QUESTION = { text: "あした、だれに、何を確かめますか。", replyDate: "2026-01-06" };
+
+  async function sendPersonal(
+    type: ReminderType,
+    questions: string[],
+    coachQuestion?: typeof QUESTION | null
+  ): Promise<Sent> {
+    const ok = await sendReminderEmail({
+      to: "sample@example.test",
+      participantName: "見本",
+      token: "tok_synthetic",
+      type,
+      questions,
+      personal: { profile: PROFILE, issue: null, ...(coachQuestion === undefined ? {} : { coachQuestion }) },
+    });
+    expect(ok).toBe(true);
+    return sent[sent.length - 1];
+  }
+
+  it("朝：渡された問いを、見出し（どの日の記入への返信か）つきで載せる", async () => {
+    const mail = await sendPersonal("morning", Q_MORNING, QUESTION);
+    expect(mail.html).toContain("前回のAIコーチの問い（1/6 の記入への返信から）");
+    expect(mail.html).toContain("あした、だれに、何を確かめますか。");
+  });
+
+  it("渡されなかったとき（キーなし・null）の朝のメールは、同じ HTML（これまでと変わらない）", async () => {
+    const without = await sendPersonal("morning", Q_MORNING);
+    const withNull = await sendPersonal("morning", Q_MORNING, null);
+    expect(without.html).not.toContain("前回のAIコーチの問い");
+    expect(withNull.html).toBe(without.html);
+  });
+
+  it("夕方のメールには、渡されても載せない", async () => {
+    const mail = await sendPersonal("evening", Q_EVENING, QUESTION);
+    expect(mail.html).not.toContain("前回のAIコーチの問い");
+    expect(mail.html).not.toContain("あした、だれに、何を確かめますか。");
+  });
+
+  it("問いを出していない環境（従来のメール）には、載らない", async () => {
+    const mail = await sendPersonal("morning", [], QUESTION);
+    expect(mail.subject).toBe("【CORE Log】おはようございます！今日の意図を記入しましょう");
+    expect(mail.html).not.toContain("前回のAIコーチの問い");
+  });
+});
